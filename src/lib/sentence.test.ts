@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   containsChinese,
   createWordDiff,
+  extractCurrentParagraph,
   extractLatestSentence,
   getCurrentParagraph,
   getPreviousContext,
+  replaceRange,
   replaceLatestSentence,
 } from "./sentence";
 
@@ -83,6 +85,29 @@ describe("latest sentence utilities", () => {
     const text = "Para one.\n\nPara two starts. Latest sentence";
     const range = extractLatestSentence(text);
     expect(getCurrentParagraph(text, range.start)).toBe("Para two starts. Latest sentence");
+  });
+
+  it("extracts the paragraph at the cursor and returns a replacement range", () => {
+    const text = "First paragraph.\n\nSecond paragraph first sentence.\nSecond paragraph second sentence.\n\nThird paragraph.";
+    const cursor = text.indexOf("second sentence");
+    const range = extractCurrentParagraph(text, cursor);
+
+    expect(range.paragraph).toBe("Second paragraph first sentence.\nSecond paragraph second sentence.");
+    expect(replaceRange(text, range, "Revised second paragraph.")).toBe(
+      "First paragraph.\n\nRevised second paragraph.\n\nThird paragraph.",
+    );
+  });
+
+  it("falls back to the latest non-empty paragraph when cursor information is unavailable", () => {
+    const text = "First paragraph.\n\n  \n\nLatest paragraph without punctuation";
+    const range = extractCurrentParagraph(text);
+
+    expect(range.paragraph).toBe("Latest paragraph without punctuation");
+    expect(text.slice(range.start, range.end)).toBe("Latest paragraph without punctuation");
+  });
+
+  it("returns an empty paragraph range for whitespace-only paragraph checks", () => {
+    expect(extractCurrentParagraph(" \n\n\t ")).toEqual({ paragraph: "", start: 0, end: 0 });
   });
 
   it("creates word-level diff parts", () => {

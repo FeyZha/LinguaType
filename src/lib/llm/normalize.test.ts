@@ -3,7 +3,7 @@ import { normalizeEnhancementResult } from "./normalize";
 import type { EnhanceLatestSentenceResult } from "./types";
 
 const baseResult: EnhanceLatestSentenceResult = {
-  taskType: "english_sentence_polishing",
+  taskType: "english_polish",
   originalSentence: "Social media 影响年轻人的价值观.",
   finalSentence: "Social media affects young people's values.",
   hasChinese: false,
@@ -18,7 +18,7 @@ describe("enhancement result normalization", () => {
   it("overrides hasChinese and taskType based on latestSentence", () => {
     const result = normalizeEnhancementResult(baseResult, "Social media 影响年轻人的价值观.");
     expect(result.hasChinese).toBe(true);
-    expect(result.taskType).toBe("mixed_sentence_enhancement");
+    expect(result.taskType).toBe("mixed_chinese_rewrite");
   });
 
   it("allows unchanged pure English polishing", () => {
@@ -31,7 +31,7 @@ describe("enhancement result normalization", () => {
       "Online learning is convenient.",
     );
     expect(result.hasChinese).toBe(false);
-    expect(result.taskType).toBe("english_sentence_polishing");
+    expect(result.taskType).toBe("unchanged");
     expect(result.finalSentence).toBe("Online learning is convenient.");
   });
 });

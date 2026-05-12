@@ -4,13 +4,42 @@ import {
   parseModelJson,
   redactApiKey,
 } from "@/lib/json";
-import { buildEnhancementUserPrompt, LINGUATYPE_SYSTEM_PROMPT } from "../prompts";
-import { normalizeEnhancementResult } from "../normalize";
+import {
+  buildFastEnhancementUserPrompt,
+  buildEnhancementUserPrompt,
+  buildLearningExtractionUserPrompt,
+  buildParagraphHealthUserPrompt,
+  buildParagraphFlowUserPrompt,
+  FAST_ENHANCEMENT_SYSTEM_PROMPT,
+  LINGUATYPE_SYSTEM_PROMPT,
+  LEARNING_EXTRACTION_SYSTEM_PROMPT,
+  PARAGRAPH_HEALTH_SYSTEM_PROMPT,
+  PARAGRAPH_FLOW_SYSTEM_PROMPT,
+} from "../prompts";
+import {
+  normalizeEnhancementResult,
+  normalizeFastEnhanceResult,
+  normalizeLearningExtractionResult,
+  normalizeParagraphCheckResult,
+  normalizeParagraphHealthResult,
+} from "../normalize";
 import {
   enhancementResultSchema,
+  fastEnhanceResultSchema,
+  learningExtractionResultSchema,
+  paragraphCheckResultSchema,
+  paragraphHealthResultSchema,
   type ApiConfig,
   type EnhanceLatestSentenceInput,
   type EnhanceLatestSentenceResult,
+  type FastEnhanceInput,
+  type FastEnhanceResult,
+  type LearningExtractionInput,
+  type LearningExtractionResult,
+  type ParagraphCheckInput,
+  type ParagraphCheckResult,
+  type ParagraphHealthInput,
+  type ParagraphHealthResult,
 } from "../types";
 
 type ChatCompletionResponse = {
@@ -73,6 +102,118 @@ export async function enhanceWithOpenAICompatibleProvider(
   return normalizeEnhancementResult(validated.data, input.latestSentence);
 }
 
+export async function enhanceFastWithOpenAICompatibleProvider(
+  input: FastEnhanceInput,
+): Promise<FastEnhanceResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    FAST_ENHANCEMENT_SYSTEM_PROMPT,
+    buildFastEnhancementUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = fastEnhanceResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid fast enhancement response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeFastEnhanceResult(validated.data, input.latestSentence);
+}
+
+export async function extractLearningWithOpenAICompatibleProvider(
+  input: LearningExtractionInput,
+): Promise<LearningExtractionResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    LEARNING_EXTRACTION_SYSTEM_PROMPT,
+    buildLearningExtractionUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = learningExtractionResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid learning extraction response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeLearningExtractionResult(validated.data);
+}
+
+export async function checkParagraphFlowWithOpenAICompatibleProvider(
+  input: ParagraphCheckInput,
+): Promise<ParagraphCheckResult> {
+  const apiConfig = input.apiConfig;
+  assertRealProviderConfig(apiConfig);
+
+  const body: Record<string, unknown> = {
+    model: apiConfig.model,
+    temperature: apiConfig.temperature,
+    max_tokens: apiConfig.maxTokens,
+    messages: [
+      { role: "system", content: PARAGRAPH_FLOW_SYSTEM_PROMPT },
+      { role: "user", content: buildParagraphFlowUserPrompt(input) },
+    ],
+  };
+
+  if (apiConfig.supportsJsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const response = await fetch(providerUrl(apiConfig), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiConfig.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(redactApiKey(`Provider request failed: ${response.status} ${responseText}`, apiConfig.apiKey));
+  }
+
+  const completion = JSON.parse(responseText) as ChatCompletionResponse;
+  const content = completion.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Provider response did not include message content.");
+  }
+
+  const parsed = parseModelJson(content);
+  const validated = paragraphCheckResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid paragraph flow response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeParagraphCheckResult(validated.data, input.currentParagraph);
+}
+
+export async function checkParagraphHealthWithOpenAICompatibleProvider(
+  input: ParagraphHealthInput,
+): Promise<ParagraphHealthResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    PARAGRAPH_HEALTH_SYSTEM_PROMPT,
+    buildParagraphHealthUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = paragraphHealthResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid paragraph health response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeParagraphHealthResult(validated.data, input.currentParagraph);
+}
+
 export async function testOpenAICompatibleConnection(apiConfig: ApiConfig): Promise<boolean> {
   assertRealProviderConfig(apiConfig);
 
@@ -115,6 +256,50 @@ export async function testOpenAICompatibleConnection(apiConfig: ApiConfig): Prom
     }
     throw error;
   }
+}
+
+async function requestOpenAICompatibleJson(
+  apiConfig: ApiConfig,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
+  assertRealProviderConfig(apiConfig);
+
+  const body: Record<string, unknown> = {
+    model: apiConfig.model,
+    temperature: apiConfig.temperature,
+    max_tokens: apiConfig.maxTokens,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  };
+
+  if (apiConfig.supportsJsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const response = await fetch(providerUrl(apiConfig), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiConfig.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(redactApiKey(`Provider request failed: ${response.status} ${responseText}`, apiConfig.apiKey));
+  }
+
+  const completion = JSON.parse(responseText) as ChatCompletionResponse;
+  const content = completion.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Provider response did not include message content.");
+  }
+
+  return content;
 }
 
 function assertRealProviderConfig(apiConfig: ApiConfig): void {

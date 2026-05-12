@@ -45,6 +45,10 @@ Rules:
 Use versioned localStorage keys:
 - linguatype.apiSettings.v1
 - linguatype.learningHistory.v1
+- linguatype.learningLibrary.v1
+- linguatype.correctionMemory.v1 legacy
+- linguatype.correctionEvents.v1
+- linguatype.paragraphHealthCache.v1
 - linguatype.writingDraft.v1
 
 Editor draft behavior:
@@ -76,7 +80,7 @@ Replacement rules:
 
 The model should return structured JSON only.
 
-The model should produce:
+Legacy `/api/enhance-latest-sentence` may produce the full v0.2 enhancement shape:
 - originalSentence
 - finalSentence
 - taskType
@@ -87,17 +91,32 @@ The model should produce:
 - coherenceRisk
 - learningItems
 
-The model should not return:
+v0.2.1 primary `/api/enhance-fast` must produce only:
+- originalSentence
+- finalSentence
+- explanationZh
+- taskType
+- hasChinese
+
+`/api/enhance-fast` must not return learningItems, corrections, correctionEvents, coherenceRisk, Markdown, HTML, or multiple candidates.
+
+`learningItems` and `correctionEvents` may be generated only by `/api/extract-learning`, and `/api/extract-learning` may run only after the user clicks Apply for the latest sentence suggestion.
+
+For latest-sentence enhancement, the model should not return:
 - Markdown
 - HTML
 - multiple candidate translations
 - full paragraphs
 - essay-level feedback unless explicitly requested later
 
+The full manual paragraph flow route may return the checked current paragraph as `revisedParagraph`, but it must not rewrite the whole article or auto-apply the result.
+
 Server-side normalization:
 1. The server determines hasChinese and taskType from latestSentence using code.
 2. The model may return hasChinese and taskType, but the server must normalize or override inconsistent values.
-3. All model responses must be normalized into EnhanceLatestSentenceResult.
+3. Legacy enhancement responses must be normalized into EnhanceLatestSentenceResult.
+4. Fast enhancement responses must be normalized into FastEnhanceResult.
+5. Learning extraction responses must be normalized into LearningExtractionResult.
 
 Pure-English unchanged output:
 1. If a pure English sentence is already natural and correct, the model may return it unchanged.
@@ -197,6 +216,176 @@ Acceptance cases must cover:
 - empty editor
 - missing API settings
 - invalid model JSON
+
+## v0.2 Scope
+
+LinguaType v0.2 upgrades the product from a latest-sentence enhancer to a stronger writing expression learning assistant.
+
+v0.2 adds:
+- Learning Library upgrade
+- Correction Memory
+- Manual Paragraph Flow Check
+- Intention-based Next Expression Toolbox
+- Enhancement Level
+- Regenerate
+- Copy revised sentence
+
+v0.2 must not change the v0.1 core flow:
+latest sentence -> enhancement -> code diff -> Apply/Cancel -> learning save.
+
+## Paragraph Flow Check
+
+Full Paragraph Flow Check is manual only.
+
+Lightweight Paragraph Health Check may run after Apply for the latest sentence when the current paragraph is long enough. It must not return revisedParagraph, generate a diff, save learning data, or auto-apply changes.
+
+The app may check:
+- repetition
+- transition
+- pronoun reference
+- logic gap
+- sentence order
+- tone consistency
+- weak development
+
+The app must not:
+- auto-rewrite paragraphs
+- score essays
+- rewrite the whole article
+- apply changes without confirmation
+
+## Learning Library
+
+Learning items must support:
+- search
+- filter
+- favorite
+- copy
+- insert
+- delete
+- export
+
+Deduplicate by type + content.
+
+For v0.2, Learning Library deduplicates by type + normalized content.
+Normalized content must at least trim whitespace and compare case-insensitively.
+
+## Correction Memory
+
+Correction Memory is the v0.2 legacy correction signal model. In v0.2.1, new correction signals should be stored as Correction Events and summarized through Writing Habits.
+
+Legacy Correction Memory deduplicates by before + after + type.
+
+Correction Events deduplicate by normalized before + normalized after + type.
+
+Regenerate, Copy revised sentence, Cancel, Paragraph Flow Check, and Paragraph Health Check must not save correction memory or correction events.
+
+## Next Expression Toolbox
+
+Next Expression Toolbox is the v0.2 legacy name. In v0.2.1, the current high-frequency UI is Inline Expression Menu near the editor.
+
+The expression menu must remain intention-based.
+
+The user chooses a writing intention first.
+
+Suggestions must be expression tools, not fixed arguments.
+
+It must not predict the user's next argument, generate a full next sentence from context, or auto-write.
+
+## Enhancement Level
+
+Supported levels:
+- minimal
+- balanced
+- polished
+
+Do not over-polish when minimal or balanced is selected.
+
+Enhancement Level controls rewrite strength:
+- minimal fixes only clear errors and may return unchanged output.
+- balanced fixes errors and clearly unnatural expression.
+- polished may make the sentence smoother or more formal without changing meaning.
+
+Regenerate must reuse the same original sentence, range, context, writing mode, and enhancement level. It must not create a multi-candidate UI and must not save learning data.
+
+Copy revised sentence copies finalSentence only. It must not modify editor text and must not save learning data.
+
+LinguaType v0.2 still uses localStorage only.
+
+Do not implement in v0.2:
+- login
+- database
+- payment
+- Chrome extension
+- cloud sync
+- spaced repetition
+- essay scoring
+- full essay correction
+- auto-writing
+- auto paragraph rewrite
+- multi-candidate translation UI
+- chat bot interface
+
+## v0.2.1 Scope
+
+LinguaType v0.2.1 refines v0.2 by:
+- splitting fast enhancement from learning extraction
+- replacing the Common Issues UI with Writing Habits insights
+- turning Paragraph Flow Check into a non-intrusive Paragraph Health Check after Apply
+- moving the Next Expression Toolbox into an Inline Expression Menu near the editor
+
+v0.2.1 must preserve the core flow:
+latest sentence -> fast enhancement -> code diff -> Apply/Cancel.
+
+Fast Enhancement rules:
+1. Fast Enhancement must not save learning data.
+2. Fast Enhancement returns only the latest sentence suggestion and a short explanation.
+3. Regenerate uses Fast Enhancement and must not create a multi-candidate UI.
+4. Copy revised sentence copies finalSentence only and must not save learning data.
+
+Learning Extraction rules:
+1. Learning Extraction runs only after the user clicks Apply for the latest sentence.
+2. Learning Extraction must not block the editor replacement.
+3. If Learning Extraction fails, do not roll back the applied text.
+4. Learning Library still deduplicates by type + normalized content.
+
+Correction Events and Writing Habits:
+1. Correction Events are the data layer.
+2. Writing Habits are aggregated insights, not raw logs.
+3. Correction Events deduplicate by normalized before + normalized after + type.
+4. Legacy linguatype.correctionMemory.v1 may be migrated to linguatype.correctionEvents.v1, but the old key must not be deleted.
+
+Paragraph Health Check:
+1. Paragraph Health Check runs only after Apply and only when the paragraph is long enough.
+2. Paragraph Health Check must not auto-apply, interrupt writing, score essays, or rewrite the paragraph.
+3. Full Paragraph Flow suggestions require explicit user action.
+4. Apply Paragraph must not save Learning Library data or Correction Events.
+
+Inline Expression Menu:
+1. The Inline Expression Menu must not call the LLM by default.
+2. It must not auto-write paragraphs.
+3. It must not predict or decide user arguments.
+4. It can insert static intention templates and Learning Library expressions at the saved cursor position.
+5. Do not restore "/" trigger.
+
+v0.2.1 still uses localStorage only.
+
+Do not implement in v0.2.1:
+- login
+- database
+- payment
+- Chrome extension
+- cloud sync
+- system input method
+- full essay correction
+- essay scoring
+- automatic continuation
+- automatic paragraph rewrite
+- multi-candidate translation UI
+- chatbot interface
+- large dashboard
+
+Regression rules that must remain true:
 - punctuation-ending latest sentence extraction
 - duplicate sentence replacement by range
 - pure-English unchanged output
@@ -215,9 +404,13 @@ Do not hardcode any single model vendor into product logic.
 
 The product logic should call:
 
-- enhanceLatestSentenceWithLLM(input, apiConfig)
+- enhanceFastWithLLM(input, apiConfig) for v0.2.1 latest-sentence suggestions
+- extractLearningWithLLM(input, apiConfig) after Apply
+- checkParagraphHealthWithLLM(input, apiConfig) for lightweight paragraph health
+- checkParagraphFlowWithLLM(input, apiConfig) for full manual paragraph suggestions
+- enhanceLatestSentenceWithLLM(input, apiConfig) only for legacy compatibility
 
-The provider layer should adapt different APIs and always return the same internal result shape.
+The provider layer should adapt different APIs and always return the same internal result shape for each flow.
 
 Primary provider for v0.1:
 
@@ -248,7 +441,7 @@ Rules:
 9. Send API config to the Next.js API route per request.
 10. Do not persist API keys on the server.
 11. Business logic must not call vendor APIs directly.
-12. All model responses must be normalized into EnhanceLatestSentenceResult.
+12. All model responses must be normalized into the correct internal result shape.
 13. Validate model responses with zod.
 14. supportsJsonMode defaults to false.
 15. Users may enable JSON mode manually in advanced settings.

@@ -10,6 +10,7 @@ describe("enhanceLatestSentenceWithLLM", () => {
       previousContext: "",
       currentParagraph: "Many student believe that AI tools can 提高学习效率.",
       writingMode: "natural",
+      enhancementLevel: "balanced",
       apiConfig: {
         provider: "openai-compatible",
         baseUrl: "",

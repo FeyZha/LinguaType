@@ -1,20 +1,28 @@
 import { containsChinese } from "@/lib/sentence";
-import { normalizeEnhancementResult } from "../normalize";
-import type { EnhanceLatestSentenceInput, EnhanceLatestSentenceResult } from "../types";
+import {
+  createParagraphFingerprint,
+  normalizeEnhancementResult,
+  normalizeFastEnhanceResult,
+  normalizeLearningExtractionResult,
+  normalizeParagraphCheckResult,
+  normalizeParagraphHealthResult,
+} from "../normalize";
+import type {
+  CorrectionDraft,
+  CorrectionEventDraft,
+  EnhanceLatestSentenceInput,
+  EnhanceLatestSentenceResult,
+  FastEnhanceInput,
+  FastEnhanceResult,
+  LearningExtractionInput,
+  LearningExtractionResult,
+  ParagraphCheckInput,
+  ParagraphCheckResult,
+  ParagraphHealthInput,
+  ParagraphHealthResult,
+} from "../types";
 
-type Replacement = {
-  before: string;
-  after: string;
-  type:
-    | "expression_translation"
-    | "grammar"
-    | "word_order"
-    | "collocation"
-    | "tone"
-    | "coherence"
-    | "polishing";
-  reason: string;
-};
+type Replacement = CorrectionDraft;
 
 const REPLACEMENTS: Replacement[] = [
   {
@@ -28,6 +36,18 @@ const REPLACEMENTS: Replacement[] = [
     after: "improve learning efficiency",
     type: "expression_translation",
     reason: "将中文短语转换为常见英文搭配。",
+  },
+  {
+    before: "鎻愰珮瀛︿範鏁堢巼",
+    after: "improve learning efficiency",
+    type: "expression_translation",
+    reason: "Convert the Chinese phrase into natural English.",
+  },
+  {
+    before: "閹绘劙鐝€涳缚绡勯弫鍫㈠芳",
+    after: "improve learning efficiency",
+    type: "expression_translation",
+    reason: "Convert the Chinese phrase into natural English.",
   },
   {
     before: "使用社交媒体",
@@ -85,6 +105,54 @@ const REPLACEMENTS: Replacement[] = [
   },
 ];
 
+export async function enhanceFastWithMockProvider(input: FastEnhanceInput): Promise<FastEnhanceResult> {
+  let finalSentence = input.latestSentence;
+
+  for (const replacement of REPLACEMENTS) {
+    if (finalSentence.includes(replacement.before)) {
+      finalSentence = finalSentence.split(replacement.before).join(replacement.after);
+    }
+  }
+
+  return normalizeFastEnhanceResult(
+    {
+      taskType: containsChinese(input.latestSentence) ? "mixed_chinese_rewrite" : "english_polish",
+      originalSentence: input.latestSentence,
+      finalSentence,
+      explanationZh: finalSentence === input.latestSentence
+        ? "The sentence is already natural."
+        : "Fast enhancement prepared for the latest sentence.",
+      hasChinese: containsChinese(input.latestSentence),
+    },
+    input.latestSentence,
+  );
+}
+
+export async function extractLearningWithMockProvider(
+  input: LearningExtractionInput,
+): Promise<LearningExtractionResult> {
+  const used = REPLACEMENTS.filter(
+    (replacement) =>
+      input.originalSentence.includes(replacement.before) ||
+      input.finalSentence.includes(replacement.after),
+  );
+
+  return normalizeLearningExtractionResult({
+    learningItems: used.slice(0, 3).map((item) => ({
+      type: item.type === "collocation" ? "collocation" : "phrase",
+      content: item.after,
+      chineseMeaning: item.before,
+      usageNote: item.reason,
+    })),
+    correctionEvents: used.map((item) => ({
+      before: item.before,
+      after: item.after,
+      type: mapCorrectionEventType(item),
+      reason: item.reason,
+    })),
+  });
+}
+
 export async function enhanceWithMockProvider(
   input: EnhanceLatestSentenceInput,
 ): Promise<EnhanceLatestSentenceResult> {
@@ -99,11 +167,10 @@ export async function enhanceWithMockProvider(
   }
 
   const result: EnhanceLatestSentenceResult = {
-    taskType: containsChinese(input.latestSentence)
-      ? "mixed_sentence_enhancement"
-      : "english_sentence_polishing",
+    taskType: containsChinese(input.latestSentence) ? "mixed_chinese_rewrite" : "english_polish",
     originalSentence: input.latestSentence,
     finalSentence,
+    explanationZh: finalSentence === input.latestSentence ? "句子已经自然，无需修改。" : "已按当前增强强度修改最新一句。",
     hasChinese: containsChinese(input.latestSentence),
     insertedExpressions: used
       .filter((item) => item.type === "expression_translation")
@@ -125,4 +192,74 @@ export async function enhanceWithMockProvider(
   };
 
   return normalizeEnhancementResult(result, input.latestSentence);
+}
+
+export async function checkParagraphFlowWithMockProvider(
+  input: ParagraphCheckInput,
+): Promise<ParagraphCheckResult> {
+  if (/for example,\s*for example/iu.test(input.currentParagraph)) {
+    const revisedParagraph = input.currentParagraph.replace(/For example,\s*for example,/u, "For example,");
+    return normalizeParagraphCheckResult(
+      {
+        originalParagraph: input.currentParagraph,
+        revisedParagraph,
+        hasIssues: true,
+        issues: [
+          {
+            type: "repetition",
+            original: "For example, for example",
+            suggestion: "For example",
+            reason: "重复使用同一个举例连接表达，删去一次会更自然。",
+          },
+        ],
+        summary: "段落整体清楚，但有重复表达。",
+      },
+      input.currentParagraph,
+    );
+  }
+
+  return normalizeParagraphCheckResult(
+    {
+      originalParagraph: input.currentParagraph,
+      revisedParagraph: input.currentParagraph,
+      hasIssues: false,
+      issues: [],
+      summary: "未发现明显段落连贯问题。",
+    },
+    input.currentParagraph,
+  );
+}
+
+export async function checkParagraphHealthWithMockProvider(
+  input: ParagraphHealthInput,
+): Promise<ParagraphHealthResult> {
+  const hasRepetition = /for example,\s*for example/iu.test(input.currentParagraph);
+  return normalizeParagraphHealthResult(
+    {
+      paragraphFingerprint: createParagraphFingerprint(input.currentParagraph),
+      hasIssues: hasRepetition,
+      issueCount: hasRepetition ? 1 : 0,
+      issueTypes: hasRepetition ? ["repetition"] : [],
+      shortSummaryZh: hasRepetition
+        ? "The paragraph may contain repeated expression."
+        : "Paragraph looks okay.",
+    },
+    input.currentParagraph,
+  );
+}
+
+function mapCorrectionEventType(item: CorrectionDraft): CorrectionEventDraft["type"] {
+  if (item.type === "expression_translation") {
+    return "chinese_transfer";
+  }
+  if (
+    item.type === "word_order" ||
+    item.type === "collocation" ||
+    item.type === "tone" ||
+    item.type === "coherence" ||
+    item.type === "polishing"
+  ) {
+    return item.type;
+  }
+  return "other";
 }

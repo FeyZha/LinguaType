@@ -1,14 +1,45 @@
-import type { ApiConfig, LearningHistoryItem, LearningItem, WritingMode } from "./llm/types";
+import type {
+  ApiConfig,
+  CorrectionDraft,
+  CorrectionEvent,
+  CorrectionEventDraft,
+  CorrectionEventType,
+  CorrectionMemory,
+  LearningItem,
+  LearningItemDraft,
+  LearningItemType,
+  ParagraphHealthCacheItem,
+  ParagraphIssueType,
+  WritingHabitInsight,
+  WritingMode,
+} from "./llm/types";
 
 export const API_SETTINGS_STORAGE_KEY = "linguatype.apiSettings.v1";
 export const LEARNING_HISTORY_STORAGE_KEY = "linguatype.learningHistory.v1";
+export const LEARNING_LIBRARY_STORAGE_KEY = "linguatype.learningLibrary.v1";
+export const CORRECTION_MEMORY_STORAGE_KEY = "linguatype.correctionMemory.v1";
+export const CORRECTION_EVENTS_STORAGE_KEY = "linguatype.correctionEvents.v1";
+export const PARAGRAPH_HEALTH_CACHE_STORAGE_KEY = "linguatype.paragraphHealthCache.v1";
 export const DRAFT_STORAGE_KEY = "linguatype.writingDraft.v1";
+
+type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 export type UpsertLearningItemsOptions = {
   sourceSentence: string;
   writingMode: WritingMode;
   now?: string;
   createId?: () => string;
+};
+
+export type UpsertCorrectionMemoryOptions = UpsertLearningItemsOptions;
+export type UpsertCorrectionEventsOptions = UpsertLearningItemsOptions;
+
+export type LearningLibraryFilters = {
+  query?: string;
+  type?: LearningItemType | "all";
+  writingMode?: WritingMode | "all";
+  favoriteOnly?: boolean;
+  sortBy?: "updatedAt" | "useCount";
 };
 
 export function defaultApiSettings(): ApiConfig {
@@ -25,29 +56,139 @@ export function defaultApiSettings(): ApiConfig {
   };
 }
 
+export function loadLearningLibraryFromStorage(
+  storage: StorageLike,
+  options: { now?: string } = {},
+): LearningItem[] {
+  const storedLibrary = parseArray(storage.getItem(LEARNING_LIBRARY_STORAGE_KEY));
+  if (storedLibrary.length > 0) {
+    return storedLibrary.map((item) => normalizeLearningItem(item, options.now));
+  }
+
+  const legacyHistory = parseArray(storage.getItem(LEARNING_HISTORY_STORAGE_KEY));
+  if (legacyHistory.length === 0) {
+    return [];
+  }
+
+  const migrated = legacyHistory.map((item) => normalizeLearningItem(item, options.now));
+  storage.setItem(LEARNING_LIBRARY_STORAGE_KEY, JSON.stringify(migrated));
+  return migrated;
+}
+
+export function loadCorrectionMemoryFromStorage(storage: StorageLike): CorrectionMemory[] {
+  return parseArray(storage.getItem(CORRECTION_MEMORY_STORAGE_KEY)).map((item) =>
+    normalizeCorrectionMemory(item),
+  );
+}
+
+export function loadCorrectionEventsFromStorage(storage: StorageLike): CorrectionEvent[] {
+  const storedEvents = parseArray(storage.getItem(CORRECTION_EVENTS_STORAGE_KEY));
+  if (storedEvents.length > 0) {
+    return dedupeCorrectionEvents(storedEvents.map((item) => normalizeCorrectionEvent(item)));
+  }
+
+  const legacyMemory = parseArray(storage.getItem(CORRECTION_MEMORY_STORAGE_KEY));
+  if (legacyMemory.length === 0) {
+    return [];
+  }
+
+  const migrated = dedupeCorrectionEvents(
+    legacyMemory.map((item) => normalizeCorrectionEvent({ ...item, type: mapLegacyCorrectionType(item.type) })),
+  );
+  storage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(migrated));
+  return migrated;
+}
+
 export function upsertLearningItems(
-  existing: LearningHistoryItem[],
-  incoming: LearningItem[],
+  existing: LearningItem[],
+  incoming: LearningItemDraft[],
   options: UpsertLearningItemsOptions,
-): LearningHistoryItem[] {
+): LearningItem[] {
   const now = options.now ?? new Date().toISOString();
   const createId = options.createId ?? (() => crypto.randomUUID());
   const byKey = new Map(existing.map((item) => [learningKey(item), item]));
 
   for (const item of incoming) {
+    const normalizedContent = item.content.trim();
+    if (!normalizedContent) {
+      continue;
+    }
+    if (!item.chineseMeaning.trim() && !item.usageNote.trim()) {
+      continue;
+    }
+
     const key = learningKey(item);
     const match = byKey.get(key);
     if (match) {
-      byKey.set(key, { ...match, useCount: match.useCount + 1 });
+      byKey.set(key, {
+        ...match,
+        useCount: match.useCount + 1,
+        updatedAt: now,
+        lastUsedAt: now,
+      });
       continue;
     }
 
     byKey.set(key, {
-      ...item,
       id: createId(),
+      type: item.type,
+      content: normalizedContent,
+      chineseMeaning: item.chineseMeaning,
+      usageNote: item.usageNote,
       sourceSentence: options.sourceSentence,
       writingMode: options.writingMode,
       createdAt: now,
+      updatedAt: now,
+      lastUsedAt: now,
+      useCount: 1,
+      favorite: false,
+      tags: item.tags ?? [],
+      topic: item.topic,
+    });
+  }
+
+  return Array.from(byKey.values());
+}
+
+export function upsertCorrectionMemory(
+  existing: CorrectionMemory[],
+  incoming: CorrectionDraft[],
+  options: UpsertCorrectionMemoryOptions,
+): CorrectionMemory[] {
+  const now = options.now ?? new Date().toISOString();
+  const createId = options.createId ?? (() => crypto.randomUUID());
+  const byKey = new Map(existing.map((item) => [correctionKey(item), item]));
+
+  for (const correction of incoming) {
+    const before = correction.before.trim();
+    const after = correction.after.trim();
+    if (!before || !after || normalizeText(before) === normalizeText(after)) {
+      continue;
+    }
+
+    const key = correctionKey(correction);
+    const match = byKey.get(key);
+    if (match) {
+      byKey.set(key, {
+        ...match,
+        useCount: match.useCount + 1,
+        updatedAt: now,
+        lastUsedAt: now,
+      });
+      continue;
+    }
+
+    byKey.set(key, {
+      id: createId(),
+      before,
+      after,
+      type: correction.type,
+      reason: correction.reason,
+      sourceSentence: options.sourceSentence,
+      writingMode: options.writingMode,
+      createdAt: now,
+      updatedAt: now,
+      lastUsedAt: now,
       useCount: 1,
     });
   }
@@ -55,6 +196,441 @@ export function upsertLearningItems(
   return Array.from(byKey.values());
 }
 
-export function learningKey(item: Pick<LearningItem, "type" | "content">): string {
-  return `${item.type}:${item.content.trim().toLowerCase()}`;
+export function upsertCorrectionEvents(
+  existing: CorrectionEvent[],
+  incoming: CorrectionEventDraft[],
+  options: UpsertCorrectionEventsOptions,
+): CorrectionEvent[] {
+  const now = options.now ?? new Date().toISOString();
+  const createId = options.createId ?? (() => crypto.randomUUID());
+  const byKey = new Map(existing.map((item) => [correctionEventKey(item), item]));
+
+  for (const event of incoming) {
+    const before = event.before.trim();
+    const after = event.after.trim();
+    if (!before || !after || normalizeText(before) === normalizeText(after)) {
+      continue;
+    }
+
+    const key = correctionEventKey(event);
+    const match = byKey.get(key);
+    if (match) {
+      byKey.set(key, {
+        ...match,
+        useCount: match.useCount + 1,
+        updatedAt: now,
+        lastUsedAt: now,
+      });
+      continue;
+    }
+
+    byKey.set(key, {
+      id: createId(),
+      before,
+      after,
+      type: event.type,
+      reason: event.reason,
+      sourceSentence: options.sourceSentence,
+      writingMode: options.writingMode,
+      createdAt: now,
+      updatedAt: now,
+      lastUsedAt: now,
+      useCount: 1,
+    });
+  }
+
+  return Array.from(byKey.values());
 }
+
+export function filterLearningLibrary(
+  items: LearningItem[],
+  filters: LearningLibraryFilters,
+): LearningItem[] {
+  const query = filters.query?.trim().toLowerCase() ?? "";
+  return [...items]
+    .filter((item) => {
+      if (query) {
+        const searchable = `${item.content} ${item.chineseMeaning}`.toLowerCase();
+        if (!searchable.includes(query)) {
+          return false;
+        }
+      }
+      if (filters.type && filters.type !== "all" && item.type !== filters.type) {
+        return false;
+      }
+      if (filters.writingMode && filters.writingMode !== "all" && item.writingMode !== filters.writingMode) {
+        return false;
+      }
+      if (filters.favoriteOnly && !item.favorite) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (filters.sortBy === "useCount") {
+        return b.useCount - a.useCount || b.updatedAt.localeCompare(a.updatedAt);
+      }
+      return b.updatedAt.localeCompare(a.updatedAt) || b.useCount - a.useCount;
+    });
+}
+
+export function sortCorrectionMemory(items: CorrectionMemory[]): CorrectionMemory[] {
+  return [...items].sort((a, b) => b.useCount - a.useCount || b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function aggregateWritingHabits(events: CorrectionEvent[]): WritingHabitInsight[] {
+  const groups = new Map<CorrectionEventType, CorrectionEvent[]>();
+  for (const event of events) {
+    if (!event.before.trim() || !event.after.trim()) {
+      continue;
+    }
+    const group = groups.get(event.type) ?? [];
+    group.push(event);
+    groups.set(event.type, group);
+  }
+
+  return Array.from(groups.entries())
+    .map(([type, group]) => {
+      const count = group.reduce((sum, event) => sum + Math.max(1, event.useCount), 0);
+      const sortedExamples = [...group].sort(
+        (a, b) => b.useCount - a.useCount || b.updatedAt.localeCompare(a.updatedAt),
+      );
+      const updatedAt = sortedExamples.reduce(
+        (latest, event) => (event.updatedAt > latest ? event.updatedAt : latest),
+        sortedExamples[0]?.updatedAt ?? new Date().toISOString(),
+      );
+      const severity: WritingHabitInsight["severity"] = count >= 5 ? "high" : count >= 3 ? "medium" : "low";
+      const meta = WRITING_HABIT_META[type];
+
+      return {
+        id: `habit-${type}`,
+        type,
+        titleZh: meta.titleZh,
+        summaryZh: meta.summaryZh,
+        count,
+        severity,
+        examples: sortedExamples.slice(0, 3).map((event) => ({
+          before: event.before,
+          after: event.after,
+          reason: event.reason,
+          sourceSentence: event.sourceSentence,
+        })),
+        suggestionZh: meta.suggestionZh,
+        updatedAt,
+      } satisfies WritingHabitInsight;
+    })
+    .sort((a, b) =>
+      severityRank(b.severity) - severityRank(a.severity) || b.count - a.count || b.updatedAt.localeCompare(a.updatedAt),
+    )
+    .slice(0, 5);
+}
+
+export function loadParagraphHealthCache(storage: StorageLike): ParagraphHealthCacheItem[] {
+  return normalizeParagraphHealthCache(parseArray(storage.getItem(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY)));
+}
+
+export function saveParagraphHealthCache(
+  storage: StorageLike,
+  items: ParagraphHealthCacheItem[],
+): ParagraphHealthCacheItem[] {
+  const normalized = normalizeParagraphHealthCache(items);
+  storage.setItem(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function exportLearningLibraryJson(items: LearningItem[]): string {
+  return JSON.stringify(items, null, 2);
+}
+
+export function learningKey(item: Pick<LearningItemDraft, "type" | "content">): string {
+  return `${item.type}:${normalizeText(item.content)}`;
+}
+
+export function correctionKey(item: Pick<CorrectionDraft, "before" | "after" | "type">): string {
+  return `${item.type}:${normalizeText(item.before)}:${normalizeText(item.after)}`;
+}
+
+export function correctionEventKey(item: Pick<CorrectionEventDraft, "before" | "after" | "type">): string {
+  return `${item.type}:${normalizeText(item.before)}:${normalizeText(item.after)}`;
+}
+
+function normalizeText(text: string): string {
+  return text.trim().toLowerCase();
+}
+
+function parseArray(value: string | null): Array<Record<string, unknown>> {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeLearningItem(item: Record<string, unknown>, fallbackNow?: string): LearningItem {
+  const now = fallbackNow ?? new Date().toISOString();
+  const createdAt = stringOr(item.createdAt, now);
+  return {
+    id: stringOr(item.id, crypto.randomUUID()),
+    type: isLearningItemType(item.type) ? item.type : "phrase",
+    content: stringOr(item.content, ""),
+    chineseMeaning: stringOr(item.chineseMeaning, ""),
+    usageNote: stringOr(item.usageNote, ""),
+    sourceSentence: stringOr(item.sourceSentence, ""),
+    writingMode: isWritingMode(item.writingMode) ? item.writingMode : "natural",
+    createdAt,
+    updatedAt: stringOr(item.updatedAt, createdAt),
+    lastUsedAt: typeof item.lastUsedAt === "string" ? item.lastUsedAt : undefined,
+    useCount: typeof item.useCount === "number" && Number.isFinite(item.useCount) ? item.useCount : 1,
+    favorite: typeof item.favorite === "boolean" ? item.favorite : false,
+    tags: Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : [],
+    topic: typeof item.topic === "string" ? item.topic : undefined,
+  };
+}
+
+function normalizeCorrectionMemory(item: Record<string, unknown>): CorrectionMemory {
+  const now = new Date().toISOString();
+  const createdAt = stringOr(item.createdAt, now);
+  return {
+    id: stringOr(item.id, crypto.randomUUID()),
+    before: stringOr(item.before, ""),
+    after: stringOr(item.after, ""),
+    type: isCorrectionType(item.type) ? item.type : "polishing",
+    reason: stringOr(item.reason, ""),
+    sourceSentence: stringOr(item.sourceSentence, ""),
+    writingMode: isWritingMode(item.writingMode) ? item.writingMode : "natural",
+    createdAt,
+    updatedAt: stringOr(item.updatedAt, createdAt),
+    lastUsedAt: typeof item.lastUsedAt === "string" ? item.lastUsedAt : undefined,
+    useCount: typeof item.useCount === "number" && Number.isFinite(item.useCount) ? item.useCount : 1,
+  };
+}
+
+function normalizeCorrectionEvent(item: Record<string, unknown>): CorrectionEvent {
+  const now = new Date().toISOString();
+  const createdAt = stringOr(item.createdAt, now);
+  return {
+    id: stringOr(item.id, crypto.randomUUID()),
+    before: stringOr(item.before, ""),
+    after: stringOr(item.after, ""),
+    type: isCorrectionEventType(item.type) ? item.type : "other",
+    reason: stringOr(item.reason, ""),
+    sourceSentence: stringOr(item.sourceSentence, ""),
+    writingMode: isWritingMode(item.writingMode) ? item.writingMode : "natural",
+    createdAt,
+    updatedAt: stringOr(item.updatedAt, createdAt),
+    lastUsedAt: typeof item.lastUsedAt === "string" ? item.lastUsedAt : undefined,
+    useCount: typeof item.useCount === "number" && Number.isFinite(item.useCount) ? item.useCount : 1,
+  };
+}
+
+function dedupeCorrectionEvents(events: CorrectionEvent[]): CorrectionEvent[] {
+  const byKey = new Map<string, CorrectionEvent>();
+  for (const event of events) {
+    if (!event.before.trim() || !event.after.trim() || normalizeText(event.before) === normalizeText(event.after)) {
+      continue;
+    }
+    const key = correctionEventKey(event);
+    const match = byKey.get(key);
+    if (!match) {
+      byKey.set(key, event);
+      continue;
+    }
+    byKey.set(key, {
+      ...match,
+      useCount: match.useCount + event.useCount,
+      updatedAt: event.updatedAt > match.updatedAt ? event.updatedAt : match.updatedAt,
+      lastUsedAt: event.lastUsedAt ?? match.lastUsedAt,
+    });
+  }
+  return Array.from(byKey.values());
+}
+
+function normalizeParagraphHealthCache(
+  items: Array<Record<string, unknown> | ParagraphHealthCacheItem>,
+): ParagraphHealthCacheItem[] {
+  const byFingerprint = new Map<string, ParagraphHealthCacheItem>();
+  for (const item of items) {
+    const fingerprint = stringOr(item.paragraphFingerprint, "");
+    const rawResult = isRecord(item.result) ? item.result : undefined;
+    if (!fingerprint || !rawResult) {
+      continue;
+    }
+    const result = {
+      paragraphFingerprint: stringOr(rawResult.paragraphFingerprint, fingerprint),
+      hasIssues: typeof rawResult.hasIssues === "boolean" ? rawResult.hasIssues : false,
+      issueCount: typeof rawResult.issueCount === "number" && Number.isFinite(rawResult.issueCount)
+        ? Math.max(0, Math.floor(rawResult.issueCount))
+        : 0,
+      issueTypes: Array.isArray(rawResult.issueTypes)
+        ? rawResult.issueTypes.filter(isParagraphIssueType)
+        : [],
+      shortSummaryZh: stringOr(rawResult.shortSummaryZh, ""),
+    };
+    const normalized: ParagraphHealthCacheItem = {
+      paragraphFingerprint: fingerprint,
+      result,
+      checkedAt: stringOr(item.checkedAt, new Date().toISOString()),
+    };
+    const match = byFingerprint.get(fingerprint);
+    if (!match || normalized.checkedAt > match.checkedAt) {
+      byFingerprint.set(fingerprint, normalized);
+    }
+  }
+
+  return Array.from(byFingerprint.values())
+    .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))
+    .slice(0, 20);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringOr(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function isLearningItemType(value: unknown): value is LearningItemType {
+  return value === "phrase" || value === "collocation" || value === "sentence_pattern";
+}
+
+function isWritingMode(value: unknown): value is WritingMode {
+  return value === "natural" || value === "ielts" || value === "academic" || value === "business" || value === "concise";
+}
+
+function isCorrectionType(value: unknown): value is CorrectionMemory["type"] {
+  return (
+    value === "expression_translation" ||
+    value === "grammar" ||
+    value === "word_order" ||
+    value === "collocation" ||
+    value === "tone" ||
+    value === "coherence" ||
+    value === "polishing"
+  );
+}
+
+function isCorrectionEventType(value: unknown): value is CorrectionEventType {
+  return (
+    value === "singular_plural" ||
+    value === "tense" ||
+    value === "article" ||
+    value === "word_order" ||
+    value === "collocation" ||
+    value === "preposition" ||
+    value === "repetition" ||
+    value === "tone" ||
+    value === "chinese_transfer" ||
+    value === "coherence" ||
+    value === "polishing" ||
+    value === "other"
+  );
+}
+
+function isParagraphIssueType(value: unknown): value is ParagraphIssueType {
+  return (
+    value === "repetition" ||
+    value === "transition" ||
+    value === "pronoun_reference" ||
+    value === "logic_gap" ||
+    value === "sentence_order" ||
+    value === "tone_consistency" ||
+    value === "weak_development"
+  );
+}
+
+function mapLegacyCorrectionType(value: unknown): CorrectionEventType {
+  if (value === "expression_translation") {
+    return "chinese_transfer";
+  }
+  if (
+    value === "word_order" ||
+    value === "collocation" ||
+    value === "tone" ||
+    value === "coherence" ||
+    value === "polishing"
+  ) {
+    return value;
+  }
+  return "other";
+}
+
+function severityRank(severity: WritingHabitInsight["severity"]): number {
+  if (severity === "high") {
+    return 3;
+  }
+  if (severity === "medium") {
+    return 2;
+  }
+  return 1;
+}
+
+const WRITING_HABIT_META: Record<
+  CorrectionEventType,
+  Pick<WritingHabitInsight, "titleZh" | "summaryZh" | "suggestionZh">
+> = {
+  singular_plural: {
+    titleZh: "Singular/plural issues",
+    summaryZh: "You sometimes mix singular and plural forms in countable nouns or general statements.",
+    suggestionZh: "Next time, check noun form after words like many, several, and one of.",
+  },
+  tense: {
+    titleZh: "Tense consistency issues",
+    summaryZh: "You sometimes mix tenses when describing general facts, past events, or opinions.",
+    suggestionZh: "Before revising, decide whether the sentence describes a general fact or a past event.",
+  },
+  article: {
+    titleZh: "Article issues",
+    summaryZh: "You sometimes omit a, an, or the, or switch unclearly between general and specific nouns.",
+    suggestionZh: "When using a singular countable noun, check whether it needs a, an, or the.",
+  },
+  word_order: {
+    titleZh: "Word order issues",
+    summaryZh: "Chinese word order sometimes carries over into your English sentence structure.",
+    suggestionZh: "Try locating the subject, verb, and object before adding modifiers or clauses.",
+  },
+  collocation: {
+    titleZh: "搭配问题",
+    summaryZh: "You sometimes translate Chinese verbs directly, which makes English collocations less natural.",
+    suggestionZh: "When writing a verb + noun pair, check whether it is a common English collocation.",
+  },
+  preposition: {
+    titleZh: "Preposition issues",
+    summaryZh: "You sometimes use the wrong preposition in expressions like influence on or reason for.",
+    suggestionZh: "Pay attention to the preposition that belongs with the noun, verb, or adjective.",
+  },
+  repetition: {
+    titleZh: "Repetition issues",
+    summaryZh: "You sometimes repeat the same connector or expression in nearby sentences.",
+    suggestionZh: "After writing a paragraph, scan for repeated connectors or repeated nouns.",
+  },
+  tone: {
+    titleZh: "Tone consistency issues",
+    summaryZh: "You sometimes switch between formal, academic, and casual expression styles.",
+    suggestionZh: "Choose the writing mode first, then keep vocabulary at a matching level of formality.",
+  },
+  chinese_transfer: {
+    titleZh: "Chinese transfer issues",
+    summaryZh: "You sometimes organize English directly from Chinese expression habits.",
+    suggestionZh: "After mixed writing, reframe the idea with common English patterns and collocations.",
+  },
+  coherence: {
+    titleZh: "Coherence issues",
+    summaryZh: "Your sentence may be correct, but the logical link to nearby sentences can be unclear.",
+    suggestionZh: "Check whether the new sentence adds a reason, contrast, example, or result.",
+  },
+  polishing: {
+    titleZh: "Conciseness issues",
+    summaryZh: "Your meaning is usually clear, but some sentences can become shorter and more natural.",
+    suggestionZh: "After drafting, look for repeated words or literal structures that can be simplified.",
+  },
+  other: {
+    titleZh: "Other expression issues",
+    summaryZh: "These applied edits are useful signals but do not yet fit a more specific category.",
+    suggestionZh: "Review the before and after examples as personal writing reminders.",
+  },
+};

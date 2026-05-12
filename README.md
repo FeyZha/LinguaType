@@ -1,21 +1,21 @@
 # LinguaType
 
-LinguaType 是一个面向中文母语英语学习者的轻量级网页写作助手。它只处理编辑器里的最新非空句子：中英混写时转换中文片段并修正语法，纯英文时只做必要的轻度润色。用户必须点击“应用”后，修改才会写回编辑器，学习表达也只会在应用后保存。
+LinguaType is a lightweight web writing assistant for Chinese-speaking English learners. It keeps the v0.1 core flow: enhance only the latest non-empty sentence, show a code-generated diff, and wait for the user to Apply or Cancel before changing the editor or saving learning data.
 
-## 启动
+v0.2 upgrades LinguaType from a latest-sentence enhancer into an expression learning assistant.
+
+v0.2.1 refines that experience into a more input-method-like writing flow: sentence revision returns quickly, learning extraction happens after Apply in the background, writing habits are summarized instead of shown as raw logs, paragraph health is non-intrusive, and expression tools live near the editor.
+
+LinguaType still is not a translator, chatbot, essay generator, full essay corrector, Chrome extension, or system input method.
+
+## Getting Started
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开终端显示的本地地址即可使用。常见地址是 `http://127.0.0.1:3000`，如果端口被占用，可以换到其他端口：
-
-```bash
-npm run dev -- --hostname 127.0.0.1 --port 3002
-```
-
-## 常用命令
+Common checks:
 
 ```bash
 npm test
@@ -23,60 +23,155 @@ npm run lint
 npm run build
 ```
 
-项目的 npm 脚本已经处理了 Windows 终端里常见的尾随说明写法，所以下面这种命令也可以：
+## Core Flow
 
-```bash
-npm test # 执行单元测试
-npm run lint # 代码格式与语法检查
-npm run build # 生产构建
-```
+1. Write naturally in the central editor.
+2. Press `Ctrl/Cmd + Enter`, or click Enhance latest sentence.
+3. LinguaType extracts only the latest non-empty sentence.
+4. If the sentence contains Chinese, it converts all Chinese segments and polishes the sentence.
+5. If the sentence is pure English, it lightly polishes it. Unchanged output is valid.
+6. Review the code-generated word diff.
+7. Click Apply to replace only that latest sentence, or Cancel to change nothing.
+8. Learning data is saved only after Apply.
 
-## 使用方式
+`Ctrl/Cmd + J` remains a legacy shortcut only when the editor is focused.
 
-1. 在编辑器中自然写作，可以中英混写。
-2. 按 `Ctrl/Cmd + Enter`，或点击“润色最新一句”。
-3. 查看建议修改、词级 diff 和中文修改说明。
-4. 点击“应用”只替换最新一句；点击“取消”则不做任何改动。
+## v0.2 Features
 
-兼容快捷键 `Ctrl/Cmd + J` 只在编辑器聚焦时生效，并会阻止浏览器默认快捷键行为。
+### Learning Library
 
-## API 设置
+The Library tab turns applied `learningItems` into reusable expression assets. It supports search, type filter, writing-mode filter, favorite-only view, sorting by use count or updated time, copy, insert, delete, and JSON export.
 
-从顶部栏打开“API 设置”。
+The new key is `linguatype.learningLibrary.v1`. On first load, LinguaType migrates old `linguatype.learningHistory.v1` data into the new library without deleting the old key. Items deduplicate by `type + normalized content`.
 
-- 默认启用 **Mock 模式**，使用本地固定演示结果，不需要真实 API。
-- 使用真实模型时，关闭 Mock 模式，并填写 API Base URL、API Key 和模型名称。
-- 高级设置包括 endpoint path、温度、最大 tokens 和 JSON mode。
-- JSON mode 默认关闭，因为很多 OpenAI-compatible provider 不支持 `response_format`。
-- “测试连接”只发送最小请求，要求 provider 返回 `{"ok": true}`。
+### Common Issues
 
-## Mock 模式
+Common Issues is the v0.2 legacy name for raw correction memory. In v0.2.1 the current UI is Writing Habits, which aggregates correction events into habit insights instead of showing a raw `before -> after` log.
 
-Mock 模式用于开发、演示和自动化测试：
+The legacy key `linguatype.correctionMemory.v1` may still be migrated, but new v0.2.1 learning signals are stored as `correctionEvents` in `linguatype.correctionEvents.v1`.
 
-- 不需要 API Base URL、API Key 或模型名称。
-- 返回确定性的本地演示结果。
-- 可以覆盖中英混写、语法修正、搭配修正和纯英文不改写等场景。
+Regenerate, Copy revised sentence, Cancel, Paragraph Flow Check, and Paragraph Health Check do not write learning data.
 
-## 隐私说明
+### Paragraph Flow Check
 
-v0.1 没有数据库，也不会在服务器端持久化 API Key。
+The Tools tab includes Check current paragraph. This is manual only. It checks the current paragraph, or the latest non-empty paragraph if cursor position is unavailable.
 
-API 设置会保存在浏览器 localStorage 中：
+It can flag repetition, transitions, pronoun reference, logic gaps, sentence order, tone consistency, and weak development. It does not score essays, rewrite the whole article, add new arguments, or auto-apply changes. Apply paragraph replaces only the checked paragraph and uses conflict detection.
+
+### Next Expression Toolbox
+
+Next Expression Toolbox is the v0.2 legacy name. In v0.2.1, the current high-frequency UI is the Inline Expression Menu near the editor.
+
+The expression tool remains intention-based. Choose one intention first:
+
+- Explain reason
+- Show result
+- Give example
+- Add contrast
+- Make concession
+- Summarize point
+
+It uses static templates and local Learning Library recall by default. It is not auto-writing, does not predict the user's viewpoint, and does not generate a full paragraph or fixed argument.
+
+### Enhancement Level
+
+The top bar includes an Enhancement Level selector:
+
+- `minimal`: fix only clear errors; unchanged pure English is valid.
+- `balanced`: default; fix errors and clearly unnatural expressions.
+- `polished`: make the sentence smoother or more formal without changing meaning.
+
+### Regenerate
+
+Regenerate re-runs enhancement for the same original latest sentence, range, context, writing mode, and enhancement level. It still shows one result, not multiple candidates, and saves no learning data until Apply.
+
+### Copy Revised Sentence
+
+Copy revised sentence copies `finalSentence` only. It does not update the editor and does not save Learning Library, correction events, or Writing Habits data.
+
+## v0.2.1 Refinements
+
+### Fast Enhancement
+
+`Ctrl/Cmd + Enter`, the enhance button, and Regenerate now use `/api/enhance-fast`. This API returns only the revised latest sentence and a short explanation, so the user can see the diff sooner.
+
+Fast Enhancement does not save Learning Library data or correction events. It only prepares a suggestion for Apply or Cancel.
+
+### Background Learning Extraction
+
+After the user clicks Apply, LinguaType immediately replaces only the latest sentence. Then it calls `/api/extract-learning` in the background to extract:
+
+- `learningItems` for the Learning Library
+- `correctionEvents` for long-term writing habit analysis
+
+If extraction fails, the applied editor text is kept. Regenerate, Copy revised sentence, Cancel, and Apply Paragraph do not trigger learning extraction.
+
+### Writing Habits
+
+Common Issues has been upgraded into Writing Habits. The data layer is now `CorrectionEvent`, stored in `linguatype.correctionEvents.v1`.
+
+Writing Habits aggregates correction events by type and shows broader patterns such as collocation issues, word order issues, article issues, or Chinese transfer issues. It does not default to a long raw `before -> after` log, and it is separate from the Learning Library.
+
+The legacy `linguatype.correctionMemory.v1` key is still supported and migrated without deletion.
+
+### Paragraph Health Check
+
+After Apply on the latest sentence, LinguaType may run a lightweight `/api/check-paragraph-health` check in the background if the current paragraph is long enough and has changed meaningfully.
+
+Paragraph Health Check:
+
+- does not block writing
+- does not return a revised paragraph
+- does not generate a diff
+- does not save learning data
+- does not auto-apply anything
+
+If it finds likely flow issues, the Review tab shows a small paragraph health prompt. Full paragraph suggestions are loaded only after the user clicks View suggestions, which calls the existing `/api/check-paragraph-flow`.
+
+### Inline Expression Menu
+
+Press `Ctrl/Cmd + K` in the editor to open the Inline Expression Menu. It provides:
+
+- intention-based templates
+- Insert from Library
+- Check this paragraph
+
+The menu is local by default. It does not call the LLM, does not auto-write, does not generate a full paragraph, and does not decide the user's argument direction. `Alt + /` is also supported as an optional shortcut; `/` trigger is not restored.
+
+## API Settings
+
+Mock Mode is enabled by default for development, demos, and tests. In Mock Mode, Base URL, API Key, and Model are not required.
+
+For real providers, LinguaType uses an OpenAI-compatible Chat Completions adapter. API settings are sent to the Next.js API route per request and are not persisted on the server. JSON mode defaults to off because many compatible providers do not support `response_format`.
+
+The test-connection API uses only a minimal prompt asking the provider to return `{"ok": true}`.
+
+## localStorage Keys
 
 - `linguatype.apiSettings.v1`
-- `linguatype.learningHistory.v1`
 - `linguatype.writingDraft.v1`
+- `linguatype.learningHistory.v1` legacy
+- `linguatype.learningLibrary.v1`
+- `linguatype.correctionMemory.v1` legacy
+- `linguatype.correctionEvents.v1`
+- `linguatype.paragraphHealthCache.v1`
 
-真实 API Key 会从浏览器随每次请求发送到 Next.js API route，但不会写入服务器存储。请只在可信设备和可信模型服务上使用自己的 API Key。
+## v0.2 Limits
 
-## v0.1 限制
+LinguaType v0.2 / v0.2.1 still does not implement:
 
-- 只润色最新一句。
-- 不改写整段。
-- 不做 essay 级别批改。
-- 不生成新论点。
-- 不预测用户下一句观点。
-- 不提供多个候选译文。
-- 不包含数据库、登录、支付、Chrome 插件、真实系统输入法、云同步、间隔复习或社交功能。
-- 输出质量取决于用户提供的模型服务。
+- login
+- database
+- payment
+- Chrome extension
+- system input method
+- cloud sync
+- spaced repetition
+- social features
+- full essay correction
+- essay scoring
+- auto-writing
+- automatic paragraph rewrite
+- multi-candidate translation UI
+- chatbot interface
+- streaming JSON as the core implementation

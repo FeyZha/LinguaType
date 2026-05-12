@@ -23,6 +23,7 @@ const baseInput: EnhanceLatestSentenceInput = {
   previousContext: "",
   currentParagraph: "Many student believe that AI tools can 提高学习效率.",
   writingMode: "natural",
+  enhancementLevel: "balanced",
   apiConfig: baseConfig,
 };
 
@@ -59,7 +60,7 @@ describe("openai compatible provider", () => {
 
     expect(body.response_format).toBeUndefined();
     expect(result.hasChinese).toBe(true);
-    expect(result.taskType).toBe("mixed_sentence_enhancement");
+    expect(result.taskType).toBe("mixed_chinese_rewrite");
   });
 
   it("adds response_format only when JSON mode is enabled", async () => {
@@ -145,7 +146,7 @@ describe("openai compatible provider", () => {
     const result = await enhanceWithOpenAICompatibleProvider(baseInput);
 
     expect(result.finalSentence).toBe("Many students believe that AI tools can improve learning efficiency.");
-    expect(result.taskType).toBe("mixed_sentence_enhancement");
+    expect(result.taskType).toBe("mixed_chinese_rewrite");
   });
 
   it("uses a minimal connection-test prompt", async () => {
