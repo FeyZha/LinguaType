@@ -12,12 +12,12 @@ type WritingIntention =
   | "summarize_point";
 
 const INTENTIONS: Array<{ value: WritingIntention; label: string; helper: string }> = [
-  { value: "explain_reason", label: "Explain reason", helper: "If you want to explain a reason, you can use:" },
-  { value: "show_result", label: "Show result", helper: "If you want to show a result, you can use:" },
-  { value: "give_example", label: "Give example", helper: "If you want to give an example, you can use:" },
-  { value: "add_contrast", label: "Add contrast", helper: "If you want to add contrast, you can use:" },
-  { value: "make_concession", label: "Make concession", helper: "If you want to make a concession, you can use:" },
-  { value: "summarize_point", label: "Summarize point", helper: "If you want to summarize a point, you can use:" },
+  { value: "explain_reason", label: "解释原因 Explain reason", helper: "想解释原因时，可以插入：" },
+  { value: "show_result", label: "说明结果 Show result", helper: "想说明结果时，可以插入：" },
+  { value: "give_example", label: "举例 Give example", helper: "想举例时，可以插入：" },
+  { value: "add_contrast", label: "转折对比 Add contrast", helper: "想转折或对比时，可以插入：" },
+  { value: "make_concession", label: "让步 Make concession", helper: "想表达让步时，可以插入：" },
+  { value: "summarize_point", label: "总结观点 Summarize point", helper: "想总结观点时，可以插入：" },
 ];
 
 const TEMPLATES: Record<WritingIntention, string[]> = {
@@ -72,13 +72,13 @@ export function InlineExpressionMenu({
     <div className="absolute bottom-14 right-4 z-20 w-[min(360px,calc(100%-2rem))] rounded-md border border-slate-200 bg-white p-3 shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Inline Expression Menu</h2>
-          <p className="mt-1 text-xs text-slate-500">Local expression tools. LLM off.</p>
+          <h2 className="text-sm font-semibold text-slate-900">表达菜单 Inline Expression Menu</h2>
+          <p className="mt-1 text-xs text-slate-500">本地表达工具，不会自动调用 LLM。</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close inline expression menu"
+          aria-label="关闭表达菜单"
           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
         >
           Esc
@@ -105,14 +105,14 @@ export function InlineExpressionMenu({
             onClick={() => setView("library")}
             className="rounded-md border border-slate-300 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            Insert from Library
+            从 Learning Library 插入
           </button>
           <button
             type="button"
             onClick={onCheckParagraph}
             className="rounded-md border border-slate-300 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            Check this paragraph
+            检查当前段落
           </button>
         </div>
       ) : null}
@@ -124,7 +124,7 @@ export function InlineExpressionMenu({
             onClick={() => setView("root")}
             className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
           >
-            Back
+            返回
           </button>
           <p className="text-xs text-slate-500">{currentIntention.helper}</p>
           {TEMPLATES[intention].map((template) => (
@@ -147,18 +147,18 @@ export function InlineExpressionMenu({
             onClick={() => setView("root")}
             className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
           >
-            Back
+            返回
           </button>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search library"
-            aria-label="Search inline library"
+            placeholder="搜索 Learning Library"
+            aria-label="搜索表达库"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-moss"
           />
           {recalled.length === 0 ? (
             <p className="rounded bg-slate-50 p-3 text-xs text-slate-500">
-              No library expression yet.
+              暂时还没有保存的表达。
             </p>
           ) : (
             recalled.map((item) => (

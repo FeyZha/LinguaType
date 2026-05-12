@@ -3,6 +3,7 @@ import {
   checkParagraphHealthWithMockProvider,
   enhanceFastWithMockProvider,
   enhanceWithMockProvider,
+  explainSelectionWithMockProvider,
   extractLearningWithMockProvider,
 } from "./mock";
 import type {
@@ -11,6 +12,7 @@ import type {
   FastEnhanceInput,
   LearningExtractionInput,
   ParagraphHealthInput,
+  SelectionExplainInput,
 } from "../types";
 
 function input(latestSentence: string, enhancementLevel: EnhancementLevel = "balanced"): EnhanceLatestSentenceInput {
@@ -90,6 +92,23 @@ describe("mock provider", () => {
     expect(result.hasIssues).toBe(true);
     expect(result.issueTypes).toContain("repetition");
     expect("revisedParagraph" in result).toBe(false);
+  });
+
+  it("explains selected text without rewriting it", async () => {
+    const selectionInput: SelectionExplainInput = {
+      selectedText: "acquire knowledge",
+      fullText: "Students acquire knowledge through practice.",
+      currentParagraph: "Students acquire knowledge through practice.",
+      writingMode: "academic",
+      apiConfig: input("").apiConfig,
+    };
+
+    const result = await explainSelectionWithMockProvider(selectionInput);
+
+    expect(result.selectedText).toBe("acquire knowledge");
+    expect(result.meaningZh).toContain("acquire knowledge");
+    expect(result.expressionType).toBe("collocation");
+    expect("finalSentence" in result).toBe(false);
   });
 
   it("converts Chinese and fixes grammar deterministically", async () => {

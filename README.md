@@ -6,6 +6,8 @@ v0.2 upgrades LinguaType from a latest-sentence enhancer into an expression lear
 
 v0.2.1 refines that experience into a more input-method-like writing flow: sentence revision returns quickly, learning extraction happens after Apply in the background, writing habits are summarized instead of shown as raw logs, paragraph health is non-intrusive, and expression tools live near the editor.
 
+v0.2.2 moves the most frequent interactions closer to the text: current sentence suggestions appear beside the editor, trigger behavior is configurable, selected text can be explained or saved, and local data controls live in the low-frequency settings area.
+
 LinguaType still is not a translator, chatbot, essay generator, full essay corrector, Chrome extension, or system input method.
 
 ## Getting Started
@@ -26,12 +28,12 @@ npm run build
 ## Core Flow
 
 1. Write naturally in the central editor.
-2. Press `Ctrl/Cmd + Enter`, or click Enhance latest sentence.
+2. Press `Ctrl/Cmd + Enter`, or click `增强最新一句`.
 3. LinguaType extracts only the latest non-empty sentence.
 4. If the sentence contains Chinese, it converts all Chinese segments and polishes the sentence.
 5. If the sentence is pure English, it lightly polishes it. Unchanged output is valid.
-6. Review the code-generated word diff.
-7. Click Apply to replace only that latest sentence, or Cancel to change nothing.
+6. Review the code-generated word diff in the `当前句建议 Current Sentence` popover.
+7. Click `应用 Apply` to replace only that latest sentence, or `取消 Cancel` to change nothing.
 8. Learning data is saved only after Apply.
 
 `Ctrl/Cmd + J` remains a legacy shortcut only when the editor is focused.
@@ -54,7 +56,7 @@ Regenerate, Copy revised sentence, Cancel, Paragraph Flow Check, and Paragraph H
 
 ### Paragraph Flow Check
 
-The Tools tab includes Check current paragraph. This is manual only. It checks the current paragraph, or the latest non-empty paragraph if cursor position is unavailable.
+Manual paragraph flow checking is a secondary action inside the Inline Expression Menu as `检查当前段落`. It checks the current paragraph, or the latest non-empty paragraph if cursor position is unavailable.
 
 It can flag repetition, transitions, pronoun reference, logic gaps, sentence order, tone consistency, and weak development. It does not score essays, rewrite the whole article, add new arguments, or auto-apply changes. Apply paragraph replaces only the checked paragraph and uses conflict detection.
 
@@ -72,6 +74,10 @@ The expression tool remains intention-based. Choose one intention first:
 - Summarize point
 
 It uses static templates and local Learning Library recall by default. It is not auto-writing, does not predict the user's viewpoint, and does not generate a full paragraph or fixed argument.
+
+### UI Language
+
+The interface is Chinese-first for Chinese-speaking English learners. Operation guidance, buttons, settings, empty states, and status messages use Chinese to lower the learning barrier. Product capability names and technical terms remain English or bilingual, such as `Learning Library`, `Writing Habits`, `Inline Expression Menu`, `Current Sentence`, `Paragraph Health`, `API Settings`, and `Mock Mode`.
 
 ### Enhancement Level
 
@@ -126,7 +132,7 @@ Paragraph Health Check:
 - does not save learning data
 - does not auto-apply anything
 
-If it finds likely flow issues, the Review tab shows a small paragraph health prompt. Full paragraph suggestions are loaded only after the user clicks View suggestions, which calls the existing `/api/check-paragraph-flow`.
+If it finds likely flow issues, the editor area shows a small `段落健康 Paragraph Health` badge. Full paragraph suggestions are loaded only after the user clicks `查看建议`, which calls the existing `/api/check-paragraph-flow`.
 
 ### Inline Expression Menu
 
@@ -136,7 +142,62 @@ Press `Ctrl/Cmd + K` in the editor to open the Inline Expression Menu. It provid
 - Insert from Library
 - Check this paragraph
 
-The menu is local by default. It does not call the LLM, does not auto-write, does not generate a full paragraph, and does not decide the user's argument direction. `Alt + /` is also supported as an optional shortcut; `/` trigger is not restored.
+The menu is local by default. It does not call the LLM, does not auto-write, does not generate a full paragraph, and does not decide the user's argument direction. Plain `/` and `Alt + /` triggers are not active in v0.2.2.
+
+## v0.2.2 Refinements
+
+### Current Sentence Popover
+
+Fast Enhancement suggestions now appear near the editor instead of making the right Review tab the primary work area. The popover shows the original sentence, suggested sentence, code-generated diff, short explanation, Apply, Cancel, Regenerate, and Copy.
+
+Escape closes the popover when enabled. Apply can auto-close it, and Cancel or Close never saves learning data.
+
+### Trigger and Intrusion Settings
+
+The `工具与设置` tab stores local trigger preferences in `linguatype.triggerSettings.v1`.
+
+Defaults:
+
+- sentence enhancement: `Ctrl/Cmd + Enter`
+- inline expression menu: `Ctrl/Cmd + K`
+- paragraph health: after every eligible Apply
+- writing habits feedback: badge
+- status feedback: popover footer
+
+`Ctrl/Cmd + J` works only when the user chooses the legacy shortcut mode and the editor is focused. `button_only` disables sentence enhancement shortcuts but keeps the button. The `/` and `Alt + /` triggers are not restored.
+
+### Selection Actions
+
+When English text is selected in the editor, LinguaType shows a lightweight selection popover with:
+
+- `解释选中内容`
+- `保存到 Learning Library`
+
+Explain selected calls `/api/explain-selection` and explains only the selected text. It does not rewrite or replace text. Save to Library is an explicit user action and writes only to the local Learning Library.
+
+### Paragraph Health Modes
+
+Paragraph Health Check remains lightweight and non-blocking, but its trigger can now be set to:
+
+- after every eligible Apply
+- after 3 applied latest-sentence edits
+- manual only
+- off
+
+It still does not return a revised paragraph, generate a diff, save learning data, or auto-apply. Full paragraph flow suggestions are loaded only after the user clicks View suggestions or manually checks a paragraph.
+
+### Data Control
+
+The `数据管理 Data Control` tab provides local-only management:
+
+- Export Learning Library JSON
+- Export Writing Habits JSON
+- Clear Learning Library
+- Clear Writing Habits
+- Reset API Settings
+- View localStorage keys
+
+Clear actions require confirmation. Clearing the Learning Library does not delete legacy learning history. Clearing Writing Habits does not delete legacy Correction Memory.
 
 ## API Settings
 
@@ -155,10 +216,11 @@ The test-connection API uses only a minimal prompt asking the provider to return
 - `linguatype.correctionMemory.v1` legacy
 - `linguatype.correctionEvents.v1`
 - `linguatype.paragraphHealthCache.v1`
+- `linguatype.triggerSettings.v1`
 
 ## v0.2 Limits
 
-LinguaType v0.2 / v0.2.1 still does not implement:
+LinguaType v0.2 / v0.2.1 / v0.2.2 still does not implement:
 
 - login
 - database

@@ -30,6 +30,22 @@ export function parseModelJson(rawResponse: string): unknown {
     if (parsed.ok) {
       return parsed.value;
     }
+
+    const repaired = repairUnescapedQuotesInJsonStrings(unfenced);
+    if (repaired !== unfenced) {
+      const repairedParsed = tryParse(repaired);
+      if (repairedParsed.ok) {
+        return repairedParsed.value;
+      }
+    }
+  }
+
+  const repaired = repairUnescapedQuotesInJsonStrings(rawResponse);
+  if (repaired !== rawResponse) {
+    const repairedParsed = tryParse(repaired);
+    if (repairedParsed.ok) {
+      return repairedParsed.value;
+    }
   }
 
   const extracted = extractFirstJsonObject(rawResponse);
@@ -60,6 +76,59 @@ function tryParse(text: string): { ok: true; value: unknown } | { ok: false } {
   } catch {
     return { ok: false };
   }
+}
+
+function repairUnescapedQuotesInJsonStrings(text: string): string {
+  let repaired = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (!inString) {
+      repaired += char;
+      if (char === "\"") {
+        inString = true;
+      }
+      continue;
+    }
+
+    if (escaped) {
+      repaired += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      repaired += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char !== "\"") {
+      repaired += char;
+      continue;
+    }
+
+    if (isLikelyStringTerminator(text, index)) {
+      repaired += char;
+      inString = false;
+    } else {
+      repaired += "\\\"";
+    }
+  }
+
+  return repaired;
+}
+
+function isLikelyStringTerminator(text: string, quoteIndex: number): boolean {
+  let index = quoteIndex + 1;
+  while (index < text.length && /\s/u.test(text[index])) {
+    index += 1;
+  }
+
+  return index >= text.length || [",", "}", "]", ":"].includes(text[index]);
 }
 
 function extractFirstJsonObject(text: string): unknown | null {

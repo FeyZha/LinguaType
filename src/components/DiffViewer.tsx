@@ -12,7 +12,7 @@ export function DiffViewer({ parts }: DiffViewerProps) {
       {parts.map((part, index) => {
         if (part.removed) {
           return (
-            <span key={`${part.value}-${index}`} className="text-red-700 line-through decoration-2">
+            <span key={`${part.value}-${index}`} className="text-slate-400 line-through decoration-2">
               {part.value}
             </span>
           );

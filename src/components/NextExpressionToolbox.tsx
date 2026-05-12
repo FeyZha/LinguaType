@@ -12,12 +12,12 @@ export type WritingIntention =
   | "summarize_point";
 
 const INTENTIONS: Array<{ value: WritingIntention; label: string; condition: string }> = [
-  { value: "explain_reason", label: "Explain reason", condition: "If you want to explain a reason, you can use:" },
-  { value: "show_result", label: "Show result", condition: "If you want to show a result, you can use:" },
-  { value: "give_example", label: "Give example", condition: "If you want to give an example, you can use:" },
-  { value: "add_contrast", label: "Add contrast", condition: "If you want to add contrast, you can use:" },
-  { value: "make_concession", label: "Make concession", condition: "If you want to make a concession, you can use:" },
-  { value: "summarize_point", label: "Summarize", condition: "If you want to summarize a point, you can use:" },
+  { value: "explain_reason", label: "解释原因 Explain reason", condition: "想解释原因时，可以使用：" },
+  { value: "show_result", label: "说明结果 Show result", condition: "想说明结果时，可以使用：" },
+  { value: "give_example", label: "举例 Give example", condition: "想举例时，可以使用：" },
+  { value: "add_contrast", label: "转折对比 Add contrast", condition: "想转折或对比时，可以使用：" },
+  { value: "make_concession", label: "让步 Make concession", condition: "想表达让步时，可以使用：" },
+  { value: "summarize_point", label: "总结 Summarize", condition: "想总结观点时，可以使用：" },
 ];
 
 const TEMPLATES: Record<WritingIntention, string[]> = {
@@ -44,10 +44,10 @@ export function NextExpressionToolbox({ history, writingMode, onInsert }: NextEx
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Next Expression Toolbox</h2>
-          <p className="mt-1 text-xs text-slate-500">Choose an intention, then insert an expression tool.</p>
+          <h2 className="text-sm font-semibold text-slate-900">表达工具箱 Expression Toolbox</h2>
+          <p className="mt-1 text-xs text-slate-500">先选择写作意图，再插入合适的表达。</p>
         </div>
-        <span className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500">LLM off</span>
+        <span className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500">LLM 未调用</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {INTENTIONS.map((intention) => (
@@ -79,7 +79,7 @@ export function NextExpressionToolbox({ history, writingMode, onInsert }: NextEx
       </div>
       {recalled.length > 0 ? (
         <div className="mt-4 border-t border-slate-100 pt-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conditional recall</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">条件召回 Conditional recall</h3>
           <p className="mt-2 text-xs text-slate-500">{selectedMeta.condition}</p>
           <div className="mt-2 space-y-2">
             {recalled.map((item) => (

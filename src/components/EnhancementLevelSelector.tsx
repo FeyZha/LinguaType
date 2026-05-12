@@ -3,9 +3,9 @@
 import type { EnhancementLevel } from "@/lib/llm/types";
 
 const LEVELS: Array<{ value: EnhancementLevel; label: string }> = [
-  { value: "minimal", label: "Minimal" },
-  { value: "balanced", label: "Balanced" },
-  { value: "polished", label: "Polished" },
+  { value: "minimal", label: "minimal 最小修改" },
+  { value: "balanced", label: "balanced 平衡" },
+  { value: "polished", label: "polished 更顺更正式" },
 ];
 
 type EnhancementLevelSelectorProps = {
@@ -19,7 +19,7 @@ export function EnhancementLevelSelector({ value, onChange }: EnhancementLevelSe
       value={value}
       onChange={(event) => onChange(event.target.value as EnhancementLevel)}
       className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-moss"
-      aria-label="Enhancement level"
+      aria-label="增强强度 Enhancement Level"
     >
       {LEVELS.map((level) => (
         <option key={level.value} value={level.value}>

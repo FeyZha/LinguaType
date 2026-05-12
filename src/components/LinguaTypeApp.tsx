@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Change } from "diff";
 import { ApiSettingsModal } from "./ApiSettingsModal";
-import { EnhancementLevelSelector } from "./EnhancementLevelSelector";
+import { DataControlPanel } from "./DataControlPanel";
 import { EnhancementPopover } from "./EnhancementPopover";
 import { InlineExpressionMenu } from "./InlineExpressionMenu";
 import { LearningLibraryPanel } from "./LearningLibraryPanel";
-import { ModeSelector } from "./ModeSelector";
 import { ParagraphFlowPanel } from "./ParagraphFlowPanel";
-import { ShortcutHint } from "./ShortcutHint";
+import { SelectionActionsPopover } from "./SelectionActionsPopover";
 import { EmptyState, ErrorState, LoadingState } from "./StateViews";
+import { TriggerSettingsPanel } from "./TriggerSettingsPanel";
 import { WritingEditor } from "./WritingEditor";
 import { WritingHabitsPanel } from "./WritingHabitsPanel";
 import {
@@ -32,12 +32,16 @@ import {
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   defaultApiSettings,
+  defaultTriggerSettings,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
   loadParagraphHealthCache,
+  loadTriggerSettingsFromStorage,
   saveParagraphHealthCache,
+  saveTriggerSettings,
   upsertCorrectionEvents,
   upsertLearningItems,
+  type TriggerSettings,
 } from "@/lib/storage";
 import type {
   ApiConfig,
@@ -47,10 +51,12 @@ import type {
   FastEnhanceInput,
   FastEnhanceResult,
   LearningExtractionResult,
+  LearningItemDraft,
   LearningItem,
   ParagraphCheckResult,
   ParagraphHealthCacheItem,
   ParagraphHealthResult,
+  SelectionExplainResult,
   WritingMode,
 } from "@/lib/llm/types";
 
@@ -60,6 +66,10 @@ type PendingEnhancement = {
   latestSentenceRange: SentenceRange;
   originalSentence: string;
   requestInput: Omit<FastEnhanceInput, "apiConfig">;
+  result?: FastEnhanceResult;
+};
+
+type CompletedEnhancement = PendingEnhancement & {
   result: FastEnhanceResult;
 };
 
@@ -82,13 +92,22 @@ type ErrorMessage = {
   rawResponse?: string;
 };
 
-type SidebarTab = "review" | "library" | "habits" | "tools";
+type SelectionActionState = {
+  start: number;
+  end: number;
+  selectedText: string;
+  explanation?: SelectionExplainResult;
+  message?: string;
+};
+
+type SidebarTab = "review" | "library" | "habits" | "tools" | "data";
 
 const SIDEBAR_TABS: Array<{ id: SidebarTab; label: string }> = [
-  { id: "review", label: "Review" },
-  { id: "library", label: "Library" },
-  { id: "habits", label: "Writing Habits" },
-  { id: "tools", label: "Tools" },
+  { id: "review", label: "检查状态 Review" },
+  { id: "library", label: "表达库 Learning Library" },
+  { id: "habits", label: "写作习惯 Writing Habits" },
+  { id: "tools", label: "工具与设置" },
+  { id: "data", label: "数据管理 Data Control" },
 ];
 
 export function LinguaTypeApp() {
@@ -96,10 +115,12 @@ export function LinguaTypeApp() {
   const healthCacheRef = useRef<ParagraphHealthCacheItem[]>([]);
   const lastHealthCheckAtRef = useRef(0);
   const isHealthCheckingRef = useRef(false);
+  const appliedEditsSinceHealthRef = useRef(0);
   const [text, setText] = useState("");
   const [writingMode, setWritingMode] = useState<WritingMode>("natural");
   const [enhancementLevel, setEnhancementLevel] = useState<EnhancementLevel>("balanced");
   const [apiSettings, setApiSettings] = useState<ApiConfig>(() => defaultApiSettings());
+  const [triggerSettings, setTriggerSettings] = useState<TriggerSettings>(() => defaultTriggerSettings());
   const [learningLibrary, setLearningLibrary] = useState<LearningItem[]>([]);
   const [correctionEvents, setCorrectionEvents] = useState<CorrectionEvent[]>([]);
   const [pending, setPending] = useState<PendingEnhancement | null>(null);
@@ -121,6 +142,9 @@ export function LinguaTypeApp() {
   const [conflictMessage, setConflictMessage] = useState("");
   const [paragraphConflictMessage, setParagraphConflictMessage] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
+  const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("review");
 
   useEffect(() => {
@@ -131,6 +155,7 @@ export function LinguaTypeApp() {
     }
     setLearningLibrary(loadLearningLibraryFromStorage(localStorage));
     setCorrectionEvents(loadCorrectionEventsFromStorage(localStorage));
+    setTriggerSettings(loadTriggerSettingsFromStorage(localStorage));
     healthCacheRef.current = loadParagraphHealthCache(localStorage);
   }, []);
 
@@ -139,7 +164,7 @@ export function LinguaTypeApp() {
   }, [text]);
 
   const diffParts: Change[] = useMemo(() => {
-    if (!pending) {
+    if (!pending?.result) {
       return [];
     }
     return createWordDiff(pending.originalSentence, pending.result.finalSentence);
@@ -168,6 +193,11 @@ export function LinguaTypeApp() {
     localStorage.setItem(API_SETTINGS_STORAGE_KEY, JSON.stringify(defaults));
   }
 
+  function persistTriggerSettings(settings: TriggerSettings) {
+    const normalized = saveTriggerSettings(localStorage, settings);
+    setTriggerSettings(normalized);
+  }
+
   function persistLearningLibrary(items: LearningItem[]) {
     setLearningLibrary(items);
     localStorage.setItem(LEARNING_LIBRARY_STORAGE_KEY, JSON.stringify(items));
@@ -179,10 +209,22 @@ export function LinguaTypeApp() {
     localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(items));
   }
 
+  function handleEditorTextChange(value: string) {
+    setText(value);
+    if (!pending) {
+      return;
+    }
+    if (value !== pending.snapshotFullText) {
+      setConflictMessage("增强后你又修改了编辑器内容。请重新增强最新一句，避免覆盖新内容。");
+      return;
+    }
+    setConflictMessage("");
+  }
+
   function ensureApiSettings(): boolean {
     if (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model)) {
       setSettingsOpen(true);
-      setError({ message: "API settings are required unless Mock Mode is enabled." });
+      setError({ message: "除非开启 Mock Mode，否则需要先填写 API Settings。" });
       return false;
     }
     return true;
@@ -212,14 +254,17 @@ export function LinguaTypeApp() {
     setConflictMessage("");
     setCopyMessage("");
     setLearningExtractionMessage("");
+    setSelectionAction(null);
 
     const range = extractLatestSentence(text);
     if (!range.sentence.trim()) {
       setEmpty(true);
+      setStatusMessage("");
       return;
     }
 
     if (!ensureApiSettings()) {
+      setStatusMessage("");
       return;
     }
 
@@ -233,8 +278,15 @@ export function LinguaTypeApp() {
       writingMode,
       enhancementLevel,
     };
+    setStatusMessage("正在增强...");
+    setPending({
+      requestId,
+      snapshotFullText,
+      latestSentenceRange: range,
+      originalSentence: range.sentence,
+      requestInput,
+    });
     setIsLoading(true);
-    setActiveTab("review");
 
     try {
       const result = await requestEnhancement(requestInput);
@@ -246,32 +298,39 @@ export function LinguaTypeApp() {
         requestInput,
         result,
       });
+      setStatusMessage("建议已生成");
     } catch (caught) {
       const payload = caught as { error?: string; rawResponse?: string };
       setError({
-        message: payload.error ?? "Enhancement failed. Please check API settings and try again.",
+        message: payload.error ?? "增强失败。请检查 API Settings 后重试。",
         rawResponse: payload.rawResponse,
       });
+      setStatusMessage("");
     } finally {
       setIsLoading(false);
     }
   }
 
   async function regenerateEnhancement() {
-    if (!pending) {
+    if (!pending?.result || isLoading || isRegenerating) {
       return;
     }
+    const requestId = crypto.randomUUID();
+    const nextPending: PendingEnhancement = { ...pending, requestId, result: undefined };
     setConflictMessage("");
     setCopyMessage("");
+    setStatusMessage("正在增强...");
+    setPending(nextPending);
     setIsRegenerating(true);
 
     try {
       const result = await requestEnhancement(pending.requestInput);
-      setPending({ ...pending, requestId: crypto.randomUUID(), result });
+      setPending({ ...nextPending, result });
+      setStatusMessage("已重新生成");
     } catch (caught) {
       const payload = caught as { error?: string; rawResponse?: string };
       setError({
-        message: payload.error ?? "Regenerate failed. Please try again.",
+        message: payload.error ?? "重新生成失败，请再试一次。",
         rawResponse: payload.rawResponse,
       });
     } finally {
@@ -280,34 +339,38 @@ export function LinguaTypeApp() {
   }
 
   function applyEnhancement() {
-    if (!pending) {
+    if (!pending?.result) {
+      return;
+    }
+    const completed: CompletedEnhancement = { ...pending, result: pending.result };
+
+    if (text !== completed.snapshotFullText) {
+      setConflictMessage("增强后你又修改了编辑器内容。请重新增强最新一句，避免覆盖新内容。");
       return;
     }
 
-    if (text !== pending.snapshotFullText) {
-      setConflictMessage("The editor changed after enhancement. Please enhance the latest sentence again.");
-      return;
-    }
-
-    const nextText = replaceLatestSentence(text, pending.latestSentenceRange, pending.result.finalSentence);
+    const nextText = replaceLatestSentence(text, completed.latestSentenceRange, completed.result.finalSentence);
     const paragraphRange = extractCurrentParagraph(
       nextText,
-      pending.latestSentenceRange.start + pending.result.finalSentence.length,
+      completed.latestSentenceRange.start + completed.result.finalSentence.length,
     );
 
     setText(nextText);
-    setPending(null);
+    if (triggerSettings.popoverBehavior.autoCloseAfterApply) {
+      setPending(null);
+    }
     setConflictMessage("");
     setCopyMessage("");
-    setLearningExtractionMessage("");
+    setLearningExtractionMessage("学习提取 Learning extraction 正在后台进行");
+    setStatusMessage("已应用 Applied");
     requestAnimationFrame(() => editorRef.current?.focus());
 
-    void runLearningExtraction(pending, nextText, paragraphRange.paragraph);
+    void runLearningExtraction(completed, nextText, paragraphRange.paragraph);
     void maybeRunParagraphHealthAfterApply(nextText, paragraphRange);
   }
 
   async function runLearningExtraction(
-    applied: PendingEnhancement,
+    applied: CompletedEnhancement,
     nextText: string,
     currentParagraph: string,
   ) {
@@ -348,12 +411,25 @@ export function LinguaTypeApp() {
         localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(nextEvents));
         return nextEvents;
       });
+      setLearningExtractionMessage("学习内容已保存到 Learning Library / Writing Habits");
+      setStatusMessage("学习内容已保存");
     } catch {
-      setLearningExtractionMessage("Learning extraction failed. Your applied text was kept.");
+      setLearningExtractionMessage("学习提取失败，但已应用的文本会保留。");
+      setStatusMessage("学习提取失败");
     }
   }
 
   async function maybeRunParagraphHealthAfterApply(nextText: string, paragraphRange: ParagraphRange) {
+    if (triggerSettings.paragraphHealthTrigger === "off" || triggerSettings.paragraphHealthTrigger === "manual_only") {
+      return;
+    }
+    appliedEditsSinceHealthRef.current += 1;
+    if (
+      triggerSettings.paragraphHealthTrigger === "after_3_applied_edits" &&
+      appliedEditsSinceHealthRef.current < 3
+    ) {
+      return;
+    }
     if (!shouldRunParagraphHealth(paragraphRange.paragraph)) {
       return;
     }
@@ -364,6 +440,7 @@ export function LinguaTypeApp() {
       if (cached.result.hasIssues) {
         setParagraphHealthNotice({ snapshotFullText: nextText, paragraphRange, result: cached.result });
       }
+      appliedEditsSinceHealthRef.current = 0;
       return;
     }
 
@@ -397,6 +474,8 @@ export function LinguaTypeApp() {
       if (result.hasIssues) {
         setParagraphHealthNotice({ snapshotFullText: nextText, paragraphRange, result });
       }
+      appliedEditsSinceHealthRef.current = 0;
+      setStatusMessage("段落健康 Paragraph Health 已检查");
     } finally {
       isHealthCheckingRef.current = false;
     }
@@ -412,18 +491,19 @@ export function LinguaTypeApp() {
     if (countSentences(paragraph) < 2) {
       return false;
     }
-    if (countEnglishWords(paragraph) < 40 && paragraph.length < 120) {
+    if (countEnglishWords(paragraph) < 40) {
       return false;
     }
     return true;
   }
 
   async function copyRevisedSentence() {
-    if (!pending) {
+    if (!pending?.result) {
       return;
     }
     await navigator.clipboard?.writeText(pending.result.finalSentence);
-    setCopyMessage("Revised sentence copied.");
+    setCopyMessage("修改后的句子已复制。");
+    setStatusMessage("已复制 Copied");
   }
 
   async function checkCurrentParagraph(cursorPosition?: number) {
@@ -445,7 +525,7 @@ export function LinguaTypeApp() {
     setInlineMenu((current) => ({ ...current, open: false }));
 
     if (!range.paragraph.trim()) {
-      setParagraphMessage("Please write a paragraph before checking flow.");
+      setParagraphMessage("请先写一段内容，再检查段落流畅度 Paragraph Flow。");
       setActiveTab("tools");
       return;
     }
@@ -482,7 +562,7 @@ export function LinguaTypeApp() {
       });
     } catch (caught) {
       const payload = caught as { error?: string };
-      setParagraphMessage(payload.error ?? "Paragraph flow check failed.");
+      setParagraphMessage(payload.error ?? "段落流畅度 Paragraph Flow 检查失败。");
     } finally {
       setIsParagraphLoading(false);
     }
@@ -493,7 +573,7 @@ export function LinguaTypeApp() {
       return;
     }
     if (text !== pendingParagraph.snapshotFullText) {
-      setParagraphConflictMessage("The paragraph changed after checking. Please check it again.");
+      setParagraphConflictMessage("检查后段落内容已变化。请重新检查，避免覆盖新内容。");
       return;
     }
 
@@ -529,8 +609,104 @@ export function LinguaTypeApp() {
     requestAnimationFrame(() => editorRef.current?.focus());
   }
 
+  function handleSelectionChange(selection: { start: number; end: number; text: string }) {
+    const selectedText = selection.text.trim();
+    if (!selectedText || selection.start === selection.end || !isEnglishSelection(selectedText)) {
+      setSelectionAction(null);
+      return;
+    }
+    setSelectionAction({
+      start: selection.start,
+      end: selection.end,
+      selectedText,
+    });
+  }
+
+  function closeSelectionActions() {
+    setSelectionAction(null);
+    requestAnimationFrame(() => editorRef.current?.focus());
+  }
+
+  async function explainSelectedText() {
+    if (!selectionAction || !ensureApiSettings()) {
+      return;
+    }
+    setIsSelectionLoading(true);
+    setSelectionAction((current) => current ? { ...current, message: "" } : current);
+
+    try {
+      const response = await fetch("/api/explain-selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedText: selectionAction.selectedText,
+          fullText: text,
+          currentParagraph: getCurrentParagraph(text, selectionAction.start),
+          writingMode,
+          apiConfig: apiSettings,
+        }),
+      });
+      const payload = (await response.json()) as SelectionExplainResult | { error?: string };
+      if (!response.ok || "error" in payload) {
+        throw payload;
+      }
+      setSelectionAction((current) =>
+        current
+          ? {
+              ...current,
+              explanation: payload as SelectionExplainResult,
+              message: "",
+            }
+          : current,
+      );
+    } catch {
+      setSelectionAction((current) =>
+        current ? { ...current, message: "选中文本解释失败。" } : current,
+      );
+    } finally {
+      setIsSelectionLoading(false);
+    }
+  }
+
+  function saveSelectedTextToLibrary() {
+    if (!selectionAction) {
+      return;
+    }
+    const explanation = selectionAction.explanation;
+    const draft: LearningItemDraft = {
+      type: mapSelectionExpressionType(explanation?.expressionType),
+      content: selectionAction.selectedText,
+      chineseMeaning: explanation?.meaningZh || "手动保存的选中表达。",
+      usageNote: explanation?.usageNoteZh || "从选中文本手动保存。",
+    };
+    const nextLibrary = upsertLearningItems(learningLibrary, [draft], {
+      sourceSentence: getCurrentParagraph(text, selectionAction.start) || selectionAction.selectedText,
+      writingMode,
+    });
+    persistLearningLibrary(nextLibrary);
+    setSelectionAction({
+      ...selectionAction,
+      message: "已保存到 Learning Library",
+    });
+  }
+
   function deleteHabitType(type: CorrectionEventType) {
     persistCorrectionEvents(correctionEvents.filter((event) => event.type !== type));
+  }
+
+  function clearLearningLibrary() {
+    persistLearningLibrary([]);
+  }
+
+  function clearWritingHabits() {
+    persistCorrectionEvents([]);
+  }
+
+  function closeCurrentSuggestion() {
+    setPending(null);
+    setConflictMessage("");
+    setCopyMessage("");
+    setStatusMessage("");
   }
 
   return (
@@ -539,24 +715,21 @@ export function LinguaTypeApp() {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-950">LinguaType</h1>
-            <p className="text-xs text-slate-500">Input-like expression learning assistant</p>
+            <p className="text-xs text-slate-500">输入法式英文表达助手</p>
           </div>
           {apiSettings.mockMode ? (
             <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-900">
-              Mock Mode
+              Mock Mode 演示模式
             </span>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ModeSelector value={writingMode} onChange={setWritingMode} />
-          <EnhancementLevelSelector value={enhancementLevel} onChange={setEnhancementLevel} />
-          <ShortcutHint />
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
-            API Settings
+            API Settings 设置
           </button>
         </div>
       </header>
@@ -569,11 +742,41 @@ export function LinguaTypeApp() {
               value={text}
               isLoading={isLoading}
               isExpressionMenuOpen={inlineMenu.open}
-              onChange={setText}
+              writingMode={writingMode}
+              enhancementLevel={enhancementLevel}
+              triggerSettings={triggerSettings}
+              onChange={handleEditorTextChange}
+              onWritingModeChange={setWritingMode}
+              onEnhancementLevelChange={setEnhancementLevel}
               onEnhance={enhanceLatestSentence}
               onOpenExpressionMenu={openInlineMenu}
               onCloseExpressionMenu={closeInlineMenu}
+              onSelectionChange={handleSelectionChange}
+              onEscape={() => {
+                if (selectionAction) {
+                  closeSelectionActions();
+                  return;
+                }
+                closeCurrentSuggestion();
+              }}
             />
+            {pending ? (
+              <div className="absolute inset-x-4 bottom-20 z-20 md:left-auto md:w-[min(640px,calc(100%-2rem))]">
+                <EnhancementPopover
+                  originalSentence={pending.originalSentence}
+                  result={pending.result}
+                  diffParts={diffParts}
+                  conflictMessage={conflictMessage}
+                  copyMessage={copyMessage}
+                  statusMessage={statusMessage}
+                  isRegenerating={isRegenerating}
+                  onApply={applyEnhancement}
+                  onCancel={closeCurrentSuggestion}
+                  onRegenerate={regenerateEnhancement}
+                  onCopy={copyRevisedSentence}
+                />
+              </div>
+            ) : null}
             <InlineExpressionMenu
               open={inlineMenu.open}
               library={learningLibrary}
@@ -582,7 +785,34 @@ export function LinguaTypeApp() {
               onInsert={(content) => insertIntoEditor(content, inlineMenu)}
               onCheckParagraph={() => void checkCurrentParagraph(inlineMenu.start)}
             />
+            {selectionAction ? (
+              <SelectionActionsPopover
+                selectedText={selectionAction.selectedText}
+                explanation={selectionAction.explanation}
+                isLoading={isSelectionLoading}
+                message={selectionAction.message}
+                onExplain={() => void explainSelectedText()}
+                onSave={saveSelectedTextToLibrary}
+                onClose={closeSelectionActions}
+              />
+            ) : null}
           </div>
+          {paragraphHealthNotice ? (
+            <section className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  段落健康 Paragraph Health：可能有 {paragraphHealthNotice.result.issueCount} 个问题
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void viewParagraphHealthSuggestions()}
+                  className="rounded border border-sky-300 bg-white px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100"
+                >
+                  查看建议
+                </button>
+              </div>
+            </section>
+          ) : null}
           {empty ? <EmptyState /> : null}
           {isLoading ? <LoadingState /> : null}
           {error ? <ErrorState message={error.message} rawResponse={error.rawResponse} /> : null}
@@ -608,48 +838,17 @@ export function LinguaTypeApp() {
 
           {activeTab === "review" ? (
             <div className="flex flex-col gap-4">
-              {pending ? (
-                <EnhancementPopover
-                  result={pending.result}
-                  diffParts={diffParts}
-                  conflictMessage={conflictMessage}
-                  copyMessage={copyMessage}
-                  isRegenerating={isRegenerating}
-                  onApply={applyEnhancement}
-                  onCancel={() => {
-                    setPending(null);
-                    setConflictMessage("");
-                    setCopyMessage("");
-                  }}
-                  onRegenerate={regenerateEnhancement}
-                  onCopy={copyRevisedSentence}
-                />
-              ) : (
-                <section className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-500">
-                  Enhance the latest sentence to review a code-generated diff here.
-                </section>
-              )}
+              <section className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                <h2 className="text-sm font-semibold text-slate-900">检查状态 Review</h2>
+                <p className="mt-2">
+                  当前句建议会优先出现在编辑器附近。这里保留低频状态和后台任务反馈。
+                </p>
+                {statusMessage ? <p className="mt-3 rounded-md bg-slate-50 p-3">{statusMessage}</p> : null}
+              </section>
               {learningExtractionMessage ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   {learningExtractionMessage}
                 </div>
-              ) : null}
-              {paragraphHealthNotice ? (
-                <section className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>
-                      Paragraph health: {paragraphHealthNotice.result.issueCount} possible{" "}
-                      {paragraphHealthNotice.result.issueCount === 1 ? "issue" : "issues"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void viewParagraphHealthSuggestions()}
-                      className="rounded border border-sky-300 bg-white px-2 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100"
-                    >
-                      View suggestions
-                    </button>
-                  </div>
-                </section>
               ) : null}
             </div>
           ) : null}
@@ -677,18 +876,35 @@ export function LinguaTypeApp() {
           ) : null}
 
           {activeTab === "tools" ? (
-            <ParagraphFlowPanel
-              result={pendingParagraph?.result}
-              diffParts={paragraphDiffParts}
-              isLoading={isParagraphLoading}
-              message={paragraphMessage}
-              conflictMessage={paragraphConflictMessage}
-              onCheck={() => void checkCurrentParagraph()}
-              onApply={applyParagraphCheck}
-              onCancel={() => {
-                setPendingParagraph(null);
-                setParagraphConflictMessage("");
-              }}
+            <div className="flex flex-col gap-4">
+              <TriggerSettingsPanel settings={triggerSettings} onChange={persistTriggerSettings} />
+              <section className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                需要检查当前段落时，请在编辑器内打开 Inline Expression Menu，然后选择 Check this paragraph。
+              </section>
+              {pendingParagraph || paragraphMessage || paragraphConflictMessage || isParagraphLoading ? (
+                <ParagraphFlowPanel
+                  result={pendingParagraph?.result}
+                  diffParts={paragraphDiffParts}
+                  isLoading={isParagraphLoading}
+                  message={paragraphMessage}
+                  conflictMessage={paragraphConflictMessage}
+                  onApply={applyParagraphCheck}
+                  onCancel={() => {
+                    setPendingParagraph(null);
+                    setParagraphConflictMessage("");
+                  }}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {activeTab === "data" ? (
+            <DataControlPanel
+              learningLibrary={learningLibrary}
+              correctionEvents={correctionEvents}
+              onClearLearningLibrary={clearLearningLibrary}
+              onClearWritingHabits={clearWritingHabits}
+              onResetApiSettings={clearSettings}
             />
           ) : null}
         </aside>
@@ -711,4 +927,20 @@ function countSentences(paragraph: string): number {
 
 function countEnglishWords(paragraph: string): number {
   return paragraph.match(/[A-Za-z]+(?:'[A-Za-z]+)?/gu)?.length ?? 0;
+}
+
+function isEnglishSelection(text: string): boolean {
+  return /[A-Za-z]/u.test(text) && !/[\u3400-\u9fff]/u.test(text);
+}
+
+function mapSelectionExpressionType(
+  expressionType?: SelectionExplainResult["expressionType"],
+): LearningItemDraft["type"] {
+  if (expressionType === "collocation") {
+    return "collocation";
+  }
+  if (expressionType === "sentence_pattern" || expressionType === "sentence") {
+    return "sentence_pattern";
+  }
+  return "phrase";
 }

@@ -4,16 +4,19 @@ import {
   buildLearningExtractionUserPrompt,
   buildParagraphHealthUserPrompt,
   buildParagraphFlowUserPrompt,
+  buildSelectionExplainUserPrompt,
   FAST_ENHANCEMENT_SYSTEM_PROMPT,
   LEARNING_EXTRACTION_SYSTEM_PROMPT,
   PARAGRAPH_HEALTH_SYSTEM_PROMPT,
   PARAGRAPH_FLOW_SYSTEM_PROMPT,
+  SELECTION_EXPLAIN_SYSTEM_PROMPT,
 } from "./prompts";
 import type {
   FastEnhanceInput,
   LearningExtractionInput,
   ParagraphCheckInput,
   ParagraphHealthInput,
+  SelectionExplainInput,
 } from "./types";
 
 const apiConfig = {
@@ -51,6 +54,27 @@ describe("LLM prompts", () => {
       expect(prompt).toContain("polished:");
     },
   );
+
+  it("does not ask the model to return code-owned fast enhancement fields", () => {
+    const input: FastEnhanceInput = {
+      fullText: "This may 影响 young people's values.",
+      latestSentence: "This may 影响 young people's values.",
+      previousContext: "",
+      currentParagraph: "This may 影响 young people's values.",
+      writingMode: "natural",
+      enhancementLevel: "balanced",
+      apiConfig,
+    };
+
+    const prompt = buildFastEnhancementUserPrompt(input);
+
+    expect(prompt).toContain('"finalSentence"');
+    expect(prompt).toContain('"explanationZh"');
+    expect(prompt).toContain("do not use double quote characters");
+    expect(prompt).not.toContain('"originalSentence"');
+    expect(prompt).not.toContain('"hasChinese"');
+    expect(prompt).not.toContain('"taskType"');
+  });
 
   it("keeps learning extraction focused on learning items and correction events", () => {
     const input: LearningExtractionInput = {
@@ -101,5 +125,22 @@ describe("LLM prompts", () => {
     expect(PARAGRAPH_FLOW_SYSTEM_PROMPT).toContain("Do not generate new arguments");
     expect(prompt).toContain("Current paragraph: First paragraph.");
     expect(prompt).toContain("ParagraphCheckResult");
+  });
+
+  it("keeps selection explanation non-mutating and JSON-only", () => {
+    const input: SelectionExplainInput = {
+      selectedText: "acquire knowledge",
+      fullText: "Students acquire knowledge through practice.",
+      currentParagraph: "Students acquire knowledge through practice.",
+      writingMode: "academic",
+      apiConfig,
+    };
+
+    const prompt = buildSelectionExplainUserPrompt(input);
+
+    expect(SELECTION_EXPLAIN_SYSTEM_PROMPT).toContain("Do not rewrite");
+    expect(prompt).toContain("SelectionExplainResult");
+    expect(prompt).toContain("acquire knowledge");
+    expect(prompt).not.toContain("finalSentence");
   });
 });

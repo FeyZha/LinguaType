@@ -102,14 +102,14 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor");
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, {
       target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
     });
-    fireEvent.change(screen.getByLabelText("Enhancement level"), { target: { value: "minimal" } });
+    fireEvent.change(screen.getByLabelText("增强强度 Enhancement Level"), { target: { value: "minimal" } });
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    expect(await screen.findByText("Suggested revision")).toBeInTheDocument();
+    expect(await screen.findByText("修改建议已生成")).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/enhance-fast");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { enhancementLevel: string };
     expect(body.enhancementLevel).toBe("minimal");
@@ -127,13 +127,13 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor");
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, {
       target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Enhance latest sentence" }));
-    await screen.findByText("Suggested revision");
-    fireEvent.click(screen.getByRole("button", { name: "Apply revision" }));
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    await screen.findByText("修改建议已生成");
+    fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
     expect(editor).toHaveValue(fastResult.finalSentence);
     await waitFor(() => {
@@ -152,16 +152,16 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor");
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, {
       target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Enhance latest sentence" }));
-    await screen.findByText("Suggested revision");
-    fireEvent.click(screen.getByRole("button", { name: "Apply revision" }));
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    await screen.findByText("修改建议已生成");
+    fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
     expect(editor).toHaveValue(fastResult.finalSentence);
-    expect(await screen.findByText("Learning extraction failed. Your applied text was kept.")).toBeInTheDocument();
+    expect(await screen.findByText("学习提取失败，但已应用的文本会保留。")).toBeInTheDocument();
   });
 
   it("regenerate and copy use fast results without saving learning data", async () => {
@@ -173,17 +173,17 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor");
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, {
       target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Enhance latest sentence" }));
-    await screen.findByText("Suggested revision");
-    fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    await screen.findByText("修改建议已生成");
+    fireEvent.click(screen.getByRole("button", { name: "重新生成 Regenerate" }));
     expect(await screen.findByText(regenerated.finalSentence)).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Copy revised sentence" }));
+      fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
     });
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/enhance-fast", "/api/enhance-fast"]);
@@ -205,17 +205,17 @@ describe("LinguaType v0.2.1 paragraph health", () => {
     render(<LinguaTypeApp />);
 
     const paragraph =
-      "AI tools are useful for students because they make daily practice easier. Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼. For example, for example, they save time when students review vocabulary and organize short writing tasks.";
-    const editor = await screen.findByLabelText("Writing editor");
+      "AI tools are useful for students because they make daily practice easier and support regular independent language practice. For example, for example, they save time when students review vocabulary and organize short writing tasks before class. Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.";
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, { target: { value: paragraph } });
-    fireEvent.click(screen.getByRole("button", { name: "Enhance latest sentence" }));
-    await screen.findByText("Suggested revision");
-    fireEvent.click(screen.getByRole("button", { name: "Apply revision" }));
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    await screen.findByText("修改建议已生成");
+    fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
-    expect(await screen.findByText("Paragraph health: 1 possible issue")).toBeInTheDocument();
+    expect(await screen.findByText("段落健康 Paragraph Health：可能有 1 个问题")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/check-paragraph-flow");
-    fireEvent.click(screen.getByRole("button", { name: "View suggestions" }));
-    expect(await screen.findByText("Paragraph flow check")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看建议" }));
+    expect(await screen.findByText("段落流畅度检查 Paragraph Flow")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/check-paragraph-flow");
   });
 
@@ -224,12 +224,14 @@ describe("LinguaType v0.2.1 paragraph health", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor");
+    const editor = await screen.findByLabelText("写作编辑器");
     fireEvent.change(editor, { target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." } });
-    fireEvent.click(screen.getByRole("button", { name: "Enhance latest sentence" }));
-    await screen.findByText("Suggested revision");
-    fireEvent.click(screen.getByRole("button", { name: "Copy revised sentence" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    await screen.findByText("修改建议已生成");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "取消 Cancel" }));
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/enhance-fast"]);
   });
@@ -241,14 +243,14 @@ describe("LinguaType v0.2.1 Inline Expression Menu", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor") as HTMLTextAreaElement;
+    const editor = await screen.findByLabelText("写作编辑器") as HTMLTextAreaElement;
     fireEvent.change(editor, { target: { value: "Hello world" } });
     editor.selectionStart = 6;
     editor.selectionEnd = 6;
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
-    expect(screen.getByText("Inline Expression Menu")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Explain reason" }));
+    expect(screen.getByText("表达菜单 Inline Expression Menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "解释原因 Explain reason" }));
     fireEvent.click(screen.getByRole("button", { name: "This may be because..." }));
 
     expect(editor).toHaveValue("Hello This may be because...world");
@@ -256,7 +258,7 @@ describe("LinguaType v0.2.1 Inline Expression Menu", () => {
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
     fireEvent.keyDown(editor, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByText("Inline Expression Menu")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("表达菜单 Inline Expression Menu")).not.toBeInTheDocument());
   });
 
   it("inserts expressions from the library and can trigger full paragraph flow check", async () => {
@@ -281,20 +283,20 @@ describe("LinguaType v0.2.1 Inline Expression Menu", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("Writing editor") as HTMLTextAreaElement;
+    const editor = await screen.findByLabelText("写作编辑器") as HTMLTextAreaElement;
     fireEvent.change(editor, { target: { value: paragraphResult.originalParagraph } });
     editor.selectionStart = 0;
     editor.selectionEnd = 0;
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "Insert from Library" }));
+    fireEvent.click(screen.getByRole("button", { name: "从 Learning Library 插入" }));
     fireEvent.click(screen.getByRole("button", { name: "as a result" }));
 
     expect(editor).toHaveValue(`as a result${paragraphResult.originalParagraph}`);
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "Check this paragraph" }));
+    fireEvent.click(screen.getByRole("button", { name: "检查当前段落" }));
 
-    expect(await screen.findByText("Paragraph flow check")).toBeInTheDocument();
+    expect(await screen.findByText("段落流畅度检查 Paragraph Flow")).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/check-paragraph-flow");
     expect(localStorage.getItem(CORRECTION_MEMORY_STORAGE_KEY)).toBeNull();
   });

@@ -16,15 +16,15 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">Writing Habits</h2>
+        <h2 className="text-sm font-semibold text-slate-900">写作习惯 Writing Habits</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Based on your recent applied edits, LinguaType summarizes recurring writing habits here.
+          基于你已 Apply 的修改，LinguaType 会在这里总结反复出现的写作习惯。
         </p>
       </div>
 
       {insights.length === 0 ? (
         <p className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-500">
-          Apply a few sentence suggestions first. LinguaType will summarize your writing habits here.
+          先应用几次句子建议。LinguaType 会把你认可过的修改总结成写作习惯。
         </p>
       ) : (
         <ul className="mt-4 space-y-3">
@@ -37,7 +37,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
                     <h3 className="font-semibold text-slate-900">{insight.titleZh}</h3>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600">
-                        Seen {insight.count}
+                        出现 {insight.count} 次
                       </span>
                       <span className={severityClassName(insight.severity)}>
                         {insight.severity}
@@ -49,7 +49,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
                     onClick={() => onDeleteType(insight.type)}
                     className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                   >
-                    Delete type
+                    删除此类
                   </button>
                 </div>
 
@@ -63,7 +63,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
                   onClick={() => setExpanded((current) => ({ ...current, [insight.id]: !isExpanded }))}
                   className="mt-3 rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-white"
                 >
-                  {isExpanded ? "Hide examples" : "Show examples"}
+                  {isExpanded ? "收起例子" : "查看例子"}
                 </button>
 
                 {isExpanded ? (

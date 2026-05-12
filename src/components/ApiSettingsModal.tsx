@@ -46,7 +46,7 @@ export function ApiSettingsModal({
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? "连接测试失败。");
       }
-      setTestMessage(draft.mockMode ? "Mock 模式已可用。" : "连接测试通过。");
+      setTestMessage(draft.mockMode ? "Mock Mode 已可用。" : "连接测试通过。");
     } catch (error) {
       setTestMessage(error instanceof Error ? error.message : "连接测试失败。");
     } finally {
@@ -63,9 +63,9 @@ export function ApiSettingsModal({
       <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">API 设置</h2>
+            <h2 className="text-lg font-semibold text-slate-950">API Settings 设置</h2>
             <p className="mt-1 text-sm text-slate-600">
-              设置只保存在当前浏览器。API Key 会随请求发送到接口，但不会保存在服务器。
+              设置只保存在当前浏览器。API Key 会随请求发送到本地 API route，但不会保存在服务器。
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
@@ -75,9 +75,9 @@ export function ApiSettingsModal({
 
         <label className="mt-5 flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 p-3">
           <span>
-            <span className="block text-sm font-semibold text-emerald-950">Mock 模式</span>
+            <span className="block text-sm font-semibold text-emerald-950">Mock Mode 演示模式</span>
             <span className="block text-xs text-emerald-800">
-              使用本地固定演示结果，无需填写真实 API 设置。
+              使用本地固定演示结果，不需要填写真实 API Settings。
             </span>
           </span>
           <input
@@ -111,7 +111,7 @@ export function ApiSettingsModal({
             />
           </label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">
-            模型名称
+            模型名称 Model
             <input
               value={draft.model}
               disabled={draft.mockMode}
@@ -123,7 +123,7 @@ export function ApiSettingsModal({
         </div>
 
         <details className="mt-4 rounded-md border border-slate-200 p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-700">高级设置</summary>
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">高级设置 Advanced</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm font-medium text-slate-700">
               Endpoint Path
@@ -135,7 +135,7 @@ export function ApiSettingsModal({
               />
             </label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">
-              温度
+              温度 Temperature
               <input
                 value={draft.temperature}
                 disabled={draft.mockMode}

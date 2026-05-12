@@ -10,11 +10,13 @@ import {
   buildLearningExtractionUserPrompt,
   buildParagraphHealthUserPrompt,
   buildParagraphFlowUserPrompt,
+  buildSelectionExplainUserPrompt,
   FAST_ENHANCEMENT_SYSTEM_PROMPT,
   LINGUATYPE_SYSTEM_PROMPT,
   LEARNING_EXTRACTION_SYSTEM_PROMPT,
   PARAGRAPH_HEALTH_SYSTEM_PROMPT,
   PARAGRAPH_FLOW_SYSTEM_PROMPT,
+  SELECTION_EXPLAIN_SYSTEM_PROMPT,
 } from "../prompts";
 import {
   normalizeEnhancementResult,
@@ -22,13 +24,16 @@ import {
   normalizeLearningExtractionResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
+  normalizeSelectionExplainResult,
 } from "../normalize";
 import {
   enhancementResultSchema,
+  fastEnhanceModelResultSchema,
   fastEnhanceResultSchema,
   learningExtractionResultSchema,
   paragraphCheckResultSchema,
   paragraphHealthResultSchema,
+  selectionExplainResultSchema,
   type ApiConfig,
   type EnhanceLatestSentenceInput,
   type EnhanceLatestSentenceResult,
@@ -40,6 +45,8 @@ import {
   type ParagraphCheckResult,
   type ParagraphHealthInput,
   type ParagraphHealthResult,
+  type SelectionExplainInput,
+  type SelectionExplainResult,
 } from "../types";
 
 type ChatCompletionResponse = {
@@ -111,7 +118,7 @@ export async function enhanceFastWithOpenAICompatibleProvider(
     buildFastEnhancementUserPrompt(input),
   );
   const parsed = parseModelJson(content);
-  const validated = fastEnhanceResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  const validated = fastEnhanceModelResultSchema.safeParse(extractEnhancementCandidate(parsed));
   if (!validated.success) {
     throw new InvalidModelSchemaError(
       `Provider returned an invalid fast enhancement response shape: ${validated.error.message}`,
@@ -212,6 +219,26 @@ export async function checkParagraphHealthWithOpenAICompatibleProvider(
   }
 
   return normalizeParagraphHealthResult(validated.data, input.currentParagraph);
+}
+
+export async function explainSelectionWithOpenAICompatibleProvider(
+  input: SelectionExplainInput,
+): Promise<SelectionExplainResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    SELECTION_EXPLAIN_SYSTEM_PROMPT,
+    buildSelectionExplainUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = selectionExplainResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid selection explanation response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeSelectionExplainResult(validated.data, input.selectedText);
 }
 
 export async function testOpenAICompatibleConnection(apiConfig: ApiConfig): Promise<boolean> {

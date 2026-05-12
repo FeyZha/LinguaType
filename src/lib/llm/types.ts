@@ -36,6 +36,15 @@ export type CorrectionEventType = z.infer<typeof correctionEventTypeSchema>;
 export const learningItemTypeSchema = z.enum(["phrase", "collocation", "sentence_pattern"]);
 export type LearningItemType = z.infer<typeof learningItemTypeSchema>;
 
+export const selectionExpressionTypeSchema = z.enum([
+  "word",
+  "phrase",
+  "collocation",
+  "sentence_pattern",
+  "sentence",
+]);
+export type SelectionExpressionType = z.infer<typeof selectionExpressionTypeSchema>;
+
 export const taskTypeSchema = z.enum([
   "mixed_chinese_rewrite",
   "english_polish",
@@ -139,13 +148,22 @@ export const fastEnhanceRequestSchema = enhanceRequestSchema;
 export type FastEnhanceInput = z.infer<typeof fastEnhanceRequestSchema>;
 
 export const fastEnhanceResultSchema = z.object({
-  originalSentence: z.string(),
+  originalSentence: z.string().optional().default(""),
   finalSentence: z.string(),
-  explanationZh: z.string(),
-  taskType: z.enum(["mixed_chinese_rewrite", "english_polish", "unchanged"]),
-  hasChinese: z.boolean(),
+  explanationZh: z.string().optional().default(""),
+  taskType: z.enum(["mixed_chinese_rewrite", "english_polish", "unchanged"]).optional().default("english_polish"),
+  hasChinese: z.boolean().optional().default(false),
 });
 export type FastEnhanceResult = z.infer<typeof fastEnhanceResultSchema>;
+
+export const fastEnhanceModelResultSchema = z.object({
+  originalSentence: z.string().optional(),
+  finalSentence: z.string(),
+  explanationZh: z.string().optional().default(""),
+  taskType: z.string().optional(),
+  hasChinese: z.boolean().optional(),
+});
+export type FastEnhanceModelResult = z.infer<typeof fastEnhanceModelResultSchema>;
 
 export const correctionEventDraftSchema = z.object({
   before: z.string(),
@@ -258,3 +276,20 @@ export const paragraphHealthCacheItemSchema = z.object({
   checkedAt: z.string(),
 });
 export type ParagraphHealthCacheItem = z.infer<typeof paragraphHealthCacheItemSchema>;
+
+export const selectionExplainRequestSchema = z.object({
+  selectedText: z.string(),
+  fullText: z.string(),
+  currentParagraph: z.string(),
+  writingMode: writingModeSchema,
+  apiConfig: apiConfigSchema,
+});
+export type SelectionExplainInput = z.infer<typeof selectionExplainRequestSchema>;
+
+export const selectionExplainResultSchema = z.object({
+  selectedText: z.string(),
+  meaningZh: z.string(),
+  usageNoteZh: z.string(),
+  expressionType: selectionExpressionTypeSchema,
+});
+export type SelectionExplainResult = z.infer<typeof selectionExplainResultSchema>;

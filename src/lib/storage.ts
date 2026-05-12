@@ -20,9 +20,23 @@ export const LEARNING_LIBRARY_STORAGE_KEY = "linguatype.learningLibrary.v1";
 export const CORRECTION_MEMORY_STORAGE_KEY = "linguatype.correctionMemory.v1";
 export const CORRECTION_EVENTS_STORAGE_KEY = "linguatype.correctionEvents.v1";
 export const PARAGRAPH_HEALTH_CACHE_STORAGE_KEY = "linguatype.paragraphHealthCache.v1";
+export const TRIGGER_SETTINGS_STORAGE_KEY = "linguatype.triggerSettings.v1";
 export const DRAFT_STORAGE_KEY = "linguatype.writingDraft.v1";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+export type TriggerSettings = {
+  sentenceEnhancementShortcut: "ctrl_enter" | "ctrl_j_legacy" | "button_only" | "disable_shortcut";
+  inlineExpressionMenuTrigger: "ctrl_k" | "floating_button" | "disabled";
+  paragraphHealthTrigger: "after_every_apply" | "after_3_applied_edits" | "manual_only" | "off";
+  writingHabitsFeedback: "badge" | "manual_only";
+  statusFeedbackStyle: "popover_footer" | "inline" | "toast";
+  popoverBehavior: {
+    autoCloseAfterApply: boolean;
+    escapeCloses: boolean;
+    suppressLargePanelAutoOpen: boolean;
+  };
+};
 
 export type UpsertLearningItemsOptions = {
   sourceSentence: string;
@@ -54,6 +68,31 @@ export function defaultApiSettings(): ApiConfig {
     supportsJsonMode: false,
     mockMode: true,
   };
+}
+
+export function defaultTriggerSettings(): TriggerSettings {
+  return {
+    sentenceEnhancementShortcut: "ctrl_enter",
+    inlineExpressionMenuTrigger: "ctrl_k",
+    paragraphHealthTrigger: "after_every_apply",
+    writingHabitsFeedback: "badge",
+    statusFeedbackStyle: "popover_footer",
+    popoverBehavior: {
+      autoCloseAfterApply: true,
+      escapeCloses: true,
+      suppressLargePanelAutoOpen: true,
+    },
+  };
+}
+
+export function loadTriggerSettingsFromStorage(storage: StorageLike): TriggerSettings {
+  return normalizeTriggerSettings(parseObject(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY)));
+}
+
+export function saveTriggerSettings(storage: StorageLike, settings: TriggerSettings): TriggerSettings {
+  const normalized = normalizeTriggerSettings(settings as unknown as Record<string, unknown>);
+  storage.setItem(TRIGGER_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 export function loadLearningLibraryFromStorage(
@@ -342,6 +381,10 @@ export function exportLearningLibraryJson(items: LearningItem[]): string {
   return JSON.stringify(items, null, 2);
 }
 
+export function exportWritingHabitsJson(events: CorrectionEvent[]): string {
+  return JSON.stringify(aggregateWritingHabits(events), null, 2);
+}
+
 export function learningKey(item: Pick<LearningItemDraft, "type" | "content">): string {
   return `${item.type}:${normalizeText(item.content)}`;
 }
@@ -368,6 +411,51 @@ function parseArray(value: string | null): Array<Record<string, unknown>> {
   } catch {
     return [];
   }
+}
+
+function parseObject(value: string | null): Record<string, unknown> | undefined {
+  if (!value) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSettings {
+  const defaults = defaultTriggerSettings();
+  const popoverBehavior = isRecord(value?.popoverBehavior) ? value.popoverBehavior : {};
+  return {
+    sentenceEnhancementShortcut: isSentenceEnhancementShortcut(value?.sentenceEnhancementShortcut)
+      ? value.sentenceEnhancementShortcut
+      : defaults.sentenceEnhancementShortcut,
+    inlineExpressionMenuTrigger: isInlineExpressionMenuTrigger(value?.inlineExpressionMenuTrigger)
+      ? value.inlineExpressionMenuTrigger
+      : defaults.inlineExpressionMenuTrigger,
+    paragraphHealthTrigger: isParagraphHealthTrigger(value?.paragraphHealthTrigger)
+      ? value.paragraphHealthTrigger
+      : defaults.paragraphHealthTrigger,
+    writingHabitsFeedback: isWritingHabitsFeedback(value?.writingHabitsFeedback)
+      ? value.writingHabitsFeedback
+      : defaults.writingHabitsFeedback,
+    statusFeedbackStyle: isStatusFeedbackStyle(value?.statusFeedbackStyle)
+      ? value.statusFeedbackStyle
+      : defaults.statusFeedbackStyle,
+    popoverBehavior: {
+      autoCloseAfterApply: typeof popoverBehavior.autoCloseAfterApply === "boolean"
+        ? popoverBehavior.autoCloseAfterApply
+        : defaults.popoverBehavior.autoCloseAfterApply,
+      escapeCloses: typeof popoverBehavior.escapeCloses === "boolean"
+        ? popoverBehavior.escapeCloses
+        : defaults.popoverBehavior.escapeCloses,
+      suppressLargePanelAutoOpen: typeof popoverBehavior.suppressLargePanelAutoOpen === "boolean"
+        ? popoverBehavior.suppressLargePanelAutoOpen
+        : defaults.popoverBehavior.suppressLargePanelAutoOpen,
+    },
+  };
 }
 
 function normalizeLearningItem(item: Record<string, unknown>, fallbackNow?: string): LearningItem {
@@ -541,6 +629,26 @@ function isParagraphIssueType(value: unknown): value is ParagraphIssueType {
     value === "tone_consistency" ||
     value === "weak_development"
   );
+}
+
+function isSentenceEnhancementShortcut(value: unknown): value is TriggerSettings["sentenceEnhancementShortcut"] {
+  return value === "ctrl_enter" || value === "ctrl_j_legacy" || value === "button_only" || value === "disable_shortcut";
+}
+
+function isInlineExpressionMenuTrigger(value: unknown): value is TriggerSettings["inlineExpressionMenuTrigger"] {
+  return value === "ctrl_k" || value === "floating_button" || value === "disabled";
+}
+
+function isParagraphHealthTrigger(value: unknown): value is TriggerSettings["paragraphHealthTrigger"] {
+  return value === "after_every_apply" || value === "after_3_applied_edits" || value === "manual_only" || value === "off";
+}
+
+function isWritingHabitsFeedback(value: unknown): value is TriggerSettings["writingHabitsFeedback"] {
+  return value === "badge" || value === "manual_only";
+}
+
+function isStatusFeedbackStyle(value: unknown): value is TriggerSettings["statusFeedbackStyle"] {
+  return value === "popover_footer" || value === "inline" || value === "toast";
 }
 
 function mapLegacyCorrectionType(value: unknown): CorrectionEventType {

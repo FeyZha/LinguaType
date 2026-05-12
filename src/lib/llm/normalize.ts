@@ -1,9 +1,11 @@
 import { containsChinese } from "@/lib/sentence";
 import type {
+  FastEnhanceModelResult,
   FastEnhanceResult,
   LearningExtractionResult,
   ParagraphCheckResult,
   ParagraphHealthResult,
+  SelectionExplainResult,
 } from "./types";
 import type { EnhanceLatestSentenceResult } from "./types";
 
@@ -35,7 +37,7 @@ export function normalizeEnhancementResult(
 }
 
 export function normalizeFastEnhanceResult(
-  result: FastEnhanceResult,
+  result: FastEnhanceModelResult,
   latestSentence: string,
 ): FastEnhanceResult {
   const hasChinese = containsChinese(latestSentence);
@@ -91,6 +93,18 @@ export function normalizeParagraphHealthResult(
     issueCount,
     issueTypes: result.hasIssues ? issueTypes : [],
     shortSummaryZh: result.shortSummaryZh || (result.hasIssues ? "Paragraph flow may need attention." : "Paragraph looks okay."),
+  };
+}
+
+export function normalizeSelectionExplainResult(
+  result: SelectionExplainResult,
+  selectedText: string,
+): SelectionExplainResult {
+  return {
+    selectedText,
+    meaningZh: result.meaningZh || `Selected expression: ${selectedText}`,
+    usageNoteZh: result.usageNoteZh || "Save this expression if it is useful for future writing.",
+    expressionType: result.expressionType,
   };
 }
 

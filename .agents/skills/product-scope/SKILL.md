@@ -5,28 +5,41 @@ description: Use when defining, reviewing, or changing LinguaType product scope,
 
 # Product Scope Skill
 
-LinguaType is a latest-sentence enhancement assistant for Chinese-speaking English learners.
+LinguaType v0.2.2 is a web-based, input-method-like English expression assistant for Chinese-speaking English learners.
 
-The app processes only the latest sentence when the user presses Ctrl/Cmd + J.
+## Product Definition
 
-Core product rules:
-1. No "/" trigger.
-2. No text selection requirement.
-3. No Chinese segment chooser.
-4. No multiple translation candidates.
-5. No full paragraph rewrite.
-6. No essay generation.
-7. No argument direction prediction.
-8. No database, auth, payment, or Chrome extension in v0.1.
-9. Main flow is latest-sentence enhancement.
-10. Learning items are saved after user applies the result.
+LinguaType is:
+- a latest-sentence enhancer
+- a mixed Chinese-English sentence converter
+- a light pure-English polishing tool
+- a local expression learning assistant
+- a local Learning Library and Writing Habits tool
 
-Core flow:
-User writes naturally → presses shortcut → app extracts latest sentence → AI revises only latest sentence → code diff highlights changes → user applies or cancels → learning items are saved.
-
-Reject or postpone features that make the MVP become:
-- a translation app
+LinguaType is not:
+- a general translator
+- a chatbot
 - an essay generator
-- a full writing correction platform
-- a social learning product
-- a real input method
+- a full essay correction or scoring tool
+- a Chrome extension
+- a real system-level input method
+- a cloud-sync product
+
+## Core Flow
+
+User writes naturally -> triggers latest sentence enhancement -> app extracts only the latest non-empty sentence -> `/api/enhance-fast` revises only that sentence -> code-generated diff appears near the editor -> user applies or cancels -> background learning extraction runs only after Apply.
+
+## Scope Rules
+
+1. Default enhancement trigger is `Ctrl/Cmd + Enter`.
+2. `Ctrl/Cmd + J` is legacy and editor-focused only when configured.
+3. No `/` trigger.
+4. No selected-text requirement for latest-sentence enhancement.
+5. No Chinese segment chooser.
+6. No multiple translation candidates.
+7. No full paragraph rewrite through latest-sentence enhancement.
+8. No essay generation, essay scoring, or argument direction prediction.
+9. No login, database, payment, cloud sync, Chrome extension, or real input method.
+10. Learning items and correction events are saved only after explicit user acceptance.
+
+Selection Actions are auxiliary and limited to explaining selected text or explicitly saving selected text to Learning Library. They must not become the main enhancement path.

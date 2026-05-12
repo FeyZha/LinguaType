@@ -4,16 +4,21 @@ import {
   CORRECTION_MEMORY_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
+  TRIGGER_SETTINGS_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   aggregateWritingHabits,
   defaultApiSettings,
+  defaultTriggerSettings,
   exportLearningLibraryJson,
+  exportWritingHabitsJson,
   filterLearningLibrary,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
+  loadTriggerSettingsFromStorage,
   saveParagraphHealthCache,
+  saveTriggerSettings,
   upsertCorrectionEvents,
   upsertLearningItems,
 } from "./storage";
@@ -48,6 +53,7 @@ describe("storage constants", () => {
     expect(CORRECTION_MEMORY_STORAGE_KEY).toBe("linguatype.correctionMemory.v1");
     expect(CORRECTION_EVENTS_STORAGE_KEY).toBe("linguatype.correctionEvents.v1");
     expect(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY).toBe("linguatype.paragraphHealthCache.v1");
+    expect(TRIGGER_SETTINGS_STORAGE_KEY).toBe("linguatype.triggerSettings.v1");
     expect(DRAFT_STORAGE_KEY).toBe("linguatype.writingDraft.v1");
   });
 
@@ -55,6 +61,48 @@ describe("storage constants", () => {
     const settings = defaultApiSettings();
     expect(settings.supportsJsonMode).toBe(false);
     expect(settings.maxTokens).toBeGreaterThanOrEqual(1600);
+  });
+});
+
+describe("v0.2.2 trigger settings storage", () => {
+  it("loads default low-intrusion trigger settings", () => {
+    expect(defaultTriggerSettings()).toEqual({
+      sentenceEnhancementShortcut: "ctrl_enter",
+      inlineExpressionMenuTrigger: "ctrl_k",
+      paragraphHealthTrigger: "after_every_apply",
+      writingHabitsFeedback: "badge",
+      statusFeedbackStyle: "popover_footer",
+      popoverBehavior: {
+        autoCloseAfterApply: true,
+        escapeCloses: true,
+        suppressLargePanelAutoOpen: true,
+      },
+    });
+  });
+
+  it("persists trigger settings and fills missing fields with defaults", () => {
+    const storage = createMemoryStorage({
+      [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        sentenceEnhancementShortcut: "disable_shortcut",
+        popoverBehavior: { escapeCloses: false },
+      }),
+    });
+
+    const loaded = loadTriggerSettingsFromStorage(storage);
+    expect(loaded.sentenceEnhancementShortcut).toBe("disable_shortcut");
+    expect(loaded.inlineExpressionMenuTrigger).toBe("ctrl_k");
+    expect(loaded.popoverBehavior).toEqual({
+      autoCloseAfterApply: true,
+      escapeCloses: false,
+      suppressLargePanelAutoOpen: true,
+    });
+
+    const saved = saveTriggerSettings(storage, {
+      ...loaded,
+      paragraphHealthTrigger: "manual_only",
+    });
+    expect(saved.paragraphHealthTrigger).toBe("manual_only");
+    expect(JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe("manual_only");
   });
 });
 
@@ -337,6 +385,7 @@ describe("correction events and writing habits", () => {
     });
     expect(insights[0].examples).toHaveLength(2);
     expect(insights[1]).toMatchObject({ type: "other", count: 1, severity: "low" });
+    expect(JSON.parse(exportWritingHabitsJson(items))[0].type).toBe("collocation");
   });
 });
 

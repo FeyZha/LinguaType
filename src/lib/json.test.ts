@@ -10,6 +10,20 @@ describe("model JSON parsing", () => {
     expect(parseModelJson('```json\n{"ok": true}\n```')).toEqual({ ok: true });
   });
 
+  it("repairs unescaped double quotes inside JSON string values", () => {
+    const raw = `\`\`\`json
+{
+  "finalSentence": "It determines the ceiling for a person's future development.",
+  "explanationZh": "将中文 "决定一个人的未来发展上限" 翻译为自然英文，"上限" 用 ceiling 表达更地道。"
+}
+\`\`\``;
+
+    expect(parseModelJson(raw)).toEqual({
+      finalSentence: "It determines the ceiling for a person's future development.",
+      explanationZh: '将中文 "决定一个人的未来发展上限" 翻译为自然英文，"上限" 用 ceiling 表达更地道。',
+    });
+  });
+
   it("extracts the first valid JSON object", () => {
     expect(parseModelJson('Here is the result: {"ok": true} thanks')).toEqual({ ok: true });
   });

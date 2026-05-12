@@ -6,6 +6,7 @@ import {
   normalizeLearningExtractionResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
+  normalizeSelectionExplainResult,
 } from "../normalize";
 import type {
   CorrectionDraft,
@@ -20,6 +21,8 @@ import type {
   ParagraphCheckResult,
   ParagraphHealthInput,
   ParagraphHealthResult,
+  SelectionExplainInput,
+  SelectionExplainResult,
 } from "../types";
 
 type Replacement = CorrectionDraft;
@@ -248,6 +251,22 @@ export async function checkParagraphHealthWithMockProvider(
   );
 }
 
+export async function explainSelectionWithMockProvider(
+  input: SelectionExplainInput,
+): Promise<SelectionExplainResult> {
+  const selectedText = input.selectedText.trim();
+  const expressionType = inferSelectionExpressionType(selectedText);
+  return normalizeSelectionExplainResult(
+    {
+      selectedText,
+      meaningZh: `Selected expression "${selectedText}" means a reusable English expression in this context.`,
+      usageNoteZh: "Use it when the same meaning or collocation fits your own sentence.",
+      expressionType,
+    },
+    selectedText,
+  );
+}
+
 function mapCorrectionEventType(item: CorrectionDraft): CorrectionEventDraft["type"] {
   if (item.type === "expression_translation") {
     return "chinese_transfer";
@@ -262,4 +281,21 @@ function mapCorrectionEventType(item: CorrectionDraft): CorrectionEventDraft["ty
     return item.type;
   }
   return "other";
+}
+
+function inferSelectionExpressionType(text: string): SelectionExplainResult["expressionType"] {
+  const normalized = text.trim().toLowerCase();
+  if (normalized === "acquire knowledge" || normalized === "pay attention to" || /\b(to|for|on|with)\b/u.test(normalized)) {
+    return "collocation";
+  }
+  if (normalized.includes("...")) {
+    return "sentence_pattern";
+  }
+  if (/[.!?]$/u.test(normalized)) {
+    return "sentence";
+  }
+  if (normalized.split(/\s+/u).filter(Boolean).length <= 1) {
+    return "word";
+  }
+  return "phrase";
 }

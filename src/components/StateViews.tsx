@@ -3,7 +3,7 @@
 export function EmptyState() {
   return (
     <div className="rounded-md border border-dashed border-slate-300 bg-white/70 px-4 py-3 text-sm text-slate-600">
-      Please write a sentence before enhancing.
+      请先写一句内容，再进行增强。
     </div>
   );
 }
@@ -11,7 +11,7 @@ export function EmptyState() {
 export function LoadingState() {
   return (
     <div className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-      Enhancing the latest sentence...
+      正在增强最新一句...
     </div>
   );
 }
@@ -28,7 +28,7 @@ export function ErrorState({
       <div>{message}</div>
       {rawResponse ? (
         <details className="mt-2">
-          <summary className="cursor-pointer font-medium">Show raw model response</summary>
+          <summary className="cursor-pointer font-medium">查看原始模型响应 raw model response</summary>
           <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-xs text-red-950">
             {rawResponse}
           </pre>

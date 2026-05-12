@@ -5,38 +5,56 @@ description: Use when implementing latest sentence extraction, Chinese detection
 
 # Latest Sentence Engine Skill
 
-The engine processes only the latest non-empty sentence.
+LinguaType v0.2.2 processes only the latest non-empty sentence for the main enhancement flow.
 
-Latest sentence extraction:
-1. Trim trailing whitespace for detection.
-2. Treat ".", "?", "!", "。", "？", "！", ";", "；", and newline as boundaries.
+## Extraction And Replacement
+
+1. Trim trailing whitespace for sentence detection.
+2. Treat `.`, `?`, `!`, Chinese sentence punctuation, semicolon, and newline as sentence boundaries.
 3. If the latest sentence has no ending punctuation, process it anyway.
 4. If the editor is empty, do not call the API.
-5. Preserve original fullText when replacing.
+5. Capture `snapshotFullText`, `latestSentenceRange`, and `originalSentence` at trigger time.
+6. On Apply, reject replacement if the current editor text differs from `snapshotFullText`.
+7. Replace only the captured range. Never use global string replacement.
 
-Chinese handling:
-1. If latest sentence contains Chinese, taskType is mixed_sentence_enhancement.
-2. Convert all Chinese segments in the latest sentence.
-3. If there are multiple Chinese segments, convert all in one API call.
+## Chinese Handling
+
+1. Detect Chinese in code with `containsChinese`; do not rely on the model to decide.
+2. If the latest sentence contains Chinese, convert all Chinese segments in one API call and polish the sentence.
+3. If there are multiple Chinese segments, convert all of them.
 4. Do not ask the user to choose a Chinese segment.
+5. Normalize the final task type to `mixed_chinese_rewrite`.
 
-Pure English handling:
-1. If latest sentence has no Chinese, taskType is english_sentence_polishing.
-2. Lightly polish only the latest sentence.
-3. Fix grammar, word order, tense, articles, and collocations.
+## Pure English Handling
+
+1. If the latest sentence has no Chinese, lightly polish it.
+2. Unchanged output is valid when the sentence is already natural.
+3. Fix grammar, word order, tense, articles, and collocations only when needed.
 4. Do not over-polish or change meaning.
+5. Normalize the final task type to `english_polish` or `unchanged`.
 
-API response must contain:
-- taskType
-- originalSentence
-- finalSentence
-- hasChinese
-- insertedExpressions
-- hasCorrection
-- corrections
-- coherenceRisk
-- learningItems
+## Fast Enhancement API
 
-Use zod to validate the response.
-Use robust JSON parsing.
-Do not let the LLM return HTML or Markdown.
+The main route is `POST /api/enhance-fast`.
+
+The model prompt should request only:
+- `finalSentence`
+- `explanationZh`
+
+The server owns and normalizes:
+- `originalSentence`
+- `hasChinese`
+- `taskType`
+
+The final API response may contain only:
+- `originalSentence`
+- `finalSentence`
+- `explanationZh`
+- `taskType`
+- `hasChinese`
+
+Do not return learning items, correction events, paragraph advice, Markdown, HTML, or multiple candidates from `/api/enhance-fast`.
+
+## JSON Robustness
+
+Use robust JSON parsing and zod validation for model outputs. The parser should tolerate common model wrapping such as Markdown code fences and recoverable unescaped quotes, but schema validation must still reject wrong shapes.

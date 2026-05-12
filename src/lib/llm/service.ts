@@ -3,6 +3,7 @@ import {
   checkParagraphHealthWithMockProvider,
   enhanceFastWithMockProvider,
   enhanceWithMockProvider,
+  explainSelectionWithMockProvider,
   extractLearningWithMockProvider,
 } from "./providers/mock";
 import {
@@ -10,6 +11,7 @@ import {
   checkParagraphHealthWithOpenAICompatibleProvider,
   enhanceFastWithOpenAICompatibleProvider,
   enhanceWithOpenAICompatibleProvider,
+  explainSelectionWithOpenAICompatibleProvider,
   extractLearningWithOpenAICompatibleProvider,
   testOpenAICompatibleConnection,
 } from "./providers/openaiCompatible";
@@ -25,6 +27,8 @@ import type {
   ParagraphCheckResult,
   ParagraphHealthInput,
   ParagraphHealthResult,
+  SelectionExplainInput,
+  SelectionExplainResult,
 } from "./types";
 
 export async function enhanceLatestSentenceWithLLM(
@@ -98,4 +102,17 @@ export async function checkParagraphHealthWithLLM(
   }
 
   return checkParagraphHealthWithOpenAICompatibleProvider(normalizedInput);
+}
+
+export async function explainSelectionWithLLM(
+  input: SelectionExplainInput,
+  apiConfig: ApiConfig = input.apiConfig,
+): Promise<SelectionExplainResult> {
+  const normalizedInput = { ...input, apiConfig };
+
+  if (apiConfig.mockMode) {
+    return explainSelectionWithMockProvider(normalizedInput);
+  }
+
+  return explainSelectionWithOpenAICompatibleProvider(normalizedInput);
 }

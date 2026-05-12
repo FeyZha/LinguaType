@@ -4,6 +4,7 @@ import type {
   LearningExtractionInput,
   ParagraphCheckInput,
   ParagraphHealthInput,
+  SelectionExplainInput,
 } from "./types";
 
 export const LINGUATYPE_SYSTEM_PROMPT = `You are an English writing sentence enhancement assistant for Chinese-speaking learners.
@@ -122,6 +123,19 @@ Rules:
 12. Do not include Markdown or HTML.
 13. Return one JSON object, not multiple versions.`;
 
+export const SELECTION_EXPLAIN_SYSTEM_PROMPT = `You are LinguaType's selected-expression explainer.
+
+The user selected text inside the editor. Explain only the selected text.
+
+Rules:
+1. Do not rewrite the selected text.
+2. Do not replace editor text.
+3. Do not suggest alternative versions.
+4. Do not generate a finalSentence field.
+5. Use the surrounding text only to explain meaning and usage.
+6. Return valid JSON only.
+7. Do not include Markdown or HTML.`;
+
 export function buildFastEnhancementUserPrompt(input: FastEnhanceInput): string {
   return `Input variables:
 Writing mode: ${input.writingMode}
@@ -148,15 +162,14 @@ polished:
 
 Return a FastEnhanceResult JSON object exactly in this shape:
 {
-  "originalSentence": "...",
   "finalSentence": "...",
-  "explanationZh": "simple Chinese explanation",
-  "taskType": "mixed_chinese_rewrite | english_polish | unchanged",
-  "hasChinese": true
+  "explanationZh": "simple Chinese explanation"
 }
 
 Important:
 - Return only the JSON object above.
+- Do not include originalSentence, hasChinese, or taskType; the server owns those fields.
+- In explanationZh, do not use double quote characters; use Chinese corner brackets or single quotes when quoting text.
 - Do not include learningItems, corrections, correctionEvents, coherenceRisk, Markdown, or HTML.
 - Do not wrap the object inside another key such as result, data, output, or content.`;
 }
@@ -321,4 +334,26 @@ Important:
 - Do not add new arguments.
 - Do not return Markdown or HTML.
 - Do not return multiple versions.`;
+}
+
+export function buildSelectionExplainUserPrompt(input: SelectionExplainInput): string {
+  return `Input variables:
+Writing mode: ${input.writingMode}
+Selected text: ${input.selectedText}
+Current paragraph for context only: ${input.currentParagraph}
+Full text for context only: ${input.fullText}
+
+Return a SelectionExplainResult JSON object exactly in this shape:
+{
+  "selectedText": "...",
+  "meaningZh": "simple Chinese meaning",
+  "usageNoteZh": "simple Chinese usage note",
+  "expressionType": "word | phrase | collocation | sentence_pattern | sentence"
+}
+
+Important:
+- Explain selectedText only.
+- Do not rewrite or polish the selected text.
+- Do not include sentence revision fields, learningItems, correctionEvents, Markdown, or HTML.
+- Return only JSON.`;
 }

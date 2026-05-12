@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  enhanceFastWithOpenAICompatibleProvider,
   enhanceWithOpenAICompatibleProvider,
   testOpenAICompatibleConnection,
 } from "./openaiCompatible";
-import type { ApiConfig, EnhanceLatestSentenceInput } from "../types";
+import type { ApiConfig, EnhanceLatestSentenceInput, FastEnhanceInput } from "../types";
 
 const baseConfig: ApiConfig = {
   provider: "openai-compatible",
@@ -22,6 +23,16 @@ const baseInput: EnhanceLatestSentenceInput = {
   latestSentence: "Many student believe that AI tools can 提高学习效率.",
   previousContext: "",
   currentParagraph: "Many student believe that AI tools can 提高学习效率.",
+  writingMode: "natural",
+  enhancementLevel: "balanced",
+  apiConfig: baseConfig,
+};
+
+const fastInput: FastEnhanceInput = {
+  fullText: "This may 影响 young people's values.",
+  latestSentence: "This may 影响 young people's values.",
+  previousContext: "",
+  currentParagraph: "This may 影响 young people's values.",
   writingMode: "natural",
   enhancementLevel: "balanced",
   apiConfig: baseConfig,
@@ -146,6 +157,37 @@ describe("openai compatible provider", () => {
     const result = await enhanceWithOpenAICompatibleProvider(baseInput);
 
     expect(result.finalSentence).toBe("Many students believe that AI tools can improve learning efficiency.");
+    expect(result.taskType).toBe("mixed_chinese_rewrite");
+  });
+
+  it("normalizes fast enhancement when the model echoes the prompt taskType union", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    finalSentence: "This may affect young people's values.",
+                    explanationZh: "将中文片段转换为自然英文。",
+                    taskType: "mixed_chinese_rewrite | english_polish | unchanged",
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const result = await enhanceFastWithOpenAICompatibleProvider(fastInput);
+
+    expect(result.originalSentence).toBe(fastInput.latestSentence);
+    expect(result.finalSentence).toBe("This may affect young people's values.");
+    expect(result.hasChinese).toBe(true);
     expect(result.taskType).toBe("mixed_chinese_rewrite");
   });
 
