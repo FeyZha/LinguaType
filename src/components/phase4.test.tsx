@@ -142,6 +142,22 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
   });
+
+  it("renders the current sentence suggestion as an inline diff bar without applying automatically", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(fastResult)));
+    render(<LinguaTypeApp />);
+
+    const editor = await screen.findByLabelText("写作编辑器");
+    fireEvent.change(editor, { target: { value: fastResult.originalSentence } });
+    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+
+    const suggestion = await screen.findByLabelText("当前句行内建议");
+    expect(suggestion).toHaveTextContent("当前句建议");
+    expect(suggestion).toHaveTextContent("bring bad influence to");
+    expect(suggestion).toHaveTextContent("have a negative influence on");
+    expect(editor).toHaveValue(fastResult.originalSentence);
+    expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
+  });
 });
 
 describe("LinguaType v0.2.2 ", () => {

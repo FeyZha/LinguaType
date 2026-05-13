@@ -8,7 +8,7 @@ type DiffViewerProps = {
 
 export function DiffViewer({ parts }: DiffViewerProps) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 text-sm leading-7">
+    <div className="rounded-md bg-transparent py-1 text-sm leading-7">
       {parts.map((part, index) => {
         if (part.removed) {
           return (

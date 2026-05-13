@@ -8,8 +8,8 @@
 | 主流程编排 | `src/components/LinguaTypeApp.tsx` | 管理 editor state、setup gating、writing archives、archive sidebar、inline setup edit、API calls、Apply 冲突检测、学习提取、outline check、sidebar state 和 localStorage hydration。 |
 | 写作存档 | `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 保存本地写作稿的标题、正文和 setup；支持新建、切换、重命名、删除和可折叠侧栏；不保存学习数据。 |
 | 写作准备 | `src/components/WritingSetupPanel.tsx`, `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 首次进入时收集领域、主题和大纲点；进入主界面后通过编辑器内联交互修改 setup；不调用 LLM，不生成正文。 |
-| 分段编辑器 | `src/components/WritingEditor.tsx` | 根据大纲点展示段落输入框、只读大纲提示和轻量内联大纲编辑入口，并把段落拼接为单个草稿文本交给主编排层。 |
-| 当前句建议 | `src/components/EnhancementPopover.tsx`, `src/components/DiffViewer.tsx` | 展示最新句建议、本地 diff、解释、Apply/Cancel/Regenerate/Copy。 |
+| 分段编辑器 | `src/components/WritingEditor.tsx` | 以 Typora 式文档流根据大纲点展示段落输入区、只读大纲标题和轻量内联大纲编辑入口，并把段落拼接为单个草稿文本交给主编排层。 |
+| 当前句建议 | `src/components/EnhancementPopover.tsx`, `src/components/DiffViewer.tsx` | 在编辑器附近以内联建议条展示最新句建议、本地 diff、解释、Apply/Cancel/Regenerate/Copy。 |
 | 主题偏好 | `src/components/ThemePreferenceControl.tsx`, `src/app/globals.css`, `src/lib/storage.ts` | 管理 light/dark/system，v0.2.5 只在主写作界面展示。 |
 | 大纲检查 API | `src/app/api/check-outline/route.ts`, `src/lib/llm/service.ts`, `src/lib/llm/prompts.ts`, `src/lib/llm/types.ts` | 检查大纲是否贴合主题；只提示，不修改。 |
 | Learning Library | `src/components/LearningLibraryPanel.tsx`, `src/lib/storage.ts` | 管理本地表达资产，支持搜索、收藏、复制、插入、删除和导出。 |
@@ -33,6 +33,6 @@
 - Storage 迁移、normalize 和 dedupe 集中在 `src/lib/storage.ts`。
 - Writing Archives 只保存正文和 setup，不写入 Learning Library 或 Correction Events；删除 archive 也不得触发学习数据保存。
 - 最新句增强只处理最新非空句，不改写整段。
-- 分段编辑器只是 UI 组织方式，不改变 Apply/Cancel 和 range replacement 规则。
+- 分段编辑器只是 UI 组织方式；即使呈现为 Typora 式文档流，也不改变 Apply/Cancel、空行拼接和 range replacement 规则。
 - 大纲检查只在用户确认内联 setup 修改后触发，只提示问题，不生成正文、不改写大纲、不保存学习数据。
 - 高频写作动作放在编辑器附近；右侧 sidebar 保持低频管理用途。

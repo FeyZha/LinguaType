@@ -32,7 +32,10 @@ export function EnhancementPopover({
   onCopy,
 }: EnhancementPopoverProps) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-lg">
+    <section
+      aria-label="当前句行内建议"
+      className="rounded-md border border-slate-200/80 bg-white/80 p-3 shadow-sm backdrop-blur"
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">当前句建议</h2>
@@ -89,14 +92,14 @@ export function EnhancementPopover({
           {copyMessage}
         </div>
       ) : null}
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-md bg-slate-50 p-3">
+      <div className="grid gap-3 text-sm">
+        <div className="rounded-md bg-slate-50/70 p-2">
           <div className="text-xs font-semibold uppercase text-slate-500">原句 Original</div>
-          <p className="mt-2 text-sm leading-6 text-slate-800">{originalSentence}</p>
+          <p className="mt-1 leading-6 text-slate-700">{originalSentence}</p>
         </div>
-        <div className="rounded-md bg-emerald-50 p-3">
+        <div className="rounded-md bg-emerald-50/80 p-2">
           <div className="text-xs font-semibold uppercase text-emerald-700">建议 Suggested</div>
-          <p className="mt-2 text-sm leading-6 text-slate-900">{result ? result.finalSentence : "检查中..."}</p>
+          <p className="mt-1 leading-6 text-slate-900">{result ? result.finalSentence : "检查中..."}</p>
         </div>
       </div>
       {result ? (
