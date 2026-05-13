@@ -4,24 +4,35 @@ import {
   CORRECTION_MEMORY_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
+  THEME_SETTINGS_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
   PERSONAL_DICTIONARY_STORAGE_KEY,
+  WRITING_SETUP_STORAGE_KEY,
+  WRITING_ARCHIVES_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   aggregateWritingHabits,
   defaultApiSettings,
+  defaultThemeSettings,
   defaultTriggerSettings,
+  defaultWritingSetup,
   exportLearningLibraryJson,
   exportWritingHabitsJson,
   filterLearningLibrary,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
   loadPersonalDictionaryFromStorage,
+  loadThemeSettingsFromStorage,
   loadTriggerSettingsFromStorage,
+  loadWritingArchivesFromStorage,
+  loadWritingSetupFromStorage,
   savePersonalDictionary,
   saveParagraphHealthCache,
+  saveThemeSettings,
   saveTriggerSettings,
+  saveWritingArchives,
+  saveWritingSetup,
   upsertCorrectionEvents,
   upsertLearningItems,
 } from "./storage";
@@ -59,12 +70,151 @@ describe("storage constants", () => {
     expect(TRIGGER_SETTINGS_STORAGE_KEY).toBe("linguatype.triggerSettings.v1");
     expect(PERSONAL_DICTIONARY_STORAGE_KEY).toBe("linguatype.personalDictionary.v1");
     expect(DRAFT_STORAGE_KEY).toBe("linguatype.writingDraft.v1");
+    expect(WRITING_SETUP_STORAGE_KEY).toBe("linguatype.writingSetup.v1");
+    expect(WRITING_ARCHIVES_STORAGE_KEY).toBe("linguatype.writingArchives.v1");
+    expect(THEME_SETTINGS_STORAGE_KEY).toBe("linguatype.themeSettings.v1");
   });
 
   it("defaults to JSON mode off and enough tokens for structured responses", () => {
     const settings = defaultApiSettings();
     expect(settings.supportsJsonMode).toBe(false);
     expect(settings.maxTokens).toBeGreaterThanOrEqual(1600);
+  });
+});
+
+describe("writing archives storage", () => {
+  it("initializes a default archive from legacy draft and setup without deleting legacy keys", () => {
+    const setup = {
+      topicArea: "technology",
+      essayTopic: "How AI changes education",
+      outlinePoints: ["Benefits", "Risks"],
+      outline: "Benefits\nRisks",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    };
+    const storage = createMemoryStorage({
+      [DRAFT_STORAGE_KEY]: "Existing draft sentence.",
+      [WRITING_SETUP_STORAGE_KEY]: JSON.stringify(setup),
+    });
+
+    const archives = loadWritingArchivesFromStorage(storage, {
+      now: "2026-05-14T01:00:00.000Z",
+      createId: () => "archive-1",
+    });
+
+    expect(archives.activeId).toBe("archive-1");
+    expect(archives.items).toHaveLength(1);
+    expect(archives.items[0]).toMatchObject({
+      id: "archive-1",
+      title: "How AI changes education",
+      text: "Existing draft sentence.",
+      setup: expect.objectContaining({ essayTopic: "How AI changes education" }),
+      createdAt: "2026-05-14T01:00:00.000Z",
+      updatedAt: "2026-05-14T01:00:00.000Z",
+    });
+    expect(storage.getItem(DRAFT_STORAGE_KEY)).toBe("Existing draft sentence.");
+    expect(storage.getItem(WRITING_SETUP_STORAGE_KEY)).toBe(JSON.stringify(setup));
+    expect(JSON.parse(storage.getItem(WRITING_ARCHIVES_STORAGE_KEY) ?? "{}").items).toHaveLength(1);
+  });
+
+  it("normalizes and saves active writing archives locally", () => {
+    const storage = createMemoryStorage();
+    const saved = saveWritingArchives(storage, {
+      activeId: "active",
+      items: [
+        {
+          id: "active",
+          title: "  ",
+          text: "Draft",
+          setup: null,
+          createdAt: "2026-05-14T00:00:00.000Z",
+          updatedAt: "2026-05-14T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(saved.items[0].title).toBe("未命名写作");
+    expect(loadWritingArchivesFromStorage(storage).activeId).toBe("active");
+  });
+});
+
+describe("writing setup storage", () => {
+  it("returns null when no setup has been saved", () => {
+    expect(loadWritingSetupFromStorage(createMemoryStorage())).toBeNull();
+  });
+
+  it("normalizes and saves writing setup locally", () => {
+    const storage = createMemoryStorage();
+    const saved = saveWritingSetup(storage, {
+      topicArea: "custom",
+      customTopicArea: "  public health  ",
+      essayTopic: "  How technology affects healthcare  ",
+      outlinePoints: ["  1. Benefits  ", "2. Risks  "],
+      outline: "  1. Benefits\n2. Risks  ",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    });
+
+    expect(saved).toEqual({
+      topicArea: "custom",
+      customTopicArea: "public health",
+      essayTopic: "How technology affects healthcare",
+      outlinePoints: ["1. Benefits", "2. Risks"],
+      outline: "1. Benefits\n2. Risks",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    });
+    expect(loadWritingSetupFromStorage(storage)).toEqual(saved);
+    expect(JSON.parse(storage.getItem(WRITING_SETUP_STORAGE_KEY) ?? "{}")).toMatchObject({
+      topicArea: "custom",
+      customTopicArea: "public health",
+    });
+  });
+
+  it("fills invalid writing setup fields with safe defaults", () => {
+    const storage = createMemoryStorage({
+      [WRITING_SETUP_STORAGE_KEY]: JSON.stringify({
+        topicArea: "invalid",
+        customTopicArea: "ignored",
+        essayTopic: 123,
+        outline: "  outline  ",
+      }),
+    });
+
+    expect(loadWritingSetupFromStorage(storage)).toMatchObject({
+      topicArea: defaultWritingSetup().topicArea,
+      customTopicArea: undefined,
+      essayTopic: "",
+      outlinePoints: ["outline"],
+      outline: "outline",
+    });
+  });
+});
+
+describe("theme settings storage", () => {
+  it("defaults to system theme", () => {
+    expect(defaultThemeSettings().preference).toBe("system");
+    expect(loadThemeSettingsFromStorage(createMemoryStorage()).preference).toBe("system");
+  });
+
+  it("normalizes and saves theme settings locally", () => {
+    const storage = createMemoryStorage();
+    const saved = saveThemeSettings(storage, {
+      preference: "dark",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    });
+
+    expect(saved).toEqual({
+      preference: "dark",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    });
+    expect(loadThemeSettingsFromStorage(storage)).toEqual(saved);
+    expect(JSON.parse(storage.getItem(THEME_SETTINGS_STORAGE_KEY) ?? "{}").preference).toBe("dark");
+  });
+
+  it("falls back to system for invalid theme settings", () => {
+    const storage = createMemoryStorage({
+      [THEME_SETTINGS_STORAGE_KEY]: JSON.stringify({ preference: "sepia" }),
+    });
+
+    expect(loadThemeSettingsFromStorage(storage).preference).toBe("system");
   });
 });
 

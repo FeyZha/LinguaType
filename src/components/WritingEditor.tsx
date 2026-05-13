@@ -7,23 +7,24 @@ import type { ProofreadingResult } from "@/lib/proofreading";
 import type { TriggerSettings } from "@/lib/storage";
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
-  natural: "Natural",
-  ielts: "IELTS",
-  academic: "Academic",
-  business: "Business",
-  concise: "Concise",
+  natural: "自然",
+  ielts: "雅思",
+  academic: "学术",
+  business: "商务",
+  concise: "简洁",
 };
 
 const ENHANCEMENT_LEVELS: EnhancementLevel[] = ["minimal", "balanced", "polished"];
 
 const ENHANCEMENT_LEVEL_LABELS: Record<EnhancementLevel, string> = {
-  minimal: "minimal",
-  balanced: "balanced",
-  polished: "polished",
+  minimal: "轻度",
+  balanced: "平衡",
+  polished: "润色",
 };
 
 type WritingEditorProps = {
   value: string;
+  outlinePoints?: string[];
   isLoading: boolean;
   isExpressionMenuOpen?: boolean;
   writingMode: WritingMode;
@@ -36,13 +37,28 @@ type WritingEditorProps = {
   onEnhance: () => void;
   onOpenExpressionMenu: (selection: { start: number; end: number }) => void;
   onCloseExpressionMenu: () => void;
-  onSelectionChange: (selection: { start: number; end: number; text: string }) => void;
+  onSelectionChange: (selection: {
+    start: number;
+    end: number;
+    text: string;
+    paragraphIndex: number;
+    anchorRect: DOMRect;
+    containerRect: DOMRect;
+  }) => void;
+  outlineEditState: { index: number; draft: string } | null;
+  onStartOutlineEdit: (index: number) => void;
+  onOutlineDraftChange: (draft: string) => void;
+  onSaveOutlineEdit: () => void;
+  onCancelOutlineEdit: () => void;
+  onAddOutlinePoint: () => void;
+  onDeleteOutlinePoint: (index: number) => void;
   onEscape: () => void;
 };
 
 export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>(
   function WritingEditor({
     value,
+    outlinePoints,
     isLoading,
     isExpressionMenuOpen,
     writingMode,
@@ -56,67 +72,153 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
     onOpenExpressionMenu,
     onCloseExpressionMenu,
     onSelectionChange,
+    outlineEditState,
+    onStartOutlineEdit,
+    onOutlineDraftChange,
+    onSaveOutlineEdit,
+    onCancelOutlineEdit,
+    onAddOutlinePoint,
+    onDeleteOutlinePoint,
     onEscape,
   }, ref) {
-    function reportSelection(target: HTMLTextAreaElement) {
+    const paragraphs = splitIntoParagraphInputs(value, outlinePoints?.length ?? 1);
+
+    function paragraphOffset(index: number): number {
+      return paragraphs.slice(0, index).reduce((sum, paragraph) => sum + paragraph.length + 2, 0);
+    }
+
+    function reportSelection(target: HTMLTextAreaElement, paragraphIndex: number) {
+      const offset = paragraphOffset(paragraphIndex);
       onSelectionChange({
-        start: target.selectionStart,
-        end: target.selectionEnd,
+        start: offset + target.selectionStart,
+        end: offset + target.selectionEnd,
         text: target.value.slice(target.selectionStart, target.selectionEnd),
+        paragraphIndex,
+        anchorRect: estimateSelectionRect(target),
+        containerRect: target.closest("[data-editor-container]")?.getBoundingClientRect() ?? target.getBoundingClientRect(),
       });
     }
 
-    function openExpressionMenu(target: HTMLTextAreaElement) {
+    function openExpressionMenu(target: HTMLTextAreaElement, paragraphIndex: number) {
+      const offset = paragraphOffset(paragraphIndex);
       onOpenExpressionMenu({
-        start: target.selectionStart,
-        end: target.selectionEnd,
+        start: offset + target.selectionStart,
+        end: offset + target.selectionEnd,
       });
+    }
+
+    function updateParagraph(index: number, nextValue: string) {
+      const nextParagraphs = [...paragraphs];
+      nextParagraphs[index] = nextValue;
+      onChange(nextParagraphs.join("\n\n"));
     }
 
     const triggerLabel = sentenceTriggerLabel(triggerSettings.sentenceEnhancementShortcut);
 
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <textarea
-          ref={ref}
-          value={value}
-          aria-label="写作编辑器"
-          onChange={(event) => {
-            onChange(event.target.value);
-            reportSelection(event.target);
-          }}
-          onMouseUp={(event) => reportSelection(event.currentTarget)}
-          onKeyUp={(event) => reportSelection(event.currentTarget)}
-          onKeyDown={(event) => {
-            const isCommand = event.ctrlKey || event.metaKey;
-            if (isCommand && event.key === "Enter" && triggerSettings.sentenceEnhancementShortcut === "ctrl_enter") {
-              event.preventDefault();
-              onEnhance();
-            }
-            if (isCommand && event.key.toLowerCase() === "j" && triggerSettings.sentenceEnhancementShortcut === "ctrl_j_legacy") {
-              event.preventDefault();
-              onEnhance();
-            }
-            if (isCommand && event.key.toLowerCase() === "k" && triggerSettings.inlineExpressionMenuTrigger === "ctrl_k") {
-              event.preventDefault();
-              openExpressionMenu(event.currentTarget);
-            }
-            if (event.key === "Escape" && isExpressionMenuOpen) {
-              event.preventDefault();
-              onCloseExpressionMenu();
-            }
-            if (event.key === "Escape" && !isExpressionMenuOpen && triggerSettings.popoverBehavior.escapeCloses) {
-              event.preventDefault();
-              onEscape();
-            }
-          }}
-          placeholder={[
-            "请直接写英文，卡住时可以夹中文。",
-            "例：This may 影响 young people's values.",
-            "按 Ctrl/Cmd + Enter 增强最新一句。",
-          ].join("\n")}
-          className="min-h-[520px] flex-1 resize-none rounded-md border border-slate-200 bg-white p-6 text-base leading-8 text-slate-900 shadow-sm outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/20"
-        />
+        <div className="grid min-h-[520px] flex-1 gap-3 overflow-auto" data-editor-container>
+          {paragraphs.map((paragraph, index) => (
+            <label key={index} className="grid min-h-[180px] gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+              <span className="grid gap-2 text-xs font-semibold text-slate-600">
+                <span className="flex items-center justify-between gap-3">
+                  <span>第 {index + 1} 段：{outlinePoints?.[index]?.trim() || "自由写作"}</span>
+                  <span className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onStartOutlineEdit(index)}
+                      aria-label={`编辑第 ${index + 1} 个大纲点`}
+                      className="rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteOutlinePoint(index)}
+                      aria-label={`删除第 ${index + 1} 个大纲点`}
+                      className="rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-red-700"
+                    >
+                      删除
+                    </button>
+                  </span>
+                </span>
+                {outlineEditState?.index === index ? (
+                  <span className="flex flex-wrap gap-2">
+                    <input
+                      value={outlineEditState.draft}
+                      onChange={(event) => onOutlineDraftChange(event.target.value)}
+                      aria-label={`内联第 ${index + 1} 个大纲点`}
+                      className="h-8 min-w-64 rounded-md border border-slate-300 px-2 text-xs text-slate-800 outline-none focus:border-moss"
+                    />
+                    <button
+                      type="button"
+                      onClick={onSaveOutlineEdit}
+                      className="rounded-md bg-moss px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      保存大纲点
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onCancelOutlineEdit}
+                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                    >
+                      取消
+                    </button>
+                  </span>
+                ) : null}
+                {index === paragraphs.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={onAddOutlinePoint}
+                    className="w-fit rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                  >
+                    + 大纲点
+                  </button>
+                ) : null}
+              </span>
+              <textarea
+                ref={index === 0 ? ref : undefined}
+                value={paragraph}
+                aria-label={index === 0 ? "写作编辑器" : `第 ${index + 1} 段正文`}
+                onChange={(event) => {
+                  updateParagraph(index, event.target.value);
+                  reportSelection(event.target, index);
+                }}
+                onMouseUp={(event) => reportSelection(event.currentTarget, index)}
+                onKeyUp={(event) => reportSelection(event.currentTarget, index)}
+                onKeyDown={(event) => {
+                  const isCommand = event.ctrlKey || event.metaKey;
+                  if (isCommand && event.key === "Enter" && triggerSettings.sentenceEnhancementShortcut === "ctrl_enter") {
+                    event.preventDefault();
+                    onEnhance();
+                  }
+                  if (isCommand && event.key.toLowerCase() === "j" && triggerSettings.sentenceEnhancementShortcut === "ctrl_j_legacy") {
+                    event.preventDefault();
+                    onEnhance();
+                  }
+                  if (isCommand && event.key.toLowerCase() === "k" && triggerSettings.inlineExpressionMenuTrigger === "ctrl_k") {
+                    event.preventDefault();
+                    openExpressionMenu(event.currentTarget, index);
+                  }
+                  if (event.key === "Escape" && isExpressionMenuOpen) {
+                    event.preventDefault();
+                    onCloseExpressionMenu();
+                  }
+                  if (event.key === "Escape" && !isExpressionMenuOpen && triggerSettings.popoverBehavior.escapeCloses) {
+                    event.preventDefault();
+                    onEscape();
+                  }
+                }}
+                placeholder={[
+                  "直接写英文，卡住时可以夹中文。",
+                  "例如：This may 影响 young people's values.",
+                  "按 Ctrl/Cmd + Enter 增强最新一句。",
+                ].join("\n")}
+                className="min-h-0 flex-1 resize-none bg-transparent text-base leading-8 text-slate-900 outline-none"
+              />
+            </label>
+          ))}
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
           <details className="group">
             <summary className="cursor-pointer list-none text-xs font-medium text-slate-600">
@@ -188,6 +290,33 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
   },
 );
 
+function splitIntoParagraphInputs(value: string, count: number): string[] {
+  const targetCount = Math.max(1, count);
+  if (targetCount === 1) {
+    return [value];
+  }
+  const parts = value.split(/\n{2,}/u);
+  while (parts.length < targetCount) {
+    parts.push("");
+  }
+  if (parts.length > targetCount) {
+    const head = parts.slice(0, targetCount - 1);
+    const tail = parts.slice(targetCount - 1).join("\n\n");
+    return [...head, tail];
+  }
+  return parts;
+}
+
+function estimateSelectionRect(target: HTMLTextAreaElement): DOMRect {
+  const rect = target.getBoundingClientRect();
+  const lineHeight = 32;
+  const textBeforeSelection = target.value.slice(0, target.selectionStart);
+  const lineIndex = textBeforeSelection.split(/\n/u).length - 1;
+  const top = rect.top + 12 + Math.min(lineIndex, 8) * lineHeight - target.scrollTop;
+  const left = rect.left + 24;
+  return new DOMRect(left, top, Math.min(240, Math.max(80, rect.width * 0.45)), lineHeight);
+}
+
 function sentenceTriggerLabel(value: TriggerSettings["sentenceEnhancementShortcut"]): string {
   if (value === "ctrl_j_legacy") {
     return "Ctrl/Cmd + J";
@@ -196,7 +325,7 @@ function sentenceTriggerLabel(value: TriggerSettings["sentenceEnhancementShortcu
     return "仅按钮";
   }
   if (value === "disable_shortcut") {
-    return "快捷键已关闭";
+    return "已关闭";
   }
   return "Ctrl/Cmd + Enter";
 }

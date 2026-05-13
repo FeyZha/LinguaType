@@ -11,9 +11,11 @@ import { ParagraphFlowPanel } from "./ParagraphFlowPanel";
 import { PersonalDictionaryPanel } from "./PersonalDictionaryPanel";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 import { EmptyState, ErrorState, LoadingState } from "./StateViews";
+import { ThemePreferenceControl } from "./ThemePreferenceControl";
 import { TriggerSettingsPanel } from "./TriggerSettingsPanel";
 import { WritingEditor } from "./WritingEditor";
 import { WritingHabitsPanel } from "./WritingHabitsPanel";
+import { TOPIC_OPTIONS, WritingSetupPanel } from "./WritingSetupPanel";
 import {
   createWordDiff,
   extractCurrentParagraph,
@@ -32,19 +34,33 @@ import {
   DRAFT_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
+  defaultWritingSetup,
   defaultApiSettings,
+  defaultThemeSettings,
   defaultTriggerSettings,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
   loadParagraphHealthCache,
   loadPersonalDictionaryFromStorage,
+  loadThemeSettingsFromStorage,
   loadTriggerSettingsFromStorage,
+  loadWritingArchivesFromStorage,
+  loadWritingSetupFromStorage,
   savePersonalDictionary,
+  saveWritingArchives,
   saveParagraphHealthCache,
+  saveThemeSettings,
   saveTriggerSettings,
+  saveWritingSetup,
+  type ThemeSettings,
   upsertCorrectionEvents,
   upsertLearningItems,
   type TriggerSettings,
+  type WritingArchivesState,
+  type WritingArchiveItem,
+  type WritingSetup,
+  type WritingTopicArea,
+  writingArchiveTitleFromSetup,
 } from "@/lib/storage";
 import type {
   ApiConfig,
@@ -56,6 +72,7 @@ import type {
   LearningExtractionResult,
   LearningItemDraft,
   LearningItem,
+  OutlineCheckResult,
   ParagraphCheckResult,
   ParagraphHealthCacheItem,
   ParagraphHealthResult,
@@ -100,9 +117,16 @@ type SelectionActionState = {
   start: number;
   end: number;
   selectedText: string;
+  position?: { left: number; top: number };
   explanation?: SelectionExplainResult;
   message?: string;
 };
+
+type InlineSetupEditState =
+  | { kind: "none" }
+  | { kind: "topic"; draft: string }
+  | { kind: "area"; draftArea: WritingTopicArea; draftCustomArea?: string }
+  | { kind: "outline-point"; index: number; draft: string };
 
 type SidebarTab = "review" | "library" | "habits" | "tools" | "data";
 
@@ -125,6 +149,11 @@ export function LinguaTypeApp() {
   const [enhancementLevel, setEnhancementLevel] = useState<EnhancementLevel>("balanced");
   const [apiSettings, setApiSettings] = useState<ApiConfig>(() => defaultApiSettings());
   const [triggerSettings, setTriggerSettings] = useState<TriggerSettings>(() => defaultTriggerSettings());
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(() => defaultThemeSettings());
+  const [writingArchives, setWritingArchives] = useState<WritingArchivesState>({ activeId: null, items: [] });
+  const [writingSetup, setWritingSetup] = useState<WritingSetup | null>(null);
+  const [setupComplete, setSetupComplete] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [learningLibrary, setLearningLibrary] = useState<LearningItem[]>([]);
   const [correctionEvents, setCorrectionEvents] = useState<CorrectionEvent[]>([]);
   const [personalDictionary, setPersonalDictionary] = useState<string[]>([]);
@@ -139,6 +168,9 @@ export function LinguaTypeApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isParagraphLoading, setIsParagraphLoading] = useState(false);
+  const [outlineCheckResult, setOutlineCheckResult] = useState<OutlineCheckResult | null>(null);
+  const [outlineCheckMessage, setOutlineCheckMessage] = useState("");
+  const [isOutlineChecking, setIsOutlineChecking] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
   const [paragraphMessage, setParagraphMessage] = useState("");
@@ -151,9 +183,21 @@ export function LinguaTypeApp() {
   const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("review");
+  const [archiveSidebarCollapsed, setArchiveSidebarCollapsed] = useState(false);
+  const [openArchiveMenuId, setOpenArchiveMenuId] = useState<string | null>(null);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+  const [renamingArchiveId, setRenamingArchiveId] = useState<string | null>(null);
+  const [inlineSetupEdit, setInlineSetupEdit] = useState<InlineSetupEditState>({ kind: "none" });
 
   useEffect(() => {
-    setText(localStorage.getItem(DRAFT_STORAGE_KEY) ?? "");
+    const storedSetup = loadWritingSetupFromStorage(localStorage);
+    const storedArchives = loadWritingArchivesFromStorage(localStorage);
+    const activeArchive = storedArchives.items.find((item) => item.id === storedArchives.activeId);
+    setWritingArchives(storedArchives);
+    setText(activeArchive?.text ?? localStorage.getItem(DRAFT_STORAGE_KEY) ?? "");
+    setWritingSetup(activeArchive?.setup ?? storedSetup);
+    setSetupComplete(Boolean(activeArchive?.setup ?? storedSetup));
+    setThemeSettings(loadThemeSettingsFromStorage(localStorage));
     const storedSettings = localStorage.getItem(API_SETTINGS_STORAGE_KEY);
     if (storedSettings) {
       setApiSettings({ ...defaultApiSettings(), ...(JSON.parse(storedSettings) as Partial<ApiConfig>) });
@@ -163,11 +207,57 @@ export function LinguaTypeApp() {
     setPersonalDictionary(loadPersonalDictionaryFromStorage(localStorage));
     setTriggerSettings(loadTriggerSettingsFromStorage(localStorage));
     healthCacheRef.current = loadParagraphHealthCache(localStorage);
+    setIsHydrated(true);
   }, []);
 
   useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
     localStorage.setItem(DRAFT_STORAGE_KEY, text);
-  }, [text]);
+    if (!writingArchives.activeId) {
+      return;
+    }
+    setWritingArchives((current) => {
+      const next = {
+        activeId: current.activeId,
+        items: current.items.map((item) =>
+          item.id === current.activeId
+            ? {
+                ...item,
+                text,
+                setup: writingSetup,
+                updatedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      };
+      saveWritingArchives(localStorage, next);
+      return next;
+    });
+  }, [isHydrated, text, writingSetup, writingArchives.activeId]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+    const root = document.documentElement;
+    root.dataset.themePreference = themeSettings.preference;
+    function applyResolvedTheme() {
+      const resolved = themeSettings.preference === "system"
+        ? typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        : themeSettings.preference;
+      root.dataset.theme = resolved;
+    }
+
+    applyResolvedTheme();
+    if (themeSettings.preference !== "system" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", applyResolvedTheme);
+    return () => media.removeEventListener("change", applyResolvedTheme);
+  }, [isHydrated, themeSettings.preference]);
 
   const diffParts: Change[] = useMemo(() => {
     if (!pending?.result) {
@@ -186,6 +276,11 @@ export function LinguaTypeApp() {
   const proofreadingResult = useMemo(
     () => analyzeProofreading(text, personalDictionary),
     [text, personalDictionary],
+  );
+
+  const activeArchive = useMemo(
+    () => writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null,
+    [writingArchives],
   );
 
   function saveSettings(settings: ApiConfig) {
@@ -207,6 +302,304 @@ export function LinguaTypeApp() {
   function persistTriggerSettings(settings: TriggerSettings) {
     const normalized = saveTriggerSettings(localStorage, settings);
     setTriggerSettings(normalized);
+  }
+
+  function persistThemeSettings(settings: ThemeSettings) {
+    const normalized = saveThemeSettings(localStorage, settings);
+    setThemeSettings(normalized);
+  }
+
+  function completeWritingSetup(setup: WritingSetup) {
+    const normalized = saveWritingSetup(localStorage, setup);
+    setWritingSetup(normalized);
+    upsertActiveArchive({
+      setup: normalized,
+      title: writingArchiveTitleFromSetup(normalized),
+    });
+    setSetupComplete(true);
+    requestAnimationFrame(() => editorRef.current?.focus());
+  }
+
+  function persistWritingSetup(setup: WritingSetup) {
+    const normalized = saveWritingSetup(localStorage, setup);
+    setWritingSetup(normalized);
+    upsertActiveArchive({ setup: normalized });
+  }
+
+  function upsertActiveArchive(patch: Partial<WritingArchiveItem>) {
+    const now = new Date().toISOString();
+    setWritingArchives((current) => {
+      const activeId = current.activeId ?? patch.id ?? crypto.randomUUID();
+      const hasActive = current.items.some((item) => item.id === activeId);
+      const base: WritingArchiveItem = {
+        id: activeId,
+        title: writingArchiveTitleFromSetup(patch.setup ?? writingSetup),
+        text,
+        setup: writingSetup,
+        createdAt: now,
+        updatedAt: now,
+        lastOpenedAt: now,
+      };
+      const next = {
+        activeId,
+        items: hasActive
+          ? current.items.map((item) =>
+              item.id === activeId
+                ? { ...item, ...patch, updatedAt: now, lastOpenedAt: now }
+                : item,
+            )
+          : [{ ...base, ...patch }, ...current.items],
+      };
+      saveWritingArchives(localStorage, next);
+      return next;
+    });
+  }
+
+  function createNewArchive() {
+    const now = new Date().toISOString();
+    const item = createBlankArchive(now);
+    setWritingArchives((current) => {
+      const next = { activeId: item.id, items: [item, ...current.items] };
+      saveWritingArchives(localStorage, next);
+      return next;
+    });
+    setText("");
+    setWritingSetup(item.setup);
+    if (item.setup) {
+      saveWritingSetup(localStorage, item.setup);
+    }
+    setSetupComplete(true);
+    setOutlineCheckResult(null);
+    setOutlineCheckMessage("");
+  }
+
+  function createBlankArchive(now = new Date().toISOString()): WritingArchiveItem {
+    return {
+      id: crypto.randomUUID(),
+      title: "未命名写作",
+      text: "",
+      setup: defaultWritingSetup(now),
+      createdAt: now,
+      updatedAt: now,
+      lastOpenedAt: now,
+    };
+  }
+
+  function switchArchive(id: string) {
+    const archive = writingArchives.items.find((item) => item.id === id);
+    if (!archive) {
+      return;
+    }
+    const now = new Date().toISOString();
+    const nextArchive = { ...archive, lastOpenedAt: now };
+    setWritingArchives((current) => {
+      const next = {
+        activeId: id,
+        items: current.items.map((item) => (item.id === id ? nextArchive : item)),
+      };
+      saveWritingArchives(localStorage, next);
+      return next;
+    });
+    setText(archive.text);
+    setWritingSetup(archive.setup);
+    if (archive.setup) {
+      saveWritingSetup(localStorage, archive.setup);
+    }
+    setSetupComplete(Boolean(archive.setup));
+    setOutlineCheckResult(null);
+    setOutlineCheckMessage("");
+  }
+
+  function renameActiveArchive(title: string) {
+    if (!writingArchives.activeId) {
+      return;
+    }
+    upsertActiveArchive({ title });
+  }
+
+  function renameArchive(id: string, title: string) {
+    const now = new Date().toISOString();
+    const next = {
+      activeId: writingArchives.activeId,
+      items: writingArchives.items.map((item) =>
+        item.id === id ? { ...item, title, updatedAt: now } : item,
+      ),
+    };
+    setWritingArchives(next);
+    saveWritingArchives(localStorage, next);
+  }
+
+  function deleteArchive(id: string) {
+    const now = new Date().toISOString();
+    const remaining = writingArchives.items.filter((item) => item.id !== id);
+    let nextActive = remaining.find((item) => item.id === writingArchives.activeId) ?? null;
+    let nextItems = remaining;
+
+    if (id === writingArchives.activeId) {
+      nextActive =
+        [...remaining].sort((a, b) => (b.lastOpenedAt ?? b.updatedAt).localeCompare(a.lastOpenedAt ?? a.updatedAt))[0] ??
+        null;
+      if (!nextActive) {
+        nextActive = createBlankArchive(now);
+        nextItems = [nextActive];
+      }
+    }
+
+    const nextState = {
+      activeId: nextActive?.id ?? null,
+      items: nextItems.map((item) => (item.id === nextActive?.id ? { ...item, lastOpenedAt: now } : item)),
+    };
+    setWritingArchives(nextState);
+    saveWritingArchives(localStorage, nextState);
+    setOpenArchiveMenuId(null);
+    setDeleteCandidateId(null);
+    setRenamingArchiveId(null);
+    if (id === writingArchives.activeId && nextActive) {
+      setText(nextActive.text);
+      setWritingSetup(nextActive.setup);
+      if (nextActive.setup) {
+        saveWritingSetup(localStorage, nextActive.setup);
+      }
+      setSetupComplete(Boolean(nextActive.setup));
+      setOutlineCheckResult(null);
+      setOutlineCheckMessage("");
+    }
+  }
+
+  function saveInlineSetup(nextSetup: WritingSetup, shouldCheckOutline: boolean) {
+    const normalized = saveWritingSetup(localStorage, {
+      ...nextSetup,
+      outline: nextSetup.outlinePoints.join("\n"),
+      updatedAt: new Date().toISOString(),
+    });
+    setWritingSetup(normalized);
+    upsertActiveArchive({ setup: normalized });
+    setSetupComplete(true);
+    setInlineSetupEdit({ kind: "none" });
+
+    if (!shouldCheckOutline) {
+      return;
+    }
+    const outlinePoints = normalized.outlinePoints.map((point) => point.trim()).filter(Boolean);
+    if (!normalized.essayTopic.trim() || outlinePoints.length === 0) {
+      setOutlineCheckResult(null);
+      setOutlineCheckMessage("");
+      return;
+    }
+    const controller = new AbortController();
+    void checkOutlineConsistency(normalized, outlinePoints, controller.signal);
+  }
+
+  function startTopicEdit() {
+    setInlineSetupEdit({ kind: "topic", draft: writingSetup?.essayTopic ?? "" });
+  }
+
+  function startAreaEdit() {
+    const setup = writingSetup ?? defaultWritingSetup();
+    setInlineSetupEdit({
+      kind: "area",
+      draftArea: setup.topicArea,
+      draftCustomArea: setup.customTopicArea,
+    });
+  }
+
+  function startOutlineEdit(index: number) {
+    setInlineSetupEdit({
+      kind: "outline-point",
+      index,
+      draft: writingSetup?.outlinePoints[index] ?? "",
+    });
+    setOutlineCheckMessage("");
+  }
+
+  function saveTopicEdit() {
+    if (inlineSetupEdit.kind !== "topic") {
+      return;
+    }
+    saveInlineSetup({ ...(writingSetup ?? defaultWritingSetup()), essayTopic: inlineSetupEdit.draft }, true);
+  }
+
+  function saveAreaEdit() {
+    if (inlineSetupEdit.kind !== "area") {
+      return;
+    }
+    saveInlineSetup(
+      {
+        ...(writingSetup ?? defaultWritingSetup()),
+        topicArea: inlineSetupEdit.draftArea,
+        customTopicArea: inlineSetupEdit.draftArea === "custom" ? inlineSetupEdit.draftCustomArea : undefined,
+      },
+      true,
+    );
+  }
+
+  function saveOutlinePointEdit() {
+    if (inlineSetupEdit.kind !== "outline-point") {
+      return;
+    }
+    const setup = writingSetup ?? defaultWritingSetup();
+    const outlinePoints = [...setup.outlinePoints];
+    outlinePoints[inlineSetupEdit.index] = inlineSetupEdit.draft;
+    saveInlineSetup({ ...setup, outlinePoints, outline: outlinePoints.join("\n") }, true);
+  }
+
+  function addOutlinePoint() {
+    const setup = writingSetup ?? defaultWritingSetup();
+    const outlinePoints = [...setup.outlinePoints, ""];
+    saveInlineSetup({ ...setup, outlinePoints, outline: outlinePoints.join("\n") }, false);
+    setInlineSetupEdit({ kind: "outline-point", index: outlinePoints.length - 1, draft: "" });
+  }
+
+  function deleteOutlinePoint(index: number) {
+    const setup = writingSetup ?? defaultWritingSetup();
+    if (setup.outlinePoints.length <= 1) {
+      return;
+    }
+    const paragraphs = text.split(/\n{2,}/u);
+    if ((paragraphs[index] ?? "").trim()) {
+      setOutlineCheckMessage("请先清空对应段落正文，再删除大纲点。");
+      return;
+    }
+    const outlinePoints = setup.outlinePoints.filter((_, pointIndex) => pointIndex !== index);
+    saveInlineSetup({ ...setup, outlinePoints, outline: outlinePoints.join("\n") }, true);
+  }
+
+  async function checkOutlineConsistency(setup: WritingSetup, outlinePoints: string[], signal: AbortSignal) {
+    if (!ensureApiSettings()) {
+      return;
+    }
+    setIsOutlineChecking(true);
+    setOutlineCheckMessage("");
+    try {
+      const topicArea = setup.topicArea === "custom" ? setup.customTopicArea ?? "自定义" : setup.topicArea;
+      const response = await fetch("/api/check-outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({
+          essayTopic: setup.essayTopic,
+          topicArea,
+          outlinePoints,
+          writingMode,
+          apiConfig: apiSettings,
+        }),
+      });
+      const payload = (await response.json()) as OutlineCheckResult | { error?: string };
+      if (!response.ok || "error" in payload) {
+        throw payload;
+      }
+      setOutlineCheckResult(payload as OutlineCheckResult);
+    } catch (caught) {
+      if (signal.aborted) {
+        return;
+      }
+      const payload = caught as { error?: string };
+      setOutlineCheckMessage(payload.error ?? "大纲检查暂时不可用。");
+    } finally {
+      if (!signal.aborted) {
+        setIsOutlineChecking(false);
+      }
+    }
   }
 
   function persistLearningLibrary(items: LearningItem[]) {
@@ -289,7 +682,7 @@ export function LinguaTypeApp() {
     const requestInput: Omit<FastEnhanceInput, "apiConfig"> = {
       fullText: snapshotFullText,
       latestSentence: range.sentence,
-      previousContext: getPreviousContext(snapshotFullText, range.start),
+      previousContext: withWritingSetupContext(getPreviousContext(snapshotFullText, range.start), writingSetup),
       currentParagraph: getCurrentParagraph(snapshotFullText, range.start),
       writingMode,
       enhancementLevel,
@@ -625,16 +1018,25 @@ export function LinguaTypeApp() {
     requestAnimationFrame(() => editorRef.current?.focus());
   }
 
-  function handleSelectionChange(selection: { start: number; end: number; text: string }) {
+  function handleSelectionChange(selection: {
+    start: number;
+    end: number;
+    text: string;
+    paragraphIndex: number;
+    anchorRect: DOMRect;
+    containerRect: DOMRect;
+  }) {
     const selectedText = selection.text.trim();
     if (!selectedText || selection.start === selection.end || !isEnglishSelection(selectedText)) {
       setSelectionAction(null);
       return;
     }
+    const position = calculateSelectionPopoverPosition(selection.anchorRect, selection.containerRect);
     setSelectionAction({
       start: selection.start,
       end: selection.end,
       selectedText,
+      position,
     });
   }
 
@@ -702,7 +1104,7 @@ export function LinguaTypeApp() {
     persistLearningLibrary(nextLibrary);
     setSelectionAction({
       ...selectionAction,
-      message: "已保存到 Learning Library",
+      message: "已保存到表达库",
     });
   }
 
@@ -725,6 +1127,27 @@ export function LinguaTypeApp() {
     setStatusMessage("");
   }
 
+  if (!isHydrated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          正在加载 LinguaType...
+        </div>
+      </main>
+    );
+  }
+
+  if (!setupComplete) {
+    return (
+      <WritingSetupPanel
+        initialSetup={writingSetup}
+        hasDraft={Boolean(text.trim())}
+        onSubmit={completeWritingSetup}
+        onContinue={() => setSetupComplete(true)}
+      />
+    );
+  }
+
   return (
     <main className="flex min-h-screen flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-5 py-3 backdrop-blur">
@@ -740,6 +1163,7 @@ export function LinguaTypeApp() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ThemePreferenceControl settings={themeSettings} onChange={persistThemeSettings} compact />
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -750,12 +1174,72 @@ export function LinguaTypeApp() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_390px]">
+      <div
+        className={`grid flex-1 gap-4 p-4 ${
+          archiveSidebarCollapsed
+            ? "xl:grid-cols-[64px_minmax(0,1fr)_390px]"
+            : "xl:grid-cols-[260px_minmax(0,1fr)_390px]"
+        }`}
+      >
+        <ArchiveSidebar
+          archives={writingArchives}
+          activeArchive={activeArchive}
+          collapsed={archiveSidebarCollapsed}
+          openMenuArchiveId={openArchiveMenuId}
+          deleteCandidateId={deleteCandidateId}
+          renamingArchiveId={renamingArchiveId}
+          onCollapse={() => setArchiveSidebarCollapsed(true)}
+          onExpand={() => setArchiveSidebarCollapsed(false)}
+          onCreate={createNewArchive}
+          onSwitch={switchArchive}
+          onRenameActive={renameActiveArchive}
+          onRenameArchive={renameArchive}
+          onOpenMenu={(id) => {
+            setOpenArchiveMenuId(openArchiveMenuId === id ? null : id);
+            setDeleteCandidateId(null);
+          }}
+          onStartRename={(id) => {
+            setRenamingArchiveId(id);
+            setOpenArchiveMenuId(null);
+          }}
+          onRequestDelete={(id) => setDeleteCandidateId(id)}
+          onCancelDelete={() => setDeleteCandidateId(null)}
+          onConfirmDelete={deleteArchive}
+        />
         <section className="flex min-h-0 flex-col gap-4">
+          <section className="rounded-md border border-slate-200 bg-white px-4 py-3">
+            <InlineSetupControls
+              activeArchive={activeArchive}
+              setup={writingSetup}
+              editState={inlineSetupEdit}
+              onStartTopicEdit={startTopicEdit}
+              onStartAreaEdit={startAreaEdit}
+              onEditStateChange={setInlineSetupEdit}
+              onSaveTopic={saveTopicEdit}
+              onSaveArea={saveAreaEdit}
+              onCancel={() => setInlineSetupEdit({ kind: "none" })}
+            />
+              {isOutlineChecking ? (
+                <p className="mt-3 text-xs text-slate-500">正在检查大纲与主题是否一致...</p>
+              ) : null}
+              {outlineCheckResult?.hasIssues ? (
+                <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {outlineCheckResult.suggestionsZh.map((suggestion) => (
+                    <p key={suggestion}>{suggestion}</p>
+                  ))}
+                </div>
+              ) : null}
+              {outlineCheckMessage ? (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {outlineCheckMessage}
+                </p>
+              ) : null}
+          </section>
           <div className="relative flex min-h-0 flex-1 flex-col">
             <WritingEditor
               ref={editorRef}
               value={text}
+              outlinePoints={writingSetup?.outlinePoints}
               isLoading={isLoading}
               isExpressionMenuOpen={inlineMenu.open}
               writingMode={writingMode}
@@ -769,6 +1253,17 @@ export function LinguaTypeApp() {
               onOpenExpressionMenu={openInlineMenu}
               onCloseExpressionMenu={closeInlineMenu}
               onSelectionChange={handleSelectionChange}
+              outlineEditState={inlineSetupEdit.kind === "outline-point" ? inlineSetupEdit : null}
+              onStartOutlineEdit={startOutlineEdit}
+              onOutlineDraftChange={(draft) =>
+                setInlineSetupEdit((current) =>
+                  current.kind === "outline-point" ? { ...current, draft } : current,
+                )
+              }
+              onSaveOutlineEdit={saveOutlinePointEdit}
+              onCancelOutlineEdit={() => setInlineSetupEdit({ kind: "none" })}
+              onAddOutlinePoint={addOutlinePoint}
+              onDeleteOutlinePoint={deleteOutlinePoint}
               onEscape={() => {
                 if (selectionAction) {
                   closeSelectionActions();
@@ -805,6 +1300,7 @@ export function LinguaTypeApp() {
             {selectionAction ? (
               <SelectionActionsPopover
                 selectedText={selectionAction.selectedText}
+                position={selectionAction.position}
                 explanation={selectionAction.explanation}
                 isLoading={isSelectionLoading}
                 message={selectionAction.message}
@@ -939,6 +1435,342 @@ export function LinguaTypeApp() {
   );
 }
 
+function ArchiveSidebar({
+  archives,
+  activeArchive,
+  collapsed,
+  openMenuArchiveId,
+  deleteCandidateId,
+  renamingArchiveId,
+  onCollapse,
+  onExpand,
+  onCreate,
+  onSwitch,
+  onRenameActive,
+  onRenameArchive,
+  onOpenMenu,
+  onStartRename,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  archives: WritingArchivesState;
+  activeArchive: WritingArchiveItem | null;
+  collapsed: boolean;
+  openMenuArchiveId: string | null;
+  deleteCandidateId: string | null;
+  renamingArchiveId: string | null;
+  onCollapse: () => void;
+  onExpand: () => void;
+  onCreate: () => void;
+  onSwitch: (id: string) => void;
+  onRenameActive: (title: string) => void;
+  onRenameArchive: (id: string, title: string) => void;
+  onOpenMenu: (id: string) => void;
+  onStartRename: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: (id: string) => void;
+}) {
+  if (collapsed) {
+    return (
+      <aside className="flex min-h-0 flex-col items-center gap-2 rounded-md border border-slate-200 bg-white p-2">
+        <button
+          type="button"
+          onClick={onExpand}
+          aria-label="展开写作存档"
+          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          ☰
+        </button>
+        <button
+          type="button"
+          onClick={onCreate}
+          aria-label="新建写作"
+          className="rounded-md bg-slate-900 px-2 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
+        >
+          +
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="flex min-h-0 flex-col gap-3 rounded-md border border-slate-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">写作存档</h2>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onCreate}
+            className="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+          >
+            新建
+          </button>
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="收起写作存档"
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            ←
+          </button>
+        </div>
+      </div>
+      {activeArchive ? (
+        <label className="grid gap-1 text-xs font-medium text-slate-600">
+          当前存档标题
+          <input
+            value={activeArchive.title}
+            onChange={(event) => onRenameActive(event.target.value)}
+            aria-label="当前存档标题"
+            className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-800 outline-none focus:border-moss"
+          />
+        </label>
+      ) : null}
+      <div className="grid gap-1 overflow-auto">
+        {archives.items.map((item) => (
+          <div
+            key={item.id}
+            className={`relative rounded-md transition ${
+              item.id === archives.activeId ? "bg-moss/10 text-moss" : "text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <div className="flex items-start gap-1">
+              {renamingArchiveId === item.id ? (
+                <input
+                  value={item.title}
+                  onChange={(event) => onRenameArchive(item.id, event.target.value)}
+                  onBlur={() => onStartRename("")}
+                  aria-label={`重命名存档：${item.title || "未命名写作"}`}
+                  className="m-2 min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-800 outline-none focus:border-moss"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSwitch(item.id)}
+                  aria-current={item.id === archives.activeId ? "true" : undefined}
+                  className="min-w-0 flex-1 px-3 py-2 text-left text-sm"
+                >
+                  <span className="block truncate font-medium">{item.title || "未命名写作"}</span>
+                  <span className="mt-1 block truncate text-xs font-normal text-slate-500">
+                    {item.setup?.essayTopic || "未填写主题"}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onOpenMenu(item.id)}
+                aria-label={`打开存档操作：${item.title || "未命名写作"}`}
+                className="m-1 rounded px-2 py-1 text-sm text-slate-500 hover:bg-white"
+              >
+                ...
+              </button>
+            </div>
+            {openMenuArchiveId === item.id ? (
+              <div className="absolute right-2 top-9 z-20 grid min-w-28 gap-1 rounded-md border border-slate-200 bg-white p-1 text-sm shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => onStartRename(item.id)}
+                  className="rounded px-2 py-1.5 text-left text-slate-700 hover:bg-slate-50"
+                >
+                  重命名
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRequestDelete(item.id)}
+                  className="rounded px-2 py-1.5 text-left text-red-700 hover:bg-red-50"
+                >
+                  删除存档
+                </button>
+              </div>
+            ) : null}
+            {deleteCandidateId === item.id ? (
+              <div className="mx-2 mb-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-900">
+                <p>只删除这个本地写作存档，不会删除表达库或写作习惯。</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onConfirmDelete(item.id)}
+                    className="rounded bg-red-700 px-2 py-1 font-semibold text-white"
+                  >
+                    确认删除存档
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelDelete}
+                    className="rounded border border-red-200 bg-white px-2 py-1 text-red-700"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function InlineSetupControls({
+  activeArchive,
+  setup,
+  editState,
+  onStartTopicEdit,
+  onStartAreaEdit,
+  onEditStateChange,
+  onSaveTopic,
+  onSaveArea,
+  onCancel,
+}: {
+  activeArchive: WritingArchiveItem | null;
+  setup: WritingSetup | null;
+  editState: InlineSetupEditState;
+  onStartTopicEdit: () => void;
+  onStartAreaEdit: () => void;
+  onEditStateChange: (state: InlineSetupEditState) => void;
+  onSaveTopic: () => void;
+  onSaveArea: () => void;
+  onCancel: () => void;
+}) {
+  const topicAreaLabel = topicAreaDisplayLabel(setup);
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-slate-950">
+            {activeArchive?.title || setup?.essayTopic || "未命名写作"}
+          </h2>
+          {editState.kind === "topic" ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                value={editState.draft}
+                onChange={(event) => onEditStateChange({ ...editState, draft: event.target.value })}
+                aria-label="内联文章主题"
+                className="h-9 min-w-72 rounded-md border border-slate-300 px-3 text-sm text-slate-800 outline-none focus:border-moss"
+              />
+              <button
+                type="button"
+                onClick={onSaveTopic}
+                className="rounded-md bg-moss px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                保存主题
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span>{setup?.essayTopic || "未填写主题"}</span>
+              <button
+                type="button"
+                onClick={onStartTopicEdit}
+                aria-label="编辑文章主题"
+                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+              >
+                编辑
+              </button>
+            </p>
+          )}
+        </div>
+        <div className="text-xs text-slate-500">
+          {editState.kind === "area" ? (
+            <div className="grid gap-2">
+              <div className="flex flex-wrap gap-1" aria-label="内联写作领域">
+                {TOPIC_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      onEditStateChange({
+                        ...editState,
+                        draftArea: option.value,
+                        draftCustomArea: option.value === "custom" ? editState.draftCustomArea ?? "" : undefined,
+                      })
+                    }
+                    className={`rounded border px-2 py-1 ${
+                      editState.draftArea === option.value
+                        ? "border-moss bg-moss text-white"
+                        : "border-slate-300 bg-white text-slate-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {editState.draftArea === "custom" ? (
+                <input
+                  value={editState.draftCustomArea ?? ""}
+                  onChange={(event) => onEditStateChange({ ...editState, draftCustomArea: event.target.value })}
+                  aria-label="内联自定义领域"
+                  className="h-8 rounded-md border border-slate-300 px-2 text-xs text-slate-800 outline-none focus:border-moss"
+                />
+              ) : null}
+              <div className="flex gap-2">
+                <button type="button" onClick={onSaveArea} className="rounded bg-moss px-2 py-1 text-white">
+                  保存领域
+                </button>
+                <button type="button" onClick={onCancel} className="rounded border border-slate-300 px-2 py-1">
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="flex flex-wrap items-center gap-2">
+              <span>领域：{topicAreaLabel}</span>
+              <button
+                type="button"
+                onClick={onStartAreaEdit}
+                aria-label="编辑写作领域"
+                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+              >
+                编辑
+              </button>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function topicAreaDisplayLabel(setup: WritingSetup | null): string {
+  if (!setup) {
+    return "未填写";
+  }
+  if (setup.topicArea === "custom") {
+    return setup.customTopicArea?.trim() || "自定义";
+  }
+  return TOPIC_OPTIONS.find((option) => option.value === setup.topicArea)?.label ?? setup.topicArea;
+}
+
+function withWritingSetupContext(previousContext: string, setup: WritingSetup | null): string {
+  if (!setup) {
+    return previousContext;
+  }
+  const topicArea = setup.topicArea === "custom" ? setup.customTopicArea : setup.topicArea;
+  const contextLines = [
+    topicArea ? `写作领域: ${topicArea}` : "",
+    setup.essayTopic ? `文章主题: ${setup.essayTopic}` : "",
+    setup.outlinePoints.length > 0 ? `用户大纲: ${setup.outlinePoints.join(" / ")}` : "",
+  ].filter(Boolean);
+  if (contextLines.length === 0) {
+    return previousContext;
+  }
+  return [
+    previousContext,
+    "Writing Setup context，仅用于 tone、meaning、coherence reference，不要生成新论点或正文:",
+    ...contextLines,
+  ].filter(Boolean).join("\n");
+}
+
 function countSentences(paragraph: string): number {
   return paragraph.split(/[.!?。？！；;\n]+/u).filter((part) => part.trim().length > 0).length;
 }
@@ -949,6 +1781,20 @@ function countEnglishWords(paragraph: string): number {
 
 function isEnglishSelection(text: string): boolean {
   return /[A-Za-z]/u.test(text) && !/[\u3400-\u9fff]/u.test(text);
+}
+
+function calculateSelectionPopoverPosition(anchorRect: DOMRect, containerRect: DOMRect): { left: number; top: number } {
+  const width = 360;
+  const gap = 10;
+  const preferredTop = anchorRect.top - containerRect.top - 190 - gap;
+  const fallbackTop = anchorRect.bottom - containerRect.top + gap;
+  const top = preferredTop >= 0 ? preferredTop : fallbackTop;
+  const centeredLeft = anchorRect.left - containerRect.left + anchorRect.width / 2 - width / 2;
+  const maxLeft = Math.max(0, containerRect.width - width - 16);
+  return {
+    left: Math.max(8, Math.min(centeredLeft, maxLeft)),
+    top: Math.max(8, top),
+  };
 }
 
 function mapSelectionExpressionType(

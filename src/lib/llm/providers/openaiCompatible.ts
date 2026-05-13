@@ -8,12 +8,14 @@ import {
   buildFastEnhancementUserPrompt,
   buildEnhancementUserPrompt,
   buildLearningExtractionUserPrompt,
+  buildOutlineCheckUserPrompt,
   buildParagraphHealthUserPrompt,
   buildParagraphFlowUserPrompt,
   buildSelectionExplainUserPrompt,
   FAST_ENHANCEMENT_SYSTEM_PROMPT,
   LINGUATYPE_SYSTEM_PROMPT,
   LEARNING_EXTRACTION_SYSTEM_PROMPT,
+  OUTLINE_CHECK_SYSTEM_PROMPT,
   PARAGRAPH_HEALTH_SYSTEM_PROMPT,
   PARAGRAPH_FLOW_SYSTEM_PROMPT,
   SELECTION_EXPLAIN_SYSTEM_PROMPT,
@@ -22,6 +24,7 @@ import {
   normalizeEnhancementResult,
   normalizeFastEnhanceResult,
   normalizeLearningExtractionResult,
+  normalizeOutlineCheckResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
   normalizeSelectionExplainResult,
@@ -31,6 +34,7 @@ import {
   fastEnhanceModelResultSchema,
   fastEnhanceResultSchema,
   learningExtractionResultSchema,
+  outlineCheckResultSchema,
   paragraphCheckResultSchema,
   paragraphHealthResultSchema,
   selectionExplainResultSchema,
@@ -41,6 +45,8 @@ import {
   type FastEnhanceResult,
   type LearningExtractionInput,
   type LearningExtractionResult,
+  type OutlineCheckInput,
+  type OutlineCheckResult,
   type ParagraphCheckInput,
   type ParagraphCheckResult,
   type ParagraphHealthInput,
@@ -219,6 +225,26 @@ export async function checkParagraphHealthWithOpenAICompatibleProvider(
   }
 
   return normalizeParagraphHealthResult(validated.data, input.currentParagraph);
+}
+
+export async function checkOutlineWithOpenAICompatibleProvider(
+  input: OutlineCheckInput,
+): Promise<OutlineCheckResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    OUTLINE_CHECK_SYSTEM_PROMPT,
+    buildOutlineCheckUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = outlineCheckResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid outline check response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeOutlineCheckResult(validated.data);
 }
 
 export async function explainSelectionWithOpenAICompatibleProvider(

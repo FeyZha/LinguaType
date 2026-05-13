@@ -24,8 +24,53 @@ export const PARAGRAPH_HEALTH_CACHE_STORAGE_KEY = "linguatype.paragraphHealthCac
 export const TRIGGER_SETTINGS_STORAGE_KEY = "linguatype.triggerSettings.v1";
 export const PERSONAL_DICTIONARY_STORAGE_KEY = "linguatype.personalDictionary.v1";
 export const DRAFT_STORAGE_KEY = "linguatype.writingDraft.v1";
+export const WRITING_SETUP_STORAGE_KEY = "linguatype.writingSetup.v1";
+export const WRITING_ARCHIVES_STORAGE_KEY = "linguatype.writingArchives.v1";
+export const THEME_SETTINGS_STORAGE_KEY = "linguatype.themeSettings.v1";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+export type WritingTopicArea =
+  | "technology"
+  | "personal_growth"
+  | "history"
+  | "art"
+  | "education"
+  | "society"
+  | "environment"
+  | "business"
+  | "custom";
+
+export type WritingSetup = {
+  topicArea: WritingTopicArea;
+  customTopicArea?: string;
+  essayTopic: string;
+  outlinePoints: string[];
+  outline?: string;
+  updatedAt: string;
+};
+
+export type WritingArchiveItem = {
+  id: string;
+  title: string;
+  text: string;
+  setup: WritingSetup | null;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string;
+};
+
+export type WritingArchivesState = {
+  activeId: string | null;
+  items: WritingArchiveItem[];
+};
+
+export type ThemePreference = "light" | "dark" | "system";
+
+export type ThemeSettings = {
+  preference: ThemePreference;
+  updatedAt: string;
+};
 
 export type TriggerSettings = {
   sentenceEnhancementShortcut: "ctrl_enter" | "ctrl_j_legacy" | "button_only" | "disable_shortcut";
@@ -85,6 +130,93 @@ export function defaultTriggerSettings(): TriggerSettings {
       suppressLargePanelAutoOpen: true,
     },
   };
+}
+
+export function defaultWritingSetup(now = new Date().toISOString()): WritingSetup {
+  return {
+    topicArea: "technology",
+    essayTopic: "",
+    outlinePoints: ["", "", ""],
+    outline: "",
+    updatedAt: now,
+  };
+}
+
+export function defaultThemeSettings(now = new Date().toISOString()): ThemeSettings {
+  return {
+    preference: "system",
+    updatedAt: now,
+  };
+}
+
+export function loadWritingSetupFromStorage(storage: StorageLike): WritingSetup | null {
+  const stored = parseObject(storage.getItem(WRITING_SETUP_STORAGE_KEY));
+  if (!stored) {
+    return null;
+  }
+  return normalizeWritingSetup(stored);
+}
+
+export function saveWritingSetup(storage: StorageLike, setup: WritingSetup): WritingSetup {
+  const normalized = normalizeWritingSetup(setup as unknown as Record<string, unknown>);
+  storage.setItem(WRITING_SETUP_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function loadWritingArchivesFromStorage(
+  storage: StorageLike,
+  options: { now?: string; createId?: () => string } = {},
+): WritingArchivesState {
+  const stored = parseObject(storage.getItem(WRITING_ARCHIVES_STORAGE_KEY));
+  if (stored) {
+    return normalizeWritingArchives(stored);
+  }
+
+  const legacyText = storage.getItem(DRAFT_STORAGE_KEY) ?? "";
+  const legacySetup = loadWritingSetupFromStorage(storage);
+  if (!legacyText.trim() && !legacySetup) {
+    return { activeId: null, items: [] };
+  }
+
+  const now = options.now ?? new Date().toISOString();
+  const id = options.createId?.() ?? crypto.randomUUID();
+  const migrated: WritingArchivesState = {
+    activeId: id,
+    items: [
+      {
+        id,
+        title: writingArchiveTitleFromSetup(legacySetup),
+        text: legacyText,
+        setup: legacySetup,
+        createdAt: now,
+        updatedAt: now,
+        lastOpenedAt: now,
+      },
+    ],
+  };
+  storage.setItem(WRITING_ARCHIVES_STORAGE_KEY, JSON.stringify(migrated));
+  return migrated;
+}
+
+export function saveWritingArchives(storage: StorageLike, state: WritingArchivesState): WritingArchivesState {
+  const normalized = normalizeWritingArchives(state as unknown as Record<string, unknown>);
+  storage.setItem(WRITING_ARCHIVES_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function writingArchiveTitleFromSetup(setup: WritingSetup | null | undefined): string {
+  const topic = setup?.essayTopic.trim();
+  return topic || "未命名写作";
+}
+
+export function loadThemeSettingsFromStorage(storage: StorageLike): ThemeSettings {
+  return normalizeThemeSettings(parseObject(storage.getItem(THEME_SETTINGS_STORAGE_KEY)));
+}
+
+export function saveThemeSettings(storage: StorageLike, settings: ThemeSettings): ThemeSettings {
+  const normalized = normalizeThemeSettings(settings as unknown as Record<string, unknown>);
+  storage.setItem(THEME_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 export function loadTriggerSettingsFromStorage(storage: StorageLike): TriggerSettings {
@@ -482,6 +614,66 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
   };
 }
 
+function normalizeWritingSetup(value: Record<string, unknown>): WritingSetup {
+  const defaults = defaultWritingSetup();
+  const topicArea = isWritingTopicArea(value.topicArea) ? value.topicArea : defaults.topicArea;
+  const customTopicArea = stringOr(value.customTopicArea, "").trim();
+  const outlinePoints = normalizeOutlinePoints(value.outlinePoints, stringOr(value.outline, ""));
+  const outline = outlinePoints.join("\n");
+  return {
+    topicArea,
+    customTopicArea: topicArea === "custom" && customTopicArea ? customTopicArea : undefined,
+    essayTopic: stringOr(value.essayTopic, "").trim(),
+    outlinePoints,
+    outline,
+    updatedAt: stringOr(value.updatedAt, defaults.updatedAt),
+  };
+}
+
+function normalizeWritingArchives(value: Record<string, unknown>): WritingArchivesState {
+  const items = Array.isArray(value.items)
+    ? value.items.filter(isRecord).map(normalizeWritingArchiveItem)
+    : [];
+  const activeId = typeof value.activeId === "string" && items.some((item) => item.id === value.activeId)
+    ? value.activeId
+    : items[0]?.id ?? null;
+  return { activeId, items };
+}
+
+function normalizeWritingArchiveItem(value: Record<string, unknown>): WritingArchiveItem {
+  const now = new Date().toISOString();
+  const rawSetup = isRecord(value.setup) ? normalizeWritingSetup(value.setup) : null;
+  const createdAt = stringOr(value.createdAt, now);
+  return {
+    id: stringOr(value.id, crypto.randomUUID()),
+    title: stringOr(value.title, "").trim() || writingArchiveTitleFromSetup(rawSetup),
+    text: stringOr(value.text, ""),
+    setup: rawSetup,
+    createdAt,
+    updatedAt: stringOr(value.updatedAt, createdAt),
+    lastOpenedAt: typeof value.lastOpenedAt === "string" ? value.lastOpenedAt : undefined,
+  };
+}
+
+function normalizeOutlinePoints(value: unknown, legacyOutline: string): string[] {
+  const rawPoints = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : legacyOutline.split(/\r?\n/u);
+  const normalized = rawPoints.map((item) => item.trim()).filter(Boolean);
+  if (normalized.length === 0) {
+    return ["", "", ""];
+  }
+  return normalized.slice(0, 12);
+}
+
+function normalizeThemeSettings(value?: Record<string, unknown>): ThemeSettings {
+  const defaults = defaultThemeSettings();
+  return {
+    preference: isThemePreference(value?.preference) ? value.preference : defaults.preference,
+    updatedAt: stringOr(value?.updatedAt, defaults.updatedAt),
+  };
+}
+
 function normalizeLearningItem(item: Record<string, unknown>, fallbackNow?: string): LearningItem {
   const now = fallbackNow ?? new Date().toISOString();
   const createdAt = stringOr(item.createdAt, now);
@@ -612,6 +804,24 @@ function isLearningItemType(value: unknown): value is LearningItemType {
 
 function isWritingMode(value: unknown): value is WritingMode {
   return value === "natural" || value === "ielts" || value === "academic" || value === "business" || value === "concise";
+}
+
+function isWritingTopicArea(value: unknown): value is WritingTopicArea {
+  return (
+    value === "technology" ||
+    value === "personal_growth" ||
+    value === "history" ||
+    value === "art" ||
+    value === "education" ||
+    value === "society" ||
+    value === "environment" ||
+    value === "business" ||
+    value === "custom"
+  );
+}
+
+function isThemePreference(value: unknown): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system";
 }
 
 function isCorrectionType(value: unknown): value is CorrectionMemory["type"] {

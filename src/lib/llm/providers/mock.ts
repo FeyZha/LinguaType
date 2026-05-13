@@ -4,6 +4,7 @@ import {
   normalizeEnhancementResult,
   normalizeFastEnhanceResult,
   normalizeLearningExtractionResult,
+  normalizeOutlineCheckResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
   normalizeSelectionExplainResult,
@@ -17,6 +18,8 @@ import type {
   FastEnhanceResult,
   LearningExtractionInput,
   LearningExtractionResult,
+  OutlineCheckInput,
+  OutlineCheckResult,
   ParagraphCheckInput,
   ParagraphCheckResult,
   ParagraphHealthInput,
@@ -251,6 +254,24 @@ export async function checkParagraphHealthWithMockProvider(
   );
 }
 
+export async function checkOutlineWithMockProvider(
+  input: OutlineCheckInput,
+): Promise<OutlineCheckResult> {
+  const points = input.outlinePoints.map((point) => point.trim()).filter(Boolean);
+  const hasEmpty = points.length < 2;
+  const hasUnrelated = points.some((point) => /\bunrelated\b|跑题|无关/iu.test(point));
+  const hasDuplicate = new Set(points.map((point) => point.toLowerCase())).size !== points.length;
+
+  return normalizeOutlineCheckResult({
+    hasIssues: hasEmpty || hasUnrelated || hasDuplicate,
+    suggestionsZh: [
+      hasEmpty ? "大纲至少需要两个明确的小点，才能支撑当前主题。" : "",
+      hasUnrelated ? "有大纲点和文章主题关联不够明确，建议改成直接回应主题的角度。" : "",
+      hasDuplicate ? "有重复的大纲点，建议合并或换成不同论证角度。" : "",
+    ],
+  });
+}
+
 export async function explainSelectionWithMockProvider(
   input: SelectionExplainInput,
 ): Promise<SelectionExplainResult> {
@@ -261,6 +282,7 @@ export async function explainSelectionWithMockProvider(
       selectedText,
       meaningZh: `Selected expression "${selectedText}" means a reusable English expression in this context.`,
       usageNoteZh: "Use it when the same meaning or collocation fits your own sentence.",
+      contextRoleZh: "It helps carry the local meaning without rewriting the sentence.",
       expressionType,
     },
     selectedText,

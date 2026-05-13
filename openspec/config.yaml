@@ -1,0 +1,182 @@
+project:
+  name: LinguaType
+  version: "0.2.4"
+  language: zh-CN
+  description: >
+    LinguaType 是面向中文母语英语学习者的 web-based 英文表达输入助手。
+    它以编辑器为中心，帮助用户在真实写作现场处理最新句中的中文意图、
+    中英混写和轻量英文润色，并把用户明确 Apply 后使用过的表达沉淀到本地学习数据中。
+
+product:
+  source_of_truth: AGENTS.md
+  current_scope: v0.2.4 writing setup and theme preference with v0.2.2 latest-sentence flow preserved
+  target_users:
+    - 中文母语的中级英语学习者
+    - 正在进行英文写作练习的学生
+    - 雅思、留学申请、研究生日常英文输出等高频写作场景用户
+  core_value:
+    - 降低英文输出阻力
+    - 提升表达判断能力
+    - 把 Apply 过的表达沉淀为可复用的个人表达资产
+  core_flow: >
+    latest sentence -> /api/enhance-fast -> code-generated diff ->
+    Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply
+  is:
+    - input-method-like latest-sentence enhancer
+    - mixed Chinese-English sentence converter
+    - light pure-English polishing tool
+    - local lightweight proofreading signals tool
+    - local expression learning assistant
+    - local Learning Library and Writing Habits tool
+  is_not:
+    - general translator
+    - chatbot
+    - essay generator
+    - full essay correction or essay scoring tool
+    - real system-level input method
+    - Chrome extension
+    - cloud-sync product
+    - large dashboard
+
+tech_stack:
+  runtime:
+    - Node.js
+    - Next.js App Router
+  frontend:
+    - React 19
+    - TypeScript
+    - Tailwind CSS
+  validation:
+    - zod
+  ai_layer:
+    - OpenAI-compatible Chat Completions adapter
+    - deterministic Mock Mode
+    - provider service abstraction under src/lib/llm/
+  persistence:
+    - browser localStorage only
+  testing:
+    - Vitest
+    - Testing Library
+    - jsdom
+  key_dependencies:
+    - diff
+    - next
+    - react
+    - react-dom
+    - zod
+
+architecture:
+  app_shell:
+    - src/app/page.tsx
+    - src/app/layout.tsx
+    - src/app/globals.css
+  main_orchestrator:
+    - src/components/LinguaTypeApp.tsx
+  ui_modules:
+    editor:
+      - src/components/WritingEditor.tsx
+      - src/components/ModeSelector.tsx
+      - src/components/EnhancementLevelSelector.tsx
+      - src/components/ShortcutHint.tsx
+    enhancement_display:
+      - src/components/EnhancementPopover.tsx
+      - src/components/DiffViewer.tsx
+      - src/components/StateViews.tsx
+    expression_and_selection:
+      - src/components/InlineExpressionMenu.tsx
+      - src/components/SelectionActionsPopover.tsx
+      - src/components/NextExpressionToolbox.tsx
+    management_panels:
+      - src/components/LearningLibraryPanel.tsx
+      - src/components/WritingHabitsPanel.tsx
+      - src/components/ParagraphFlowPanel.tsx
+      - src/components/TriggerSettingsPanel.tsx
+      - src/components/DataControlPanel.tsx
+      - src/components/PersonalDictionaryPanel.tsx
+      - src/components/ApiSettingsModal.tsx
+  domain_modules:
+    sentence_and_range:
+      - src/lib/sentence.ts
+    local_storage:
+      - src/lib/storage.ts
+    writing_setup:
+      - src/components/WritingSetupPanel.tsx
+      - src/components/ThemePreferenceControl.tsx
+    local_proofreading:
+      - src/lib/proofreading.ts
+    llm_contracts:
+      - src/lib/llm/types.ts
+    llm_prompts:
+      - src/lib/llm/prompts.ts
+    llm_service:
+      - src/lib/llm/service.ts
+    provider_adapters:
+      - src/lib/llm/providers/mock.ts
+      - src/lib/llm/providers/openaiCompatible.ts
+      - src/lib/llm/normalize.ts
+      - src/lib/json.ts
+  api_routes:
+    primary:
+      - POST /api/enhance-fast
+      - POST /api/extract-learning
+      - POST /api/check-paragraph-health
+      - POST /api/check-paragraph-flow
+      - POST /api/explain-selection
+      - POST /api/test-connection
+    legacy:
+      - POST /api/enhance-latest-sentence
+
+conventions:
+  documentation_language:
+    default: zh-CN
+    rule: >
+      后续所有 OpenSpec proposal、design、tasks、spec，以及项目说明文档默认使用中文编写。
+      代码路径、函数名、API routes、schema 名称、localStorage keys、命令和产品 capability names 可以保留英文。
+  product_copy:
+    rule: >
+      用户可见 UI 文案应中文优先。
+  change_management:
+    - 非平凡 product、architecture、API、storage、interaction 变更必须先创建 OpenSpec change。
+    - change artifacts 放在 openspec/changes/<change-name>/。
+    - 实现前必须保证 proposal、design、tasks 和相关 specs 清晰且符合 AGENTS.md。
+    - 完成后再 archive change。
+  implementation_style:
+    - 保持 editor-first，不把产品改成 chatbot 或 dashboard。
+    - 优先 additive change，不重写现有主流程。
+    - 不大规模重构，不删除已有功能。
+    - 不新增 login、database、payment、cloud sync、Chrome extension 或真实系统输入法。
+    - 不自动 Apply 模型输出。
+    - 学习数据只在用户明确 Apply 或明确 Save to Library 后保存。
+  data_and_storage:
+    - 所有 v0.2.x 数据保持 localStorage-only。
+    - 不删除 legacy localStorage keys。
+    - localStorage 迁移、dedupe、export 和聚合逻辑归属 src/lib/storage.ts。
+  ai_and_api:
+    - 产品逻辑不得直接调用 vendor API。
+    - API routes 通过 src/lib/llm/service.ts 调用 provider service functions。
+    - provider-specific code 放在 src/lib/llm/providers/。
+    - prompts 放在 src/lib/llm/prompts.ts。
+    - shared schemas and types 放在 src/lib/llm/types.ts。
+    - API keys 不得 hardcode、log、commit 或 server-persist。
+  editor_and_replacement:
+    - 只处理最新非空句。
+    - 最新句增强不要求选中文本，也不要求 slash trigger。
+    - 使用 range-based replacement，不使用字符串替换。
+    - Apply 前必须做 snapshotFullText conflict detection。
+    - diff highlighting 必须由代码生成，不由模型返回。
+  verification:
+    - 优先运行与变更风险匹配的最小验证。
+    - 不主动运行长期 dev server。
+    - 不主动安装或更新依赖。
+    - 文档-only change 以一致性检查和 changed files 检查为主。
+
+openspec:
+  changes_dir: openspec/changes
+  specs_dir: openspec/specs
+  archive_dir: openspec/changes/archive
+  spec_language: zh-CN
+  requirement_style:
+    - 使用中文描述 Requirement 和 Scenario。
+    - 保留 OpenSpec 关键词，如 ADDED Requirements、Requirement、Scenario、GIVEN、WHEN、THEN、AND。
+    - 每条 requirement 应说明可验证的行为或文档约束。
+  artifact_language_rule: 后续所有 spec 和 OpenSpec artifacts 默认使用中文编写。

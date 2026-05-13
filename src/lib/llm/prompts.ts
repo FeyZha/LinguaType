@@ -4,6 +4,7 @@ import type {
   LearningExtractionInput,
   ParagraphCheckInput,
   ParagraphHealthInput,
+  OutlineCheckInput,
   SelectionExplainInput,
 } from "./types";
 
@@ -135,6 +136,20 @@ Rules:
 5. Use the surrounding text only to explain meaning and usage.
 6. Return valid JSON only.
 7. Do not include Markdown or HTML.`;
+
+export const OUTLINE_CHECK_SYSTEM_PROMPT = `You are LinguaType's lightweight outline checker.
+
+The user is preparing or adjusting an essay outline before writing. Check only whether the outline matches the essay topic.
+
+Rules:
+1. Do not write the essay.
+2. Do not generate paragraphs.
+3. Do not decide the user's argument.
+4. Only point out clear mismatch, missing focus, or duplicated points.
+5. If there is no clear issue, return no suggestions.
+6. Use concise Chinese suggestions.
+7. Return valid JSON only.
+8. Do not include Markdown or HTML.`;
 
 export function buildFastEnhancementUserPrompt(input: FastEnhanceInput): string {
   return `Input variables:
@@ -348,12 +363,36 @@ Return a SelectionExplainResult JSON object exactly in this shape:
   "selectedText": "...",
   "meaningZh": "simple Chinese meaning",
   "usageNoteZh": "simple Chinese usage note",
+  "contextRoleZh": "simple Chinese note about its role in this context",
+  "structureNotesZh": "optional simple Chinese structure note",
   "expressionType": "word | phrase | collocation | sentence_pattern | sentence"
 }
 
 Important:
 - Explain selectedText only.
 - Do not rewrite or polish the selected text.
+- Do not return replacement text or alternatives.
 - Do not include sentence revision fields, learningItems, correctionEvents, Markdown, or HTML.
+- Return only JSON.`;
+}
+
+export function buildOutlineCheckUserPrompt(input: OutlineCheckInput): string {
+  return `Input variables:
+Writing mode: ${input.writingMode}
+Writing area: ${input.topicArea}
+Essay topic: ${input.essayTopic}
+Outline points:
+${input.outlinePoints.map((point, index) => `${index + 1}. ${point}`).join("\n")}
+
+Return an OutlineCheckResult JSON object exactly in this shape:
+{
+  "hasIssues": true,
+  "suggestionsZh": ["简短中文建议"]
+}
+
+Important:
+- Check only whether the outline supports the essay topic.
+- Do not write topic sentences, body paragraphs, or examples for the user.
+- If no issue is found, set hasIssues to false and suggestionsZh to [].
 - Return only JSON.`;
 }

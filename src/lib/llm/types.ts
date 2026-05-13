@@ -290,6 +290,23 @@ export const selectionExplainResultSchema = z.object({
   selectedText: z.string(),
   meaningZh: z.string(),
   usageNoteZh: z.string(),
+  contextRoleZh: z.string().optional(),
+  structureNotesZh: z.string().optional(),
   expressionType: selectionExpressionTypeSchema,
 });
 export type SelectionExplainResult = z.infer<typeof selectionExplainResultSchema>;
+
+export const outlineCheckRequestSchema = z.object({
+  essayTopic: z.string(),
+  topicArea: z.string(),
+  outlinePoints: z.array(z.string()).min(1),
+  writingMode: writingModeSchema,
+  apiConfig: apiConfigSchema,
+});
+export type OutlineCheckInput = z.infer<typeof outlineCheckRequestSchema>;
+
+export const outlineCheckResultSchema = z.object({
+  hasIssues: z.boolean(),
+  suggestionsZh: z.array(z.string()),
+});
+export type OutlineCheckResult = z.infer<typeof outlineCheckResultSchema>;

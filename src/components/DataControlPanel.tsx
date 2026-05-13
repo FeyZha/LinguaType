@@ -10,7 +10,9 @@ import {
   LEARNING_LIBRARY_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
   PERSONAL_DICTIONARY_STORAGE_KEY,
+  THEME_SETTINGS_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
+  WRITING_SETUP_STORAGE_KEY,
   exportLearningLibraryJson,
   exportWritingHabitsJson,
 } from "@/lib/storage";
@@ -135,6 +137,8 @@ export function DataControlPanel({
             PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
             TRIGGER_SETTINGS_STORAGE_KEY,
             PERSONAL_DICTIONARY_STORAGE_KEY,
+            WRITING_SETUP_STORAGE_KEY,
+            THEME_SETTINGS_STORAGE_KEY,
           ].map((key) => (
             <li key={key}>{key}</li>
           ))}
