@@ -5,6 +5,7 @@ import type {
   LearningExtractionResult,
   ParagraphCheckResult,
   ParagraphHealthResult,
+  OutlineCheckResult,
   SelectionExplainResult,
 } from "./types";
 import type { EnhanceLatestSentenceResult } from "./types";
@@ -104,7 +105,17 @@ export function normalizeSelectionExplainResult(
     selectedText,
     meaningZh: result.meaningZh || `Selected expression: ${selectedText}`,
     usageNoteZh: result.usageNoteZh || "Save this expression if it is useful for future writing.",
+    contextRoleZh: result.contextRoleZh || "结合当前上下文理解这个表达的作用。",
+    structureNotesZh: result.structureNotesZh,
     expressionType: result.expressionType,
+  };
+}
+
+export function normalizeOutlineCheckResult(result: OutlineCheckResult): OutlineCheckResult {
+  const suggestionsZh = result.suggestionsZh.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  return {
+    hasIssues: result.hasIssues && suggestionsZh.length > 0,
+    suggestionsZh: result.hasIssues ? suggestionsZh : [],
   };
 }
 

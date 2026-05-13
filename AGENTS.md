@@ -23,7 +23,21 @@ LinguaType is:
 
 ## Current Scope
 
-The current product version is v0.2.2.
+The current product version is v0.2.7.
+
+v0.2.7 refines the main writing shell, Writing Archives, setup editing, and outline checking. It keeps the latest-sentence enhancement, Apply/Cancel, and learning-data save rules unchanged.
+
+Writing Setup collects topic area, essay topic, and outline before entering the editor. After the user enters the main writing UI, topic area, essay topic, and outline edits should happen through lightweight inline editor controls rather than leaving the editor or opening a setup drawer. Writing Setup is not a landing page or essay generator. It must not call the LLM, generate article content, decide the user's argument, save learning data, or rewrite text by itself.
+
+Writing Setup uses direct topic-area buttons, local preset essay topics, and multiple outline point inputs. Preset topic refresh is local only and must not call the LLM.
+
+The main writing UI may show segmented paragraph inputs based on outline points, but the product still preserves the latest-sentence enhancement contract and range-based Apply behavior. The main UI must not show a separate article-outline management card; outline points should be shown on the relevant paragraph labels with a low-emphasis inline edit entry.
+
+Writing Archives store local writing drafts as separate local documents. They are localStorage-only, may save title, text, setup, createdAt, updatedAt, and lastOpenedAt, and must not save learning data or trigger extraction. The archive sidebar may be collapsible. Archive item menus may support rename and delete. Archive delete must require confirmation, must only update `linguatype.writingArchives.v1`, and must not clear Learning Library, Correction Events, legacy draft/setup keys, or trigger `/api/extract-learning`. Archive title rename must not automatically change the essay topic.
+
+Outline Check uses `POST /api/check-outline` only after the user confirms inline topic or outline changes. Editing, adding, deleting, opening archive menus, switching archives, deleting archives, or refreshing outline fields must not call the LLM. Outline Check is non-blocking, only checks whether the outline matches the essay topic, only shows suggestions when issues exist, and must not rewrite the outline or generate article content.
+
+Theme Preference supports `light`, `dark`, and `system`. It belongs in the main writing UI only, is UI-only, and must not affect API Settings, LLM provider behavior, Learning Library, Correction Events, Paragraph Health, or Selection Actions.
 
 v0.2.2 preserves the core flow:
 latest sentence -> `/api/enhance-fast` -> code-generated diff -> Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply.
@@ -31,6 +45,16 @@ latest sentence -> `/api/enhance-fast` -> code-generated diff -> Apply/Cancel ->
 High-frequency UI belongs near the editor. The right sidebar is for low-frequency management: Review status, Learning Library, Writing Habits, Tools / Settings, and Data Control.
 
 User-facing UI copy should be Chinese-first for Chinese-speaking English learners. Keep feature names in English when they are product capability names, and write key terms bilingually, for example `表达库 Learning Library`, `写作习惯 Writing Habits`, `当前句建议 Current Sentence`, and `API Settings 设置`.
+
+## Project Docs
+
+Use these docs for current structure and handoff context:
+- `PRODUCT.md`: product identity, target user, current scope, and non-goals.
+- `ARCHITECTURE.md`: current app layers, data flow, storage model, and provider abstraction.
+- `MODULES.md`: module ownership, file mapping, dependency direction, and boundary rules.
+- `CHANGELOG.md`: high-level product and documentation milestones.
+
+`AGENTS.md` remains the source of truth for product constraints and agent execution rules. Do not duplicate long architecture narratives here; update the dedicated docs instead.
 
 ## Token-saving workflow
 
@@ -106,7 +130,7 @@ Draft behavior:
 
 ## localStorage Keys
 
-Current keys: `linguatype.apiSettings.v1`, `linguatype.writingDraft.v1`, `linguatype.learningLibrary.v1`, `linguatype.correctionEvents.v1`, `linguatype.paragraphHealthCache.v1`, `linguatype.triggerSettings.v1`, `linguatype.personalDictionary.v1`.
+Current keys: `linguatype.apiSettings.v1`, `linguatype.writingDraft.v1`, `linguatype.writingSetup.v1`, `linguatype.writingArchives.v1`, `linguatype.themeSettings.v1`, `linguatype.learningLibrary.v1`, `linguatype.correctionEvents.v1`, `linguatype.paragraphHealthCache.v1`, `linguatype.triggerSettings.v1`, `linguatype.personalDictionary.v1`.
 
 Legacy keys: `linguatype.learningHistory.v1`, `linguatype.correctionMemory.v1`.
 
@@ -114,11 +138,12 @@ Migration rules:
 1. Migrate legacy learning history into Learning Library without deleting the old key.
 2. Migrate legacy correction memory into Correction Events without deleting the old key.
 3. Fill missing legacy fields with safe defaults.
-4. Keep all v0.2.2 data local; do not add a backend store.
+4. Migrate existing draft/setup into Writing Archives without deleting the old keys.
+5. Keep all v0.2.x data local; do not add a backend store.
 
 ## API Routes
 
-Primary routes: `POST /api/enhance-fast`, `POST /api/extract-learning`, `POST /api/check-paragraph-health`, `POST /api/check-paragraph-flow`, `POST /api/explain-selection`, `POST /api/test-connection`.
+Primary routes: `POST /api/enhance-fast`, `POST /api/extract-learning`, `POST /api/check-paragraph-health`, `POST /api/check-paragraph-flow`, `POST /api/check-outline`, `POST /api/explain-selection`, `POST /api/test-connection`.
 
 Legacy route: `POST /api/enhance-latest-sentence`.
 
@@ -242,6 +267,8 @@ Explain selected:
 1. Calls `/api/explain-selection`.
 2. Does not modify editor text.
 3. Does not save learning data by itself.
+4. Shows structured explanation in Chinese-first UI.
+5. The popover should follow the selected text position and avoid covering the selection when possible.
 
 Save to Library:
 1. Is explicit user intent.
@@ -262,6 +289,18 @@ Rules:
 3. Clear Writing Habits clears only `linguatype.correctionEvents.v1`.
 4. Do not delete legacy keys from clear actions.
 5. Do not add import, cloud sync, login, database, or payment.
+
+## OpenSpec Workflow
+
+Use OpenSpec for non-trivial product, architecture, API, storage, or interaction changes before implementation.
+
+Rules:
+1. Keep this `AGENTS.md` file as the source of truth for LinguaType product constraints.
+2. Put OpenSpec change artifacts under `openspec/changes/<change-name>/`.
+3. Use `/opsx:propose "<change summary>"` to create a proposal, design, and tasks before implementation.
+4. Implement only after the OpenSpec tasks are clear and consistent with the current product scope.
+5. Archive completed changes with `/opsx:archive` when the work is done.
+6. Write future OpenSpec proposals, designs, tasks, and specs in Chinese by default; keep code paths, API routes, schema names, commands, localStorage keys, and product capability names in English when useful.
 
 ## Testing And Verification
 

@@ -6,6 +6,7 @@ import {
   CORRECTION_MEMORY_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
+  WRITING_SETUP_STORAGE_KEY,
 } from "@/lib/storage";
 import type {
   FastEnhanceResult,
@@ -78,6 +79,15 @@ function response(payload: unknown, status = 200) {
 
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem(
+    WRITING_SETUP_STORAGE_KEY,
+    JSON.stringify({
+      topicArea: "technology",
+      essayTopic: "AI tools and learning",
+      outline: "1. Benefits\n2. Limits",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    }),
+  );
   let id = 0;
   vi.stubGlobal("crypto", { randomUUID: () => `id-${++id}` });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {

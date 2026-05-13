@@ -1,6 +1,7 @@
 import {
   checkParagraphFlowWithMockProvider,
   checkParagraphHealthWithMockProvider,
+  checkOutlineWithMockProvider,
   enhanceFastWithMockProvider,
   enhanceWithMockProvider,
   explainSelectionWithMockProvider,
@@ -9,6 +10,7 @@ import {
 import {
   checkParagraphFlowWithOpenAICompatibleProvider,
   checkParagraphHealthWithOpenAICompatibleProvider,
+  checkOutlineWithOpenAICompatibleProvider,
   enhanceFastWithOpenAICompatibleProvider,
   enhanceWithOpenAICompatibleProvider,
   explainSelectionWithOpenAICompatibleProvider,
@@ -23,6 +25,8 @@ import type {
   FastEnhanceResult,
   LearningExtractionInput,
   LearningExtractionResult,
+  OutlineCheckInput,
+  OutlineCheckResult,
   ParagraphCheckInput,
   ParagraphCheckResult,
   ParagraphHealthInput,
@@ -102,6 +106,19 @@ export async function checkParagraphHealthWithLLM(
   }
 
   return checkParagraphHealthWithOpenAICompatibleProvider(normalizedInput);
+}
+
+export async function checkOutlineWithLLM(
+  input: OutlineCheckInput,
+  apiConfig: ApiConfig = input.apiConfig,
+): Promise<OutlineCheckResult> {
+  const normalizedInput = { ...input, apiConfig };
+
+  if (apiConfig.mockMode) {
+    return checkOutlineWithMockProvider(normalizedInput);
+  }
+
+  return checkOutlineWithOpenAICompatibleProvider(normalizedInput);
 }
 
 export async function explainSelectionWithLLM(

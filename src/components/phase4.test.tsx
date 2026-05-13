@@ -7,6 +7,7 @@ import {
   CORRECTION_EVENTS_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
+  WRITING_SETUP_STORAGE_KEY,
   defaultApiSettings,
 } from "@/lib/storage";
 import type {
@@ -72,6 +73,15 @@ function longParagraph(sentence = fastResult.originalSentence) {
 
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem(
+    WRITING_SETUP_STORAGE_KEY,
+    JSON.stringify({
+      topicArea: "technology",
+      essayTopic: "AI tools and learning",
+      outline: "1. Benefits\n2. Limits",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    }),
+  );
   let id = 0;
   vi.stubGlobal("crypto", { randomUUID: () => `id-${++id}` });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -139,12 +149,12 @@ describe("LinguaType v0.2.2 ", () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByPlaceholderText(/请直接写英文，卡住时可以夹中文。/i);
+    const editor = (await screen.findAllByPlaceholderText(/直接写英文，卡住时可以夹中文。/i))[0];
     expect(editor).toHaveAttribute(
       "placeholder",
-      expect.stringContaining("例：This may 影响 young people's values."),
+      expect.stringContaining("例如：This may 影响 young people's values."),
     );
-    expect(screen.getByText(/模式：Natural \| 强度：balanced \| 触发：Ctrl\/Cmd \+ Enter/)).toBeInTheDocument();
+    expect(screen.getByText(/模式：自然 \| 强度：平衡 \| 触发：Ctrl\/Cmd \+ Enter/)).toBeInTheDocument();
 
     fireEvent.keyDown(editor, { key: "/", altKey: true });
     expect(screen.queryByText("表达菜单")).not.toBeInTheDocument();
@@ -245,13 +255,13 @@ describe("LinguaType v0.2.2 selection actions", () => {
     editor.selectionEnd = 26;
     fireEvent.mouseUp(editor);
 
-    expect(screen.getByText("选中文本操作 Selection Actions")).toBeInTheDocument();
+    expect(screen.getByText("选中文本操作")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "解释选中内容" }));
     expect(await screen.findByText(selectionResult.usageNoteZh)).toBeInTheDocument();
     expect(editor).toHaveValue("Students acquire knowledge through practice.");
 
-    fireEvent.click(screen.getByRole("button", { name: "保存到 Learning Library" }));
-    expect(await screen.findByText("已保存到 Learning Library")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存到表达库" }));
+    expect(await screen.findByText("已保存到表达库")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]")[0]).toMatchObject({
       content: "acquire knowledge",
       type: "collocation",
