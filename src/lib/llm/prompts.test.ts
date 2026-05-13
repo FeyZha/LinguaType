@@ -96,7 +96,7 @@ describe("LLM prompts", () => {
     expect(prompt).not.toContain("finalSentence\":");
   });
 
-  it("keeps paragraph health prompt lightweight without revised paragraphs", () => {
+  it("keeps prompt lightweight without revised paragraphs", () => {
     const input: ParagraphHealthInput = {
       fullText: "First sentence. Second sentence.",
       currentParagraph: "First sentence. Second sentence.",

@@ -1,23 +1,25 @@
 "use client";
 
 import { forwardRef } from "react";
+import { ProofreadingSignalsPanel } from "./ProofreadingSignalsPanel";
 import type { EnhancementLevel, WritingMode } from "@/lib/llm/types";
+import type { ProofreadingResult } from "@/lib/proofreading";
 import type { TriggerSettings } from "@/lib/storage";
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
-  natural: "Natural 自然",
+  natural: "Natural",
   ielts: "IELTS",
-  academic: "Academic 学术",
-  business: "Business 商务",
-  concise: "Concise 简洁",
+  academic: "Academic",
+  business: "Business",
+  concise: "Concise",
 };
 
 const ENHANCEMENT_LEVELS: EnhancementLevel[] = ["minimal", "balanced", "polished"];
 
 const ENHANCEMENT_LEVEL_LABELS: Record<EnhancementLevel, string> = {
-  minimal: "minimal 最小修改",
-  balanced: "balanced 平衡",
-  polished: "polished 更顺更正式",
+  minimal: "minimal",
+  balanced: "balanced",
+  polished: "polished",
 };
 
 type WritingEditorProps = {
@@ -26,6 +28,7 @@ type WritingEditorProps = {
   isExpressionMenuOpen?: boolean;
   writingMode: WritingMode;
   enhancementLevel: EnhancementLevel;
+  proofreadingResult: ProofreadingResult;
   triggerSettings: TriggerSettings;
   onChange: (value: string) => void;
   onWritingModeChange: (mode: WritingMode) => void;
@@ -44,6 +47,7 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
     isExpressionMenuOpen,
     writingMode,
     enhancementLevel,
+    proofreadingResult,
     triggerSettings,
     onChange,
     onWritingModeChange,
@@ -116,15 +120,15 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
           <details className="group">
             <summary className="cursor-pointer list-none text-xs font-medium text-slate-600">
-              模式 Mode：{WRITING_MODE_LABELS[writingMode]} | 强度 Level：{ENHANCEMENT_LEVEL_LABELS[enhancementLevel]} | 触发 Trigger：{triggerLabel}
+              模式：{WRITING_MODE_LABELS[writingMode]} | 强度：{ENHANCEMENT_LEVEL_LABELS[enhancementLevel]} | 触发：{triggerLabel}
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-xs font-medium text-slate-600">
-                写作模式 Writing Mode
+                写作模式
                 <select
                   value={writingMode}
                   onChange={(event) => onWritingModeChange(event.target.value as WritingMode)}
-                  aria-label="写作模式 Writing Mode"
+                  aria-label="写作模式"
                   className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-moss"
                 >
                   {(Object.keys(WRITING_MODE_LABELS) as WritingMode[]).map((mode) => (
@@ -135,11 +139,11 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
                 </select>
               </label>
               <label className="grid gap-1 text-xs font-medium text-slate-600">
-                增强强度 Enhancement Level
+                增强强度
                 <select
                   value={enhancementLevel}
                   onChange={(event) => onEnhancementLevelChange(event.target.value as EnhancementLevel)}
-                  aria-label="增强强度 Enhancement Level"
+                  aria-label="增强强度"
                   className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none focus:border-moss"
                 >
                   {ENHANCEMENT_LEVELS.map((level) => (
@@ -152,6 +156,7 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
             </div>
           </details>
           <div className="flex flex-wrap gap-2">
+            <ProofreadingSignalsPanel result={proofreadingResult} />
             {triggerSettings.inlineExpressionMenuTrigger === "floating_button" ? (
               <button
                 type="button"

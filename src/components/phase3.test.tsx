@@ -106,7 +106,7 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     fireEvent.change(editor, {
       target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
     });
-    fireEvent.change(screen.getByLabelText("增强强度 Enhancement Level"), { target: { value: "minimal" } });
+    fireEvent.change(screen.getByLabelText("增强强度"), { target: { value: "minimal" } });
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
     expect(await screen.findByText("修改建议已生成")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
     await screen.findByText("修改建议已生成");
-    fireEvent.click(screen.getByRole("button", { name: "重新生成 Regenerate" }));
+    fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
     expect(await screen.findByText(regenerated.finalSentence)).toBeInTheDocument();
 
     await act(async () => {
@@ -192,7 +192,7 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
   });
 });
 
-describe("LinguaType v0.2.1 paragraph health", () => {
+describe("LinguaType v0.2.1", () => {
   it("runs health check after Apply only when paragraph is long enough, then expands full suggestions on demand", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/enhance-fast") return Promise.resolve(response(fastResult));
@@ -212,14 +212,14 @@ describe("LinguaType v0.2.1 paragraph health", () => {
     await screen.findByText("修改建议已生成");
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
-    expect(await screen.findByText("段落健康 Paragraph Health：可能有 1 个问题")).toBeInTheDocument();
+    expect(await screen.findByText("段落健康：可能有 1 个问题")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/check-paragraph-flow");
     fireEvent.click(screen.getByRole("button", { name: "查看建议" }));
     expect(await screen.findByText("段落流畅度检查 Paragraph Flow")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/check-paragraph-flow");
   });
 
-  it("does not run paragraph health for short paragraphs, cancel, or copy", async () => {
+  it("does not run for short paragraphs, cancel, or copy", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(fastResult));
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
@@ -231,13 +231,13 @@ describe("LinguaType v0.2.1 paragraph health", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
     });
-    fireEvent.click(screen.getByRole("button", { name: "取消 Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/enhance-fast"]);
   });
 });
 
-describe("LinguaType v0.2.1 Inline Expression Menu", () => {
+describe("LinguaType v0.2.1", () => {
   it("opens with Ctrl/Cmd + K, inserts an intention template at the saved cursor, and closes with Escape", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -249,7 +249,7 @@ describe("LinguaType v0.2.1 Inline Expression Menu", () => {
     editor.selectionEnd = 6;
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
-    expect(screen.getByText("表达菜单 Inline Expression Menu")).toBeInTheDocument();
+    expect(screen.getByText("表达菜单")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "解释原因 Explain reason" }));
     fireEvent.click(screen.getByRole("button", { name: "This may be because..." }));
 
@@ -258,7 +258,7 @@ describe("LinguaType v0.2.1 Inline Expression Menu", () => {
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
     fireEvent.keyDown(editor, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByText("表达菜单 Inline Expression Menu")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("表达菜单")).not.toBeInTheDocument());
   });
 
   it("inserts expressions from the library and can trigger full paragraph flow check", async () => {

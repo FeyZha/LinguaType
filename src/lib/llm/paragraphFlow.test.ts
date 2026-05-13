@@ -48,7 +48,7 @@ describe("checkParagraphFlowWithLLM", () => {
 });
 
 describe("checkParagraphHealthWithLLM", () => {
-  it("returns a lightweight mock paragraph health result", async () => {
+  it("returns a lightweight mock result", async () => {
     const input: ParagraphHealthInput = {
       fullText: "AI tools are useful. For example, for example, they save time.",
       currentParagraph: "AI tools are useful. For example, for example, they save time.",

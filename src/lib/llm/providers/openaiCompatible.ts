@@ -213,7 +213,7 @@ export async function checkParagraphHealthWithOpenAICompatibleProvider(
   const validated = paragraphHealthResultSchema.safeParse(extractEnhancementCandidate(parsed));
   if (!validated.success) {
     throw new InvalidModelSchemaError(
-      `Provider returned an invalid paragraph health response shape: ${validated.error.message}`,
+      `Provider returned an invalid response shape: ${validated.error.message}`,
       content,
     );
   }

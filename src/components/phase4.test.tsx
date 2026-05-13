@@ -107,7 +107,7 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     fireEvent.change(editor, { target: { value: fastResult.originalSentence } });
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    expect(await screen.findByText("当前句建议 Current Sentence")).toBeInTheDocument();
+    expect(await screen.findByText("当前句建议")).toBeInTheDocument();
     expect(screen.getAllByText(fastResult.originalSentence).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("检查中...")).toBeInTheDocument();
 
@@ -123,18 +123,18 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     fireEvent.change(editor, { target: { value: fastResult.originalSentence } });
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    expect(await screen.findByText("当前句建议 Current Sentence")).toBeInTheDocument();
+    expect(await screen.findByText("当前句建议")).toBeInTheDocument();
     expect(screen.getByText("原句 Original")).toBeInTheDocument();
     expect(screen.getByText("建议 Suggested")).toBeInTheDocument();
     expect(screen.getByText(fastResult.explanationZh)).toBeInTheDocument();
     fireEvent.keyDown(editor, { key: "Escape" });
 
-    await waitFor(() => expect(screen.queryByText("当前句建议 Current Sentence")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
   });
 });
 
-describe("LinguaType v0.2.2 trigger settings", () => {
+describe("LinguaType v0.2.2 ", () => {
   it("uses the product placeholder and does not open the expression menu with Alt slash", async () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<LinguaTypeApp />);
@@ -144,10 +144,10 @@ describe("LinguaType v0.2.2 trigger settings", () => {
       "placeholder",
       expect.stringContaining("例：This may 影响 young people's values."),
     );
-    expect(screen.getByText(/模式 Mode：Natural 自然 \| 强度 Level：balanced 平衡 \| 触发 Trigger：Ctrl\/Cmd \+ Enter/)).toBeInTheDocument();
+    expect(screen.getByText(/模式：Natural \| 强度：balanced \| 触发：Ctrl\/Cmd \+ Enter/)).toBeInTheDocument();
 
     fireEvent.keyDown(editor, { key: "/", altKey: true });
-    expect(screen.queryByText("表达菜单 Inline Expression Menu")).not.toBeInTheDocument();
+    expect(screen.queryByText("表达菜单")).not.toBeInTheDocument();
   });
 
   it("persists button-only enhancement and disables shortcut enhancement while keeping the button active", async () => {
@@ -164,7 +164,7 @@ describe("LinguaType v0.2.2 trigger settings", () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
-    expect(await screen.findByText("当前句建议 Current Sentence")).toBeInTheDocument();
+    expect(await screen.findByText("当前句建议")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").sentenceEnhancementShortcut).toBe("button_only");
   });
 
@@ -182,7 +182,7 @@ describe("LinguaType v0.2.2 trigger settings", () => {
     fireEvent.change(editor, { target: { value: "Hello world" } });
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
-    expect(screen.queryByText("表达菜单 Inline Expression Menu")).not.toBeInTheDocument();
+    expect(screen.queryByText("表达菜单")).not.toBeInTheDocument();
   });
 
   it("supports disabling sentence shortcuts while keeping explicit button enhancement available", async () => {
@@ -200,7 +200,7 @@ describe("LinguaType v0.2.2 trigger settings", () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
-    expect(await screen.findByText("当前句建议 Current Sentence")).toBeInTheDocument();
+    expect(await screen.findByText("当前句建议")).toBeInTheDocument();
   });
 
   it("keeps manual paragraph checking out of the Tools panel as a direct action", async () => {
@@ -210,7 +210,7 @@ describe("LinguaType v0.2.2 trigger settings", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "工具与设置" }));
 
     expect(screen.queryByRole("button", { name: "检查当前段落" })).not.toBeInTheDocument();
-    expect(screen.getByText(/需要检查当前段落时，请在编辑器内打开 Inline Expression Menu/i)).toBeInTheDocument();
+    expect(screen.getByText(/需要检查当前段落时，请在编辑器内打开/i)).toBeInTheDocument();
   });
 });
 
@@ -259,8 +259,8 @@ describe("LinguaType v0.2.2 selection actions", () => {
   });
 });
 
-describe("LinguaType v0.2.2 paragraph health settings and data control", () => {
-  it("runs paragraph health only on the third applied edit when configured", async () => {
+describe("LinguaType v0.2.2 settings and data control", () => {
+  it("runs only on the third applied edit when configured", async () => {
     localStorage.setItem(
       TRIGGER_SETTINGS_STORAGE_KEY,
       JSON.stringify({
@@ -280,14 +280,14 @@ describe("LinguaType v0.2.2 paragraph health settings and data control", () => {
     for (let index = 0; index < 3; index += 1) {
       fireEvent.change(editor, { target: { value: longParagraph(fastResult.originalSentence) } });
       fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
-      await screen.findByText("当前句建议 Current Sentence");
+      await screen.findByText("当前句建议");
       await screen.findByText(fastResult.explanationZh);
       fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
-      await waitFor(() => expect(screen.queryByText("当前句建议 Current Sentence")).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
     }
 
     await waitFor(() => expect(fetchMock.mock.calls.map((call) => call[0]).filter((url) => url === "/api/check-paragraph-health")).toHaveLength(1));
-    expect(await screen.findByText("段落健康 Paragraph Health：可能有 2 个问题")).toBeInTheDocument();
+    expect(await screen.findByText("段落健康：可能有 2 个问题")).toBeInTheDocument();
   });
 
   it("exports and clears local learning data through Data Control", async () => {
@@ -331,7 +331,7 @@ describe("LinguaType v0.2.2 paragraph health settings and data control", () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<LinguaTypeApp />);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "数据管理 Data Control" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "数据管理" }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "导出 Writing Habits JSON" }));
     });

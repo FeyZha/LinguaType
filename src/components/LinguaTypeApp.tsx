@@ -8,6 +8,7 @@ import { EnhancementPopover } from "./EnhancementPopover";
 import { InlineExpressionMenu } from "./InlineExpressionMenu";
 import { LearningLibraryPanel } from "./LearningLibraryPanel";
 import { ParagraphFlowPanel } from "./ParagraphFlowPanel";
+import { PersonalDictionaryPanel } from "./PersonalDictionaryPanel";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 import { EmptyState, ErrorState, LoadingState } from "./StateViews";
 import { TriggerSettingsPanel } from "./TriggerSettingsPanel";
@@ -36,7 +37,9 @@ import {
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
   loadParagraphHealthCache,
+  loadPersonalDictionaryFromStorage,
   loadTriggerSettingsFromStorage,
+  savePersonalDictionary,
   saveParagraphHealthCache,
   saveTriggerSettings,
   upsertCorrectionEvents,
@@ -59,6 +62,7 @@ import type {
   SelectionExplainResult,
   WritingMode,
 } from "@/lib/llm/types";
+import { analyzeProofreading } from "@/lib/proofreading";
 
 type PendingEnhancement = {
   requestId: string;
@@ -103,11 +107,11 @@ type SelectionActionState = {
 type SidebarTab = "review" | "library" | "habits" | "tools" | "data";
 
 const SIDEBAR_TABS: Array<{ id: SidebarTab; label: string }> = [
-  { id: "review", label: "检查状态 Review" },
-  { id: "library", label: "表达库 Learning Library" },
-  { id: "habits", label: "写作习惯 Writing Habits" },
+  { id: "review", label: "检查状态" },
+  { id: "library", label: "表达库" },
+  { id: "habits", label: "写作习惯" },
   { id: "tools", label: "工具与设置" },
-  { id: "data", label: "数据管理 Data Control" },
+  { id: "data", label: "数据管理" },
 ];
 
 export function LinguaTypeApp() {
@@ -123,6 +127,7 @@ export function LinguaTypeApp() {
   const [triggerSettings, setTriggerSettings] = useState<TriggerSettings>(() => defaultTriggerSettings());
   const [learningLibrary, setLearningLibrary] = useState<LearningItem[]>([]);
   const [correctionEvents, setCorrectionEvents] = useState<CorrectionEvent[]>([]);
+  const [personalDictionary, setPersonalDictionary] = useState<string[]>([]);
   const [pending, setPending] = useState<PendingEnhancement | null>(null);
   const [pendingParagraph, setPendingParagraph] = useState<PendingParagraphCheck | null>(null);
   const [paragraphHealthNotice, setParagraphHealthNotice] = useState<ParagraphHealthNotice | null>(null);
@@ -155,6 +160,7 @@ export function LinguaTypeApp() {
     }
     setLearningLibrary(loadLearningLibraryFromStorage(localStorage));
     setCorrectionEvents(loadCorrectionEventsFromStorage(localStorage));
+    setPersonalDictionary(loadPersonalDictionaryFromStorage(localStorage));
     setTriggerSettings(loadTriggerSettingsFromStorage(localStorage));
     healthCacheRef.current = loadParagraphHealthCache(localStorage);
   }, []);
@@ -176,6 +182,11 @@ export function LinguaTypeApp() {
     }
     return createWordDiff(pendingParagraph.originalParagraph, pendingParagraph.result.revisedParagraph);
   }, [pendingParagraph]);
+
+  const proofreadingResult = useMemo(
+    () => analyzeProofreading(text, personalDictionary),
+    [text, personalDictionary],
+  );
 
   function saveSettings(settings: ApiConfig) {
     const normalized = {
@@ -207,6 +218,11 @@ export function LinguaTypeApp() {
   function persistCorrectionEvents(items: CorrectionEvent[]) {
     setCorrectionEvents(items);
     localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(items));
+  }
+
+  function persistPersonalDictionary(terms: string[]) {
+    const normalized = savePersonalDictionary(localStorage, terms);
+    setPersonalDictionary(normalized);
   }
 
   function handleEditorTextChange(value: string) {
@@ -475,7 +491,7 @@ export function LinguaTypeApp() {
         setParagraphHealthNotice({ snapshotFullText: nextText, paragraphRange, result });
       }
       appliedEditsSinceHealthRef.current = 0;
-      setStatusMessage("段落健康 Paragraph Health 已检查");
+      setStatusMessage("段落健康 已检查");
     } finally {
       isHealthCheckingRef.current = false;
     }
@@ -719,7 +735,7 @@ export function LinguaTypeApp() {
           </div>
           {apiSettings.mockMode ? (
             <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-900">
-              Mock Mode 演示模式
+              演示模式
             </span>
           ) : null}
         </div>
@@ -729,7 +745,7 @@ export function LinguaTypeApp() {
             onClick={() => setSettingsOpen(true)}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
-            API Settings 设置
+            API 设置
           </button>
         </div>
       </header>
@@ -744,6 +760,7 @@ export function LinguaTypeApp() {
               isExpressionMenuOpen={inlineMenu.open}
               writingMode={writingMode}
               enhancementLevel={enhancementLevel}
+              proofreadingResult={proofreadingResult}
               triggerSettings={triggerSettings}
               onChange={handleEditorTextChange}
               onWritingModeChange={setWritingMode}
@@ -801,7 +818,7 @@ export function LinguaTypeApp() {
             <section className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
-                  段落健康 Paragraph Health：可能有 {paragraphHealthNotice.result.issueCount} 个问题
+                  段落健康：可能有 {paragraphHealthNotice.result.issueCount} 个问题
                 </span>
                 <button
                   type="button"
@@ -839,7 +856,7 @@ export function LinguaTypeApp() {
           {activeTab === "review" ? (
             <div className="flex flex-col gap-4">
               <section className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                <h2 className="text-sm font-semibold text-slate-900">检查状态 Review</h2>
+                <h2 className="text-sm font-semibold text-slate-900">检查状态</h2>
                 <p className="mt-2">
                   当前句建议会优先出现在编辑器附近。这里保留低频状态和后台任务反馈。
                 </p>
@@ -878,8 +895,9 @@ export function LinguaTypeApp() {
           {activeTab === "tools" ? (
             <div className="flex flex-col gap-4">
               <TriggerSettingsPanel settings={triggerSettings} onChange={persistTriggerSettings} />
+              <PersonalDictionaryPanel terms={personalDictionary} onChange={persistPersonalDictionary} />
               <section className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                需要检查当前段落时，请在编辑器内打开 Inline Expression Menu，然后选择 Check this paragraph。
+                需要检查当前段落时，请在编辑器内打开，然后选择 Check this paragraph。
               </section>
               {pendingParagraph || paragraphMessage || paragraphConflictMessage || isParagraphLoading ? (
                 <ParagraphFlowPanel

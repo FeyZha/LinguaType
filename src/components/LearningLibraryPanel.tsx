@@ -11,11 +11,11 @@ const TYPE_LABELS: Record<LearningItemType, string> = {
 };
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
-  natural: "Natural 自然",
+  natural: "Natural",
   ielts: "IELTS",
-  academic: "Academic 学术",
-  business: "Business 商务",
-  concise: "Concise 简洁",
+  academic: "Academic",
+  business: "Business",
+  concise: "Concise",
 };
 
 type LearningLibraryPanelProps = {
@@ -55,7 +55,7 @@ export function LearningLibraryPanel({
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">表达库 Learning Library</h2>
+          <h2 className="text-sm font-semibold text-slate-900">表达库</h2>
           <p className="mt-1 text-xs text-slate-500">保存你认可过、以后可复用的表达。</p>
         </div>
         <button
@@ -127,7 +127,7 @@ export function LearningLibraryPanel({
         </div>
       </div>
       {visibleItems.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">应用 Apply 句子建议后，有价值的表达会保存到这里。</p>
+        <p className="mt-3 text-sm text-slate-500">应用 句子建议后，有价值的表达会保存到这里。</p>
       ) : (
         <ul className="mt-3 space-y-3">
           {visibleItems.map((item) => (
@@ -159,21 +159,21 @@ export function LearningLibraryPanel({
                   onClick={() => onInsert(item.content)}
                   className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-white"
                 >
-                  插入 Insert
+                  插入
                 </button>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(item.content)}
                   className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-white"
                 >
-                  复制 Copy
+                  复制
                 </button>
                 <button
                   type="button"
                   onClick={() => onDelete(item.id)}
                   className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                 >
-                  删除 Delete
+                  删除
                 </button>
               </div>
             </li>

@@ -9,6 +9,7 @@ import {
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
+  PERSONAL_DICTIONARY_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
   exportLearningLibraryJson,
   exportWritingHabitsJson,
@@ -42,7 +43,7 @@ export function DataControlPanel({
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">数据管理 Data Control</h2>
+      <h2 className="text-sm font-semibold text-slate-900">数据管理</h2>
       <p className="mt-1 text-xs text-slate-500">所有学习数据都保存在本地浏览器，可导出或清空。</p>
       <div className="mt-4 grid gap-2">
         <button
@@ -133,6 +134,7 @@ export function DataControlPanel({
             CORRECTION_EVENTS_STORAGE_KEY,
             PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
             TRIGGER_SETTINGS_STORAGE_KEY,
+            PERSONAL_DICTIONARY_STORAGE_KEY,
           ].map((key) => (
             <li key={key}>{key}</li>
           ))}

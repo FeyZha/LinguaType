@@ -6,6 +6,7 @@ import {
   DRAFT_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
+  PERSONAL_DICTIONARY_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   aggregateWritingHabits,
@@ -16,7 +17,9 @@ import {
   filterLearningLibrary,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
+  loadPersonalDictionaryFromStorage,
   loadTriggerSettingsFromStorage,
+  savePersonalDictionary,
   saveParagraphHealthCache,
   saveTriggerSettings,
   upsertCorrectionEvents,
@@ -54,6 +57,7 @@ describe("storage constants", () => {
     expect(CORRECTION_EVENTS_STORAGE_KEY).toBe("linguatype.correctionEvents.v1");
     expect(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY).toBe("linguatype.paragraphHealthCache.v1");
     expect(TRIGGER_SETTINGS_STORAGE_KEY).toBe("linguatype.triggerSettings.v1");
+    expect(PERSONAL_DICTIONARY_STORAGE_KEY).toBe("linguatype.personalDictionary.v1");
     expect(DRAFT_STORAGE_KEY).toBe("linguatype.writingDraft.v1");
   });
 
@@ -64,8 +68,20 @@ describe("storage constants", () => {
   });
 });
 
-describe("v0.2.2 trigger settings storage", () => {
-  it("loads default low-intrusion trigger settings", () => {
+describe("personal dictionary storage", () => {
+  it("loads and saves normalized local dictionary terms", () => {
+    const storage = createMemoryStorage({
+      [PERSONAL_DICTIONARY_STORAGE_KEY]: JSON.stringify([" LinguaType ", "linguatype", "", "IELTS"]),
+    });
+
+    expect(loadPersonalDictionaryFromStorage(storage)).toEqual(["LinguaType", "IELTS"]);
+    expect(savePersonalDictionary(storage, ["  DeepSeek  ", "deepseek"])).toEqual(["DeepSeek"]);
+    expect(JSON.parse(storage.getItem(PERSONAL_DICTIONARY_STORAGE_KEY) ?? "[]")).toEqual(["DeepSeek"]);
+  });
+});
+
+describe("v0.2.2  storage", () => {
+  it("loads default low-intrusion ", () => {
     expect(defaultTriggerSettings()).toEqual({
       sentenceEnhancementShortcut: "ctrl_enter",
       inlineExpressionMenuTrigger: "ctrl_k",
@@ -80,7 +96,7 @@ describe("v0.2.2 trigger settings storage", () => {
     });
   });
 
-  it("persists trigger settings and fills missing fields with defaults", () => {
+  it("persists  and fills missing fields with defaults", () => {
     const storage = createMemoryStorage({
       [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
         sentenceEnhancementShortcut: "disable_shortcut",

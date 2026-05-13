@@ -13,6 +13,7 @@ import type {
   WritingHabitInsight,
   WritingMode,
 } from "./llm/types";
+import { normalizePersonalDictionary } from "./proofreading";
 
 export const API_SETTINGS_STORAGE_KEY = "linguatype.apiSettings.v1";
 export const LEARNING_HISTORY_STORAGE_KEY = "linguatype.learningHistory.v1";
@@ -21,6 +22,7 @@ export const CORRECTION_MEMORY_STORAGE_KEY = "linguatype.correctionMemory.v1";
 export const CORRECTION_EVENTS_STORAGE_KEY = "linguatype.correctionEvents.v1";
 export const PARAGRAPH_HEALTH_CACHE_STORAGE_KEY = "linguatype.paragraphHealthCache.v1";
 export const TRIGGER_SETTINGS_STORAGE_KEY = "linguatype.triggerSettings.v1";
+export const PERSONAL_DICTIONARY_STORAGE_KEY = "linguatype.personalDictionary.v1";
 export const DRAFT_STORAGE_KEY = "linguatype.writingDraft.v1";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -92,6 +94,16 @@ export function loadTriggerSettingsFromStorage(storage: StorageLike): TriggerSet
 export function saveTriggerSettings(storage: StorageLike, settings: TriggerSettings): TriggerSettings {
   const normalized = normalizeTriggerSettings(settings as unknown as Record<string, unknown>);
   storage.setItem(TRIGGER_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function loadPersonalDictionaryFromStorage(storage: StorageLike): string[] {
+  return normalizePersonalDictionary(parseStringArray(storage.getItem(PERSONAL_DICTIONARY_STORAGE_KEY)));
+}
+
+export function savePersonalDictionary(storage: StorageLike, terms: string[]): string[] {
+  const normalized = normalizePersonalDictionary(terms);
+  storage.setItem(PERSONAL_DICTIONARY_STORAGE_KEY, JSON.stringify(normalized));
   return normalized;
 }
 
@@ -408,6 +420,18 @@ function parseArray(value: string | null): Array<Record<string, unknown>> {
   try {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseStringArray(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
   } catch {
     return [];
   }

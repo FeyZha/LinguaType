@@ -4,11 +4,11 @@ import type { CorrectionMemory, WritingMode } from "@/lib/llm/types";
 import { sortCorrectionMemory } from "@/lib/storage";
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
-  natural: "Natural 自然",
+  natural: "Natural",
   ielts: "IELTS",
-  academic: "Academic 学术",
-  business: "Business 商务",
-  concise: "Concise 简洁",
+  academic: "Academic",
+  business: "Business",
+  concise: "Concise",
 };
 
 type CommonIssuesPanelProps = {
@@ -53,7 +53,7 @@ export function CommonIssuesPanel({ items, onDelete }: CommonIssuesPanelProps) {
                   onClick={() => onDelete(item.id)}
                   className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                 >
-                  删除 Delete
+                  删除
                 </button>
               </div>
             </li>

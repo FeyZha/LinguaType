@@ -4,9 +4,9 @@ LinguaType is a lightweight web writing assistant for Chinese-speaking English l
 
 v0.2 upgrades LinguaType from a latest-sentence enhancer into an expression learning assistant.
 
-v0.2.1 refines that experience into a more input-method-like writing flow: sentence revision returns quickly, learning extraction happens after Apply in the background, writing habits are summarized instead of shown as raw logs, paragraph health is non-intrusive, and expression tools live near the editor.
+v0.2.1 refines that experience into a more input-method-like writing flow: sentence revision returns quickly, learning extraction happens after Apply in the background, writing habits are summarized instead of shown as raw logs, is non-intrusive, and expression tools live near the editor.
 
-v0.2.2 moves the most frequent interactions closer to the text: current sentence suggestions appear beside the editor, trigger behavior is configurable, selected text can be explained or saved, and local data controls live in the low-frequency settings area.
+v0.2.2 moves the most frequent interactions closer to the text: current sentence suggestions appear beside the editor, trigger behavior is configurable, selected text can be explained or saved, local proofreading signals appear near the editor, and local data controls live in the low-frequency settings area.
 
 LinguaType still is not a translator, chatbot, essay generator, full essay corrector, Chrome extension, or system input method.
 
@@ -52,17 +52,17 @@ Common Issues is the v0.2 legacy name for raw correction memory. In v0.2.1 the c
 
 The legacy key `linguatype.correctionMemory.v1` may still be migrated, but new v0.2.1 learning signals are stored as `correctionEvents` in `linguatype.correctionEvents.v1`.
 
-Regenerate, Copy revised sentence, Cancel, Paragraph Flow Check, and Paragraph Health Check do not write learning data.
+Regenerate, Copy revised sentence, Cancel, Paragraph Flow Check, and Check do not write learning data.
 
 ### Paragraph Flow Check
 
-Manual paragraph flow checking is a secondary action inside the Inline Expression Menu as `检查当前段落`. It checks the current paragraph, or the latest non-empty paragraph if cursor position is unavailable.
+Manual paragraph flow checking is a secondary action inside the as `检查当前段落`. It checks the current paragraph, or the latest non-empty paragraph if cursor position is unavailable.
 
 It can flag repetition, transitions, pronoun reference, logic gaps, sentence order, tone consistency, and weak development. It does not score essays, rewrite the whole article, add new arguments, or auto-apply changes. Apply paragraph replaces only the checked paragraph and uses conflict detection.
 
 ### Next Expression Toolbox
 
-Next Expression Toolbox is the v0.2 legacy name. In v0.2.1, the current high-frequency UI is the Inline Expression Menu near the editor.
+Next Expression Toolbox is the v0.2 legacy name. In v0.2.1, the current high-frequency UI is the near the editor.
 
 The expression tool remains intention-based. Choose one intention first:
 
@@ -120,7 +120,7 @@ Writing Habits aggregates correction events by type and shows broader patterns s
 
 The legacy `linguatype.correctionMemory.v1` key is still supported and migrated without deletion.
 
-### Paragraph Health Check
+### Check
 
 After Apply on the latest sentence, LinguaType may run a lightweight `/api/check-paragraph-health` check in the background if the current paragraph is long enough and has changed meaningfully.
 
@@ -132,11 +132,11 @@ Paragraph Health Check:
 - does not save learning data
 - does not auto-apply anything
 
-If it finds likely flow issues, the editor area shows a small `段落健康 Paragraph Health` badge. Full paragraph suggestions are loaded only after the user clicks `查看建议`, which calls the existing `/api/check-paragraph-flow`.
+If it finds likely flow issues, the editor area shows a small `段落健康` badge. Full paragraph suggestions are loaded only after the user clicks `查看建议`, which calls the existing `/api/check-paragraph-flow`.
 
-### Inline Expression Menu
+###
 
-Press `Ctrl/Cmd + K` in the editor to open the Inline Expression Menu. It provides:
+Press `Ctrl/Cmd + K` in the editor to open the. It provides:
 
 - intention-based templates
 - Insert from Library
@@ -158,13 +158,13 @@ The `工具与设置` tab stores local trigger preferences in `linguatype.trigge
 
 Defaults:
 
-- sentence enhancement: `Ctrl/Cmd + Enter`
-- inline expression menu: `Ctrl/Cmd + K`
-- paragraph health: after every eligible Apply
+-: `Ctrl/Cmd + Enter`
+-: `Ctrl/Cmd + K`
+-: after every eligible Apply
 - writing habits feedback: badge
 - status feedback: popover footer
 
-`Ctrl/Cmd + J` works only when the user chooses the legacy shortcut mode and the editor is focused. `button_only` disables sentence enhancement shortcuts but keeps the button. The `/` and `Alt + /` triggers are not restored.
+`Ctrl/Cmd + J` works only when the user chooses the legacy shortcut mode and the editor is focused. `button_only` disables shortcuts but keeps the button. The `/` and `Alt + /` triggers are not restored.
 
 ### Selection Actions
 
@@ -175,7 +175,7 @@ When English text is selected in the editor, LinguaType shows a lightweight sele
 
 Explain selected calls `/api/explain-selection` and explains only the selected text. It does not rewrite or replace text. Save to Library is an explicit user action and writes only to the local Learning Library.
 
-### Paragraph Health Modes
+### Modes
 
 Paragraph Health Check remains lightweight and non-blocking, but its trigger can now be set to:
 
@@ -186,9 +186,19 @@ Paragraph Health Check remains lightweight and non-blocking, but its trigger can
 
 It still does not return a revised paragraph, generate a diff, save learning data, or auto-apply. Full paragraph flow suggestions are loaded only after the user clicks View suggestions or manually checks a paragraph.
 
+### Local Proofreading Signals
+
+LinguaType borrows the rule-checking idea from LanguageTool, but the first implementation stays local. The editor bottom status bar shows a collapsed `校对提示 Proofreading：N 个问题` button by default. Clicking it expands `文本统计 Text Stats` and small `Proofreading Signals` for common typo hints, duplicate words, punctuation spacing, style hints, and long sentences.
+
+These hints do not call the LLM, do not call LanguageTool's public API, do not score essays, and never auto-apply changes.
+
+### Personal Dictionary
+
+The `工具与设置` area includes `个人词典 Personal Dictionary`. Terms are stored locally in `linguatype.personalDictionary.v1` and can suppress user-approved local proofreading hints where applicable.
+
 ### Data Control
 
-The `数据管理 Data Control` tab provides local-only management:
+The `数据管理` tab provides local-only management:
 
 - Export Learning Library JSON
 - Export Writing Habits JSON
@@ -217,6 +227,7 @@ The test-connection API uses only a minimal prompt asking the provider to return
 - `linguatype.correctionEvents.v1`
 - `linguatype.paragraphHealthCache.v1`
 - `linguatype.triggerSettings.v1`
+- `linguatype.personalDictionary.v1`
 
 ## v0.2 Limits
 
@@ -234,6 +245,7 @@ LinguaType v0.2 / v0.2.1 / v0.2.2 still does not implement:
 - essay scoring
 - auto-writing
 - automatic paragraph rewrite
+- automatic high-frequency LanguageTool public API checks
 - multi-candidate translation UI
 - chatbot interface
 - streaming JSON as the core implementation

@@ -16,7 +16,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">写作习惯 Writing Habits</h2>
+        <h2 className="text-sm font-semibold text-slate-900">写作习惯</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">
           基于你已 Apply 的修改，LinguaType 会在这里总结反复出现的写作习惯。
         </p>

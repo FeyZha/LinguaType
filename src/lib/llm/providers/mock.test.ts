@@ -79,7 +79,7 @@ describe("mock provider", () => {
     expect(result.correctionEvents.some((event) => event.type === "other")).toBe(true);
   });
 
-  it("returns lightweight paragraph health without a revised paragraph", async () => {
+  it("returns lightweight without a revised paragraph", async () => {
     const healthInput: ParagraphHealthInput = {
       fullText: "AI tools are useful. For example, for example, they save time.",
       currentParagraph: "AI tools are useful. For example, for example, they save time.",

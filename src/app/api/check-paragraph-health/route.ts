@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     if (error instanceof InvalidModelJsonError) {
       return NextResponse.json(
         {
-          error: "The model returned invalid JSON for paragraph health.",
+          error: "The model returned invalid JSON for.",
           rawResponse: redactApiKey(error.rawResponse, apiKey),
         },
         { status: 422 },

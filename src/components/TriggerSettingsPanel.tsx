@@ -21,11 +21,11 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">触发与打扰设置 Trigger Settings</h2>
+      <h2 className="text-sm font-semibold text-slate-900">触发与打扰设置 </h2>
       <p className="mt-1 text-xs text-slate-500">控制快捷键、自动提示和低打扰反馈方式。</p>
       <div className="mt-4 space-y-3">
         <label className="block text-sm text-slate-700">
-          <span className="mb-1 block text-xs font-semibold text-slate-500">句子增强触发 Sentence Enhancement</span>
+          <span className="mb-1 block text-xs font-semibold text-slate-500">句子增强触发</span>
           <select
             aria-label="句子增强触发"
             value={settings.sentenceEnhancementShortcut}
@@ -43,7 +43,7 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
           </select>
         </label>
         <label className="block text-sm text-slate-700">
-          <span className="mb-1 block text-xs font-semibold text-slate-500">表达菜单触发 Inline Expression Menu</span>
+          <span className="mb-1 block text-xs font-semibold text-slate-500">表达菜单触发</span>
           <select
             aria-label="表达菜单触发"
             value={settings.inlineExpressionMenuTrigger}
@@ -60,7 +60,7 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
           </select>
         </label>
         <label className="block text-sm text-slate-700">
-          <span className="mb-1 block text-xs font-semibold text-slate-500">段落健康触发 Paragraph Health</span>
+          <span className="mb-1 block text-xs font-semibold text-slate-500">段落健康触发</span>
           <select
             aria-label="段落健康触发"
             value={settings.paragraphHealthTrigger}

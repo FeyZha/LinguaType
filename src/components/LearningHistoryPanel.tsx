@@ -48,21 +48,21 @@ export function LearningHistoryPanel({ items, onDelete, onInsert }: LearningHist
                           onClick={() => onInsert(item.content)}
                           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-white"
                         >
-                          插入 Insert
+                          插入
                         </button>
                         <button
                           type="button"
                           onClick={() => navigator.clipboard?.writeText(item.content)}
                           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-white"
                         >
-                          复制 Copy
+                          复制
                         </button>
                         <button
                           type="button"
                           onClick={() => onDelete(item.id)}
                           className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                         >
-                          删除 Delete
+                          删除
                         </button>
                       </div>
                     </li>

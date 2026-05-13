@@ -72,7 +72,7 @@ export function InlineExpressionMenu({
     <div className="absolute bottom-14 right-4 z-20 w-[min(360px,calc(100%-2rem))] rounded-md border border-slate-200 bg-white p-3 shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">表达菜单 Inline Expression Menu</h2>
+          <h2 className="text-sm font-semibold text-slate-900">表达菜单</h2>
           <p className="mt-1 text-xs text-slate-500">本地表达工具，不会自动调用 LLM。</p>
         </div>
         <button
