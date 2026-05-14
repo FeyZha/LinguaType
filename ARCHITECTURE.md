@@ -7,7 +7,7 @@ LinguaType 是基于 Next.js App Router 的本地优先 Web 应用。前端由 R
 ```text
 src/app/page.tsx
   -> src/components/LinguaTypeApp.tsx
-      -> 写作准备 / 可折叠写作存档 / 分段编辑器 / 内联设置修改 / 浮层 / 侧边栏
+      -> 写作准备 / 可折叠写作存档 / Typora 式分段编辑器 / 内联设置修改 / 行内当前句建议 / 低频工具侧栏
       -> src/lib/sentence.ts
       -> src/lib/storage.ts
       -> src/lib/proofreading.ts
@@ -33,6 +33,7 @@ src/app/api/*/route.ts
 - Paragraph Health / Paragraph Flow。
 - Selection Actions。
 - 编辑器内联 Writing Setup 修改和显式 outline check。
+- 沉浸式编辑器壳层、行内当前句建议展示和右侧低频工具降噪。
 - 右侧低频管理面板。
 
 ## 写作准备数据流
@@ -66,7 +67,7 @@ App load
 
 ## 分段草稿数据流
 
-主写作界面按大纲点数量展示多个段落输入框。UI 层将段落用空行拼接成单个 `text`，继续写入 `linguatype.writingDraft.v1`。
+主写作界面按大纲点数量展示多个段落输入框。v0.2.7 的视觉呈现是 Typora 式文档流：文章主题在编辑器顶部以 H1 风格展示，大纲点以段落标题展示，正文 textarea 去除强卡片边框。UI 层仍将段落用空行拼接成单个 `text`，继续写入 `linguatype.writingDraft.v1`。
 
 这样可以保留既有能力：
 
@@ -85,7 +86,7 @@ App load
   -> POST /api/enhance-fast
   -> enhanceFastWithLLM()
   -> provider 返回 finalSentence
-  -> EnhancementPopover 展示 diff
+  -> 行内当前句建议展示本地 diff
   -> 用户 Apply
   -> replaceLatestSentence()
   -> POST /api/extract-learning

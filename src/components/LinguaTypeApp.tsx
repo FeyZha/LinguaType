@@ -1150,10 +1150,10 @@ export function LinguaTypeApp() {
 
   return (
     <main className="flex min-h-screen flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 bg-white/80 px-5 py-3 backdrop-blur">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 bg-white/60 px-5 py-2.5 backdrop-blur">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-lg font-bold text-slate-950">LinguaType</h1>
+            <h1 className="text-base font-semibold text-slate-950">LinguaType</h1>
             <p className="text-xs text-slate-500">输入法式英文表达助手</p>
           </div>
           {apiSettings.mockMode ? (
@@ -1175,10 +1175,10 @@ export function LinguaTypeApp() {
       </header>
 
       <div
-        className={`grid flex-1 gap-4 p-4 ${
+        className={`grid flex-1 gap-5 px-4 py-3 ${
           archiveSidebarCollapsed
-            ? "xl:grid-cols-[64px_minmax(0,1fr)_390px]"
-            : "xl:grid-cols-[260px_minmax(0,1fr)_390px]"
+            ? "xl:grid-cols-[56px_minmax(0,1fr)_320px]"
+            : "xl:grid-cols-[248px_minmax(0,1fr)_320px]"
         }`}
       >
         <ArchiveSidebar
@@ -1206,8 +1206,13 @@ export function LinguaTypeApp() {
           onCancelDelete={() => setDeleteCandidateId(null)}
           onConfirmDelete={deleteArchive}
         />
-        <section className="flex min-h-0 flex-col gap-4">
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-3">
+        <section
+          aria-label="沉浸式写作区"
+          className={`mx-auto flex min-h-0 w-full max-w-5xl flex-col gap-4 px-2 py-3 transition-[max-width] ${
+            archiveSidebarCollapsed ? "xl:max-w-6xl" : ""
+          }`}
+        >
+          <section className="px-1">
             <InlineSetupControls
               activeArchive={activeArchive}
               setup={writingSetup}
@@ -1273,7 +1278,7 @@ export function LinguaTypeApp() {
               }}
             />
             {pending ? (
-              <div className="absolute inset-x-4 bottom-20 z-20 md:left-auto md:w-[min(640px,calc(100%-2rem))]">
+              <div className="mt-4">
                 <EnhancementPopover
                   originalSentence={pending.originalSentence}
                   result={pending.result}
@@ -1331,8 +1336,8 @@ export function LinguaTypeApp() {
           {error ? <ErrorState message={error.message} rawResponse={error.rawResponse} /> : null}
         </section>
 
-        <aside className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-2">
+        <aside className="flex flex-col gap-3 border-l border-slate-200/70 pl-3">
+          <div className="grid grid-cols-2 gap-1 rounded-md bg-white/55 p-1">
             {SIDEBAR_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -1341,7 +1346,7 @@ export function LinguaTypeApp() {
                 aria-selected={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`rounded px-2 py-1.5 text-sm ${
-                  activeTab === tab.id ? "bg-moss text-white" : "text-slate-700 hover:bg-slate-50"
+                  activeTab === tab.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-white"
                 }`}
               >
                 {tab.label}
@@ -1474,12 +1479,12 @@ function ArchiveSidebar({
 }) {
   if (collapsed) {
     return (
-      <aside className="flex min-h-0 flex-col items-center gap-2 rounded-md border border-slate-200 bg-white p-2">
+      <aside className="flex min-h-0 flex-col items-center gap-2 border-r border-slate-200/70 py-2 pr-2">
         <button
           type="button"
           onClick={onExpand}
           aria-label="展开写作存档"
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          className="rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-white"
         >
           ☰
         </button>
@@ -1496,7 +1501,7 @@ function ArchiveSidebar({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col gap-3 rounded-md border border-slate-200 bg-white p-3">
+    <aside className="flex min-h-0 flex-col gap-3 border-r border-slate-200/70 py-2 pr-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">写作存档</h2>
         <div className="flex items-center gap-1">
@@ -1511,20 +1516,20 @@ function ArchiveSidebar({
             type="button"
             onClick={onCollapse}
             aria-label="收起写作存档"
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className="rounded-md px-2 py-1.5 text-xs text-slate-600 hover:bg-white"
           >
             ←
           </button>
         </div>
       </div>
       {activeArchive ? (
-        <label className="grid gap-1 text-xs font-medium text-slate-600">
+        <label className="grid gap-1 text-xs font-medium text-slate-500">
           当前存档标题
           <input
             value={activeArchive.title}
             onChange={(event) => onRenameActive(event.target.value)}
             aria-label="当前存档标题"
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-800 outline-none focus:border-moss"
+            className="h-9 rounded-md border border-slate-200 bg-white/65 px-3 text-sm text-slate-800 outline-none focus:border-moss"
           />
         </label>
       ) : null}
@@ -1533,7 +1538,7 @@ function ArchiveSidebar({
           <div
             key={item.id}
             className={`relative rounded-md transition ${
-              item.id === archives.activeId ? "bg-moss/10 text-moss" : "text-slate-700 hover:bg-slate-50"
+              item.id === archives.activeId ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-white"
             }`}
           >
             <div className="flex items-start gap-1">
@@ -1553,7 +1558,9 @@ function ArchiveSidebar({
                   className="min-w-0 flex-1 px-3 py-2 text-left text-sm"
                 >
                   <span className="block truncate font-medium">{item.title || "未命名写作"}</span>
-                  <span className="mt-1 block truncate text-xs font-normal text-slate-500">
+                  <span className={`mt-1 block truncate text-xs font-normal ${
+                    item.id === archives.activeId ? "text-slate-300" : "text-slate-500"
+                  }`}>
                     {item.setup?.essayTopic || "未填写主题"}
                   </span>
                 </button>
@@ -1562,7 +1569,9 @@ function ArchiveSidebar({
                 type="button"
                 onClick={() => onOpenMenu(item.id)}
                 aria-label={`打开存档操作：${item.title || "未命名写作"}`}
-                className="m-1 rounded px-2 py-1 text-sm text-slate-500 hover:bg-white"
+                className={`m-1 rounded px-2 py-1 text-sm ${
+                  item.id === archives.activeId ? "text-slate-200 hover:bg-white/10" : "text-slate-500 hover:bg-white"
+                }`}
               >
                 ...
               </button>
@@ -1640,9 +1649,9 @@ function InlineSetupControls({
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold text-slate-950">
-            {activeArchive?.title || setup?.essayTopic || "未命名写作"}
-          </h2>
+          <h1 className="truncate text-4xl font-semibold leading-tight text-slate-950">
+            {setup?.essayTopic || activeArchive?.title || "未命名写作"}
+          </h1>
           {editState.kind === "topic" ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <input
@@ -1667,20 +1676,20 @@ function InlineSetupControls({
               </button>
             </div>
           ) : (
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <span>{setup?.essayTopic || "未填写主题"}</span>
               <button
                 type="button"
                 onClick={onStartTopicEdit}
                 aria-label="编辑文章主题"
-                className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
+              className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100"
               >
                 编辑
               </button>
             </p>
           )}
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="pt-2 text-xs text-slate-500">
           {editState.kind === "area" ? (
             <div className="grid gap-2">
               <div className="flex flex-wrap gap-1" aria-label="内联写作领域">

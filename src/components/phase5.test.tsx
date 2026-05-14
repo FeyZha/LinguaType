@@ -196,6 +196,56 @@ describe("LinguaType v0.2.7 editor shell", () => {
     expect(screen.getByLabelText("写作编辑器")).toHaveValue("Existing draft sentence.");
   });
 
+  it("uses an immersive document flow with topic and outline headings while preserving paragraph joining", async () => {
+    localStorage.setItem(DRAFT_STORAGE_KEY, "Opening paragraph.\n\nSecond paragraph.");
+    localStorage.setItem(
+      WRITING_SETUP_STORAGE_KEY,
+      JSON.stringify({
+        topicArea: "education",
+        essayTopic: "AI topic",
+        outlinePoints: ["Context", "Counterpoint"],
+        outline: "Context\nCounterpoint",
+        updatedAt: "2026-05-14T00:00:00.000Z",
+      }),
+    );
+
+    render(<LinguaTypeApp />);
+
+    expect(await screen.findByLabelText("沉浸式写作区")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "AI topic" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /Context/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /Counterpoint/ })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("第 2 段正文"), { target: { value: "Updated second paragraph." } });
+
+    await waitFor(() => {
+      const archives = JSON.parse(localStorage.getItem(WRITING_ARCHIVES_STORAGE_KEY) ?? "{}");
+      expect(archives.items[0].text).toBe("Opening paragraph.\n\nUpdated second paragraph.");
+    });
+  });
+
+  it("keeps the immersive editor region available after collapsing writing archives", async () => {
+    localStorage.setItem(DRAFT_STORAGE_KEY, "Focused draft sentence.");
+    localStorage.setItem(
+      WRITING_SETUP_STORAGE_KEY,
+      JSON.stringify({
+        topicArea: "technology",
+        essayTopic: "Focused topic",
+        outlinePoints: ["Focus"],
+        outline: "Focus",
+        updatedAt: "2026-05-14T00:00:00.000Z",
+      }),
+    );
+
+    render(<LinguaTypeApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "收起写作存档" }));
+
+    expect(screen.getByRole("button", { name: "展开写作存档" })).toBeInTheDocument();
+    expect(screen.getByLabelText("沉浸式写作区")).toBeInTheDocument();
+    expect(screen.getByLabelText("写作编辑器")).toHaveValue("Focused draft sentence.");
+  });
+
   it("deletes the active archive from the item menu and switches to the most recently opened remaining archive", async () => {
     localStorage.setItem(
       WRITING_ARCHIVES_STORAGE_KEY,

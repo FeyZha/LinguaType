@@ -25,19 +25,21 @@ LinguaType is:
 
 The current product version is v0.2.7.
 
-v0.2.7 refines the main writing shell, Writing Archives, setup editing, and outline checking. It keeps the latest-sentence enhancement, Apply/Cancel, and learning-data save rules unchanged.
+v0.2.7 refines the main writing shell, Writing Archives, setup editing, and outline checking. The main writing UI is an immersive Typora-like integrated workbench: the essay topic reads like an H1 in the document flow, outline points read like paragraph headings, and paragraph text areas should feel borderless and writing-first. It keeps the latest-sentence enhancement, Apply/Cancel, and learning-data save rules unchanged.
 
 Writing Setup collects topic area, essay topic, and outline before entering the editor. After the user enters the main writing UI, topic area, essay topic, and outline edits should happen through lightweight inline editor controls rather than leaving the editor or opening a setup drawer. Writing Setup is not a landing page or essay generator. It must not call the LLM, generate article content, decide the user's argument, save learning data, or rewrite text by itself.
 
 Writing Setup uses direct topic-area buttons, local preset essay topics, and multiple outline point inputs. Preset topic refresh is local only and must not call the LLM.
 
-The main writing UI may show segmented paragraph inputs based on outline points, but the product still preserves the latest-sentence enhancement contract and range-based Apply behavior. The main UI must not show a separate article-outline management card; outline points should be shown on the relevant paragraph labels with a low-emphasis inline edit entry.
+The main writing UI may show segmented paragraph inputs based on outline points, but the product still preserves the latest-sentence enhancement contract and range-based Apply behavior. The main UI must not show a separate article-outline management card; outline points should be shown as Typora-like paragraph headings with a low-emphasis inline edit entry.
 
 Writing Archives store local writing drafts as separate local documents. They are localStorage-only, may save title, text, setup, createdAt, updatedAt, and lastOpenedAt, and must not save learning data or trigger extraction. The archive sidebar may be collapsible. Archive item menus may support rename and delete. Archive delete must require confirmation, must only update `linguatype.writingArchives.v1`, and must not clear Learning Library, Correction Events, legacy draft/setup keys, or trigger `/api/extract-learning`. Archive title rename must not automatically change the essay topic.
 
 Outline Check uses `POST /api/check-outline` only after the user confirms inline topic or outline changes. Editing, adding, deleting, opening archive menus, switching archives, deleting archives, or refreshing outline fields must not call the LLM. Outline Check is non-blocking, only checks whether the outline matches the essay topic, only shows suggestions when issues exist, and must not rewrite the outline or generate article content.
 
 Theme Preference supports `light`, `dark`, and `system`. It belongs in the main writing UI only, is UI-only, and must not affect API Settings, LLM provider behavior, Learning Library, Correction Events, Paragraph Health, or Selection Actions.
+
+Current Sentence suggestions should appear near the editor as an inline diff suggestion bar when possible. They must remain suggestions, not applied text, until the user explicitly clicks Apply.
 
 v0.2.2 preserves the core flow:
 latest sentence -> `/api/enhance-fast` -> code-generated diff -> Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply.

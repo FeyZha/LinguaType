@@ -116,19 +116,21 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
     const triggerLabel = sentenceTriggerLabel(triggerSettings.sentenceEnhancementShortcut);
 
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="grid min-h-[520px] flex-1 gap-3 overflow-auto" data-editor-container>
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
+        <div className="grid min-h-[520px] flex-1 gap-10 overflow-auto px-1 py-2" data-editor-container>
           {paragraphs.map((paragraph, index) => (
-            <label key={index} className="grid min-h-[180px] gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+            <label key={index} className="grid min-h-[180px] gap-3">
               <span className="grid gap-2 text-xs font-semibold text-slate-600">
-                <span className="flex items-center justify-between gap-3">
-                  <span>第 {index + 1} 段：{outlinePoints?.[index]?.trim() || "自由写作"}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold leading-snug text-slate-900">
+                    {outlinePoints?.[index]?.trim() || `第 ${index + 1} 段 自由写作`}
+                  </h2>
                   <span className="flex gap-1">
                     <button
                       type="button"
                       onClick={() => onStartOutlineEdit(index)}
                       aria-label={`编辑第 ${index + 1} 个大纲点`}
-                      className="rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                      className="rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                     >
                       编辑
                     </button>
@@ -136,12 +138,12 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
                       type="button"
                       onClick={() => onDeleteOutlinePoint(index)}
                       aria-label={`删除第 ${index + 1} 个大纲点`}
-                      className="rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-red-700"
+                      className="rounded px-2 py-1 text-xs font-medium text-slate-300 hover:bg-slate-100 hover:text-red-700"
                     >
                       删除
                     </button>
                   </span>
-                </span>
+                </div>
                 {outlineEditState?.index === index ? (
                   <span className="flex flex-wrap gap-2">
                     <input
@@ -170,7 +172,7 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
                   <button
                     type="button"
                     onClick={onAddOutlinePoint}
-                    className="w-fit rounded px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                    className="w-fit rounded px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
                     + 大纲点
                   </button>
@@ -214,12 +216,12 @@ export const WritingEditor = forwardRef<HTMLTextAreaElement, WritingEditorProps>
                   "例如：This may 影响 young people's values.",
                   "按 Ctrl/Cmd + Enter 增强最新一句。",
                 ].join("\n")}
-                className="min-h-0 flex-1 resize-none bg-transparent text-base leading-8 text-slate-900 outline-none"
+                className="min-h-0 flex-1 resize-none bg-transparent text-[17px] leading-8 text-slate-900 outline-none placeholder:text-slate-300"
               />
             </label>
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 px-1 py-3">
           <details className="group">
             <summary className="cursor-pointer list-none text-xs font-medium text-slate-600">
               模式：{WRITING_MODE_LABELS[writingMode]} | 强度：{ENHANCEMENT_LEVEL_LABELS[enhancementLevel]} | 触发：{triggerLabel}
