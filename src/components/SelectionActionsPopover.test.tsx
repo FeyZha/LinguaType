@@ -1,8 +1,29 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 
 describe("SelectionActionsPopover", () => {
+  it("shows only the explain icon before the user requests an explanation", () => {
+    const onExplain = vi.fn();
+
+    render(
+      <SelectionActionsPopover
+        selectedText="make a difference"
+        position={{ left: 120, top: 80 }}
+        isLoading={false}
+        onExplain={onExplain}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "解释选中内容" })).toBeInTheDocument();
+    expect(screen.queryByText("开始解释")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "解释选中内容" }));
+    expect(onExplain).toHaveBeenCalledTimes(1);
+  });
+
   it("uses Chinese-only labels, dynamic position, and structured explanation", () => {
     render(
       <SelectionActionsPopover
@@ -22,7 +43,7 @@ describe("SelectionActionsPopover", () => {
       />,
     );
 
-    expect(screen.getByText("选中文本操作")).toBeInTheDocument();
+    expect(screen.getByText("解释选中内容")).toBeInTheDocument();
     expect(screen.queryByText(/Selection Actions/u)).not.toBeInTheDocument();
     expect(screen.getByText("含义")).toBeInTheDocument();
     expect(screen.getByText("用法")).toBeInTheDocument();

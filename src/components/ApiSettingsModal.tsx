@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import type { ApiConfig } from "@/lib/llm/types";
 
 type ApiSettingsModalProps = {
@@ -11,6 +12,13 @@ type ApiSettingsModalProps = {
   onClear: () => void;
 };
 
+type ApiSettingsPanelProps = {
+  settings: ApiConfig;
+  onSave: (settings: ApiConfig) => void;
+  onClear: () => void;
+  className?: string;
+};
+
 export function ApiSettingsModal({
   open,
   settings,
@@ -18,20 +26,42 @@ export function ApiSettingsModal({
   onSave,
   onClear,
 }: ApiSettingsModalProps) {
-  const [draft, setDraft] = useState<ApiConfig>(settings);
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1c1c]/25 p-4 backdrop-blur-sm">
+      <ApiSettingsPanel
+        settings={settings}
+        onClear={onClear}
+        onSave={(nextSettings) => {
+          onSave(nextSettings);
+          onClose();
+        }}
+        className="w-full max-w-2xl shadow-[0_24px_80px_rgba(28,28,28,0.16)]"
+      />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="关闭 API Settings 设置"
+        className="absolute right-6 top-6 rounded-md bg-white/70 px-3 py-2 text-sm text-[#1c1c1c]/60 shadow-sm transition hover:bg-white"
+      >
+        关闭
+      </button>
+    </div>
+  );
+}
+
+export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: ApiSettingsPanelProps) {
+  const [draft, setDraft] = useState<ApiConfig>(() => ({ ...settings, mockMode: false }));
   const [testing, setTesting] = useState(false);
   const [testMessage, setTestMessage] = useState("");
 
   useEffect(() => {
-    if (open) {
-      setDraft(settings);
-      setTestMessage("");
-    }
-  }, [open, settings]);
-
-  if (!open) {
-    return null;
-  }
+    setDraft({ ...settings, mockMode: false });
+    setTestMessage("");
+  }, [settings]);
 
   async function testConnection() {
     setTesting(true);
@@ -46,7 +76,7 @@ export function ApiSettingsModal({
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? "连接测试失败。");
       }
-      setTestMessage(draft.mockMode ? "Mock Mode 已可用。" : "连接测试通过。");
+      setTestMessage("连接测试通过。");
     } catch (error) {
       setTestMessage(error instanceof Error ? error.message : "连接测试失败。");
     } finally {
@@ -59,152 +89,131 @@ export function ApiSettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4">
-      <div className="w-full max-w-2xl rounded-md bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-950">API 设置</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              设置只保存在当前浏览器。API Key 会随请求发送到本地 API route，但不会保存在服务器。
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
-            关闭
-          </button>
-        </div>
+    <section className={`rounded-md bg-[var(--lt-surface)] p-5 text-[var(--lt-text)] ring-1 ring-[var(--lt-border)] ${className}`}>
+      <div>
+        <h2 className="text-lg font-semibold">API Settings 设置</h2>
+        <p className="mt-1 text-sm leading-6 text-[var(--lt-muted)]">
+          设置只保存在当前浏览器。API Key 会随请求发送到本地 API route，但不会保存到服务器。
+        </p>
+      </div>
 
-        <label className="mt-5 flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 p-3">
-          <span>
-            <span className="block text-sm font-semibold text-emerald-950">演示模式</span>
-            <span className="block text-xs text-emerald-800">
-              使用本地固定演示结果，不需要填写真实 API Settings。
-            </span>
-          </span>
+      <div className="mt-4 grid gap-3">
+        <SoftInputLabel label="API Base URL">
           <input
-            type="checkbox"
-            checked={draft.mockMode}
-            onChange={(event) => update("mockMode", event.target.checked)}
-            className="h-5 w-5 accent-moss"
+            value={draft.baseUrl}
+            onChange={(event) => update("baseUrl", event.target.value)}
+            placeholder="https://api.example.com"
+            className={inputClassName}
           />
-        </label>
+        </SoftInputLabel>
+        <SoftInputLabel label="API Key">
+          <input
+            value={draft.apiKey}
+            onChange={(event) => update("apiKey", event.target.value)}
+            type="password"
+            placeholder="仅保存在浏览器 localStorage"
+            className={inputClassName}
+          />
+        </SoftInputLabel>
+        <SoftInputLabel label="模型名称 Model">
+          <input
+            value={draft.model}
+            onChange={(event) => update("model", event.target.value)}
+            placeholder="gpt-4o-mini 或兼容模型"
+            className={inputClassName}
+          />
+        </SoftInputLabel>
+      </div>
 
-        <div className="mt-4 grid gap-3">
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            API Base URL
+      <details className="mt-4 rounded-md bg-[var(--lt-surface-soft)] px-3 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--lt-muted)]">高级设置</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <SoftInputLabel label="Endpoint Path">
             <input
-              value={draft.baseUrl}
-              disabled={draft.mockMode}
-              onChange={(event) => update("baseUrl", event.target.value)}
-              placeholder="https://api.example.com"
-              className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
+              value={draft.endpointPath}
+              onChange={(event) => update("endpointPath", event.target.value)}
+              className={inputClassName}
             />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            API Key
+          </SoftInputLabel>
+          <SoftInputLabel label="温度 Temperature">
             <input
-              value={draft.apiKey}
-              disabled={draft.mockMode}
-              onChange={(event) => update("apiKey", event.target.value)}
-              type="password"
-              placeholder="仅保存在浏览器 localStorage"
-              className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
+              value={draft.temperature}
+              type="number"
+              min={0}
+              max={2}
+              step={0.1}
+              onChange={(event) => update("temperature", Number(event.target.value))}
+              className={inputClassName}
             />
-          </label>
-          <label className="grid gap-1 text-sm font-medium text-slate-700">
-            模型名称 Model
+          </SoftInputLabel>
+          <SoftInputLabel label="最大 Tokens">
             <input
-              value={draft.model}
-              disabled={draft.mockMode}
-              onChange={(event) => update("model", event.target.value)}
-              placeholder="gpt-4o-mini 或兼容模型"
-              className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
+              value={draft.maxTokens}
+              type="number"
+              min={1}
+              onChange={(event) => update("maxTokens", Number(event.target.value))}
+              className={inputClassName}
             />
+          </SoftInputLabel>
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--lt-muted)]">
+            <input
+              type="checkbox"
+              checked={draft.supportsJsonMode}
+              onChange={(event) => update("supportsJsonMode", event.target.checked)}
+              className="h-4 w-4 accent-[var(--lt-text)] disabled:opacity-40"
+            />
+            Provider 支持 JSON mode
           </label>
         </div>
+      </details>
 
-        <details className="mt-4 rounded-md border border-slate-200 p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-700">高级设置</summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              Endpoint Path
-              <input
-                value={draft.endpointPath}
-                disabled={draft.mockMode}
-                onChange={(event) => update("endpointPath", event.target.value)}
-                className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              温度 Temperature
-              <input
-                value={draft.temperature}
-                disabled={draft.mockMode}
-                type="number"
-                min={0}
-                max={2}
-                step={0.1}
-                onChange={(event) => update("temperature", Number(event.target.value))}
-                className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">
-              最大 Tokens
-              <input
-                value={draft.maxTokens}
-                disabled={draft.mockMode}
-                type="number"
-                min={1}
-                onChange={(event) => update("maxTokens", Number(event.target.value))}
-                className="rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-moss disabled:bg-slate-100"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <input
-                type="checkbox"
-                checked={draft.supportsJsonMode}
-                disabled={draft.mockMode}
-                onChange={(event) => update("supportsJsonMode", event.target.checked)}
-                className="h-4 w-4 accent-moss"
-              />
-              Provider 支持 JSON mode
-            </label>
-          </div>
-        </details>
+      {testMessage ? (
+        <div className="mt-3 rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-sm text-[var(--lt-muted)]">
+          {testMessage}
+        </div>
+      ) : null}
 
-        {testMessage ? (
-          <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{testMessage}</div>
-        ) : null}
-
-        <div className="mt-5 flex flex-wrap justify-between gap-3">
+      <div className="mt-5 flex flex-wrap justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            onClear();
+            setTestMessage("API 设置已重置。");
+          }}
+          className="rounded-md px-3 py-2 text-sm text-red-700/80 transition hover:bg-red-500/[0.08] hover:text-red-800 dark:text-red-300"
+        >
+          清空设置
+        </button>
+        <div className="flex gap-2">
           <button
             type="button"
-            onClick={onClear}
-            className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+            onClick={testConnection}
+            disabled={testing}
+            className="rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-sm text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)] disabled:opacity-50"
           >
-            清空设置
+            {testing ? "测试中..." : "测试连接"}
           </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={testConnection}
-              disabled={testing}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {testing ? "测试中..." : "测试连接"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSave(draft);
-                onClose();
-              }}
-              className="rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white hover:bg-moss/90"
-            >
-              保存设置
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onSave({ ...draft, mockMode: false })}
+            className="rounded-md bg-[var(--lt-text)] px-4 py-2 text-sm font-medium text-[var(--lt-bg)] transition opacity-95 hover:opacity-85"
+          >
+            保存设置
+          </button>
         </div>
       </div>
-    </div>
+    </section>
+  );
+}
+
+const inputClassName =
+  "rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-[var(--lt-text)] outline-none transition placeholder:text-[var(--lt-muted)] focus:bg-[var(--lt-surface)] focus:ring-1 focus:ring-[var(--lt-ring)] disabled:opacity-45";
+
+function SoftInputLabel({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid gap-1 text-sm font-medium text-[var(--lt-muted)]">
+      {label}
+      {children}
+    </label>
   );
 }

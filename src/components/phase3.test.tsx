@@ -2,11 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LinguaTypeApp } from "./LinguaTypeApp";
 import {
+  API_SETTINGS_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
   CORRECTION_MEMORY_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
   WRITING_SETUP_STORAGE_KEY,
+  defaultApiSettings,
 } from "@/lib/storage";
 import type {
   FastEnhanceResult,
@@ -77,6 +79,20 @@ function response(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status });
 }
 
+function setEditorText(editor: HTMLElement, value: string) {
+  editor.textContent = value;
+  fireEvent.input(editor);
+}
+
+function setEditorSelection(editor: HTMLElement, start: number, end = start) {
+  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionStart = start;
+  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionEnd = end;
+}
+
+function expectEditorText(editor: HTMLElement, value: string) {
+  expect(editor).toHaveTextContent(value);
+}
+
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem(
@@ -86,6 +102,15 @@ beforeEach(() => {
       essayTopic: "AI tools and learning",
       outline: "1. Benefits\n2. Limits",
       updatedAt: "2026-05-14T00:00:00.000Z",
+    }),
+  );
+  localStorage.setItem(
+    API_SETTINGS_STORAGE_KEY,
+    JSON.stringify({
+      ...defaultApiSettings(),
+      baseUrl: "https://api.example.test",
+      apiKey: "test-key",
+      model: "test-model",
     }),
   );
   let id = 0;
@@ -113,10 +138,9 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, {
-      target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
-    });
-    fireEvent.change(screen.getByLabelText("增强强度"), { target: { value: "minimal" } });
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    fireEvent.click(screen.getByRole("button", { name: "强度：平衡" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "轻度" }));
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
     expect(await screen.findByText("修改建议已生成")).toBeInTheDocument();
@@ -138,14 +162,12 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, {
-      target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByText("修改建议已生成");
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
-    expect(editor).toHaveValue(fastResult.finalSentence);
+    expectEditorText(editor, fastResult.finalSentence);
     await waitFor(() => {
       expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/extract-learning");
       expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]")).toHaveLength(1);
@@ -163,14 +185,12 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, {
-      target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByText("修改建议已生成");
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
-    expect(editor).toHaveValue(fastResult.finalSentence);
+    expectEditorText(editor, fastResult.finalSentence);
     expect(await screen.findByText("学习提取失败，但已应用的文本会保留。")).toBeInTheDocument();
   });
 
@@ -184,10 +204,8 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, {
-      target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByText("修改建议已生成");
     fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
     expect(await screen.findByText(regenerated.finalSentence)).toBeInTheDocument();
@@ -217,8 +235,8 @@ describe("LinguaType v0.2.1", () => {
     const paragraph =
       "AI tools are useful for students because they make daily practice easier and support regular independent language practice. For example, for example, they save time when students review vocabulary and organize short writing tasks before class. Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.";
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, { target: { value: paragraph } });
-    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    setEditorText(editor, paragraph);
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByText("修改建议已生成");
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
@@ -235,8 +253,8 @@ describe("LinguaType v0.2.1", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    fireEvent.change(editor, { target: { value: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼." } });
-    fireEvent.click(screen.getByRole("button", { name: "增强最新一句" }));
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByText("修改建议已生成");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
@@ -253,17 +271,16 @@ describe("LinguaType v0.2.1", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("写作编辑器") as HTMLTextAreaElement;
-    fireEvent.change(editor, { target: { value: "Hello world" } });
-    editor.selectionStart = 6;
-    editor.selectionEnd = 6;
+    const editor = await screen.findByLabelText("写作编辑器");
+    setEditorText(editor, "Hello world");
+    setEditorSelection(editor, 6);
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
     expect(screen.getByText("表达菜单")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "解释原因 Explain reason" }));
     fireEvent.click(screen.getByRole("button", { name: "This may be because..." }));
 
-    expect(editor).toHaveValue("Hello This may be because...world");
+    expectEditorText(editor, "Hello This may be because...world");
     expect(fetchMock).not.toHaveBeenCalled();
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
@@ -293,15 +310,14 @@ describe("LinguaType v0.2.1", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("写作编辑器") as HTMLTextAreaElement;
-    fireEvent.change(editor, { target: { value: paragraphResult.originalParagraph } });
-    editor.selectionStart = 0;
-    editor.selectionEnd = 0;
+    const editor = await screen.findByLabelText("写作编辑器");
+    setEditorText(editor, paragraphResult.originalParagraph);
+    setEditorSelection(editor, 0);
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
     fireEvent.click(screen.getByRole("button", { name: "从 Learning Library 插入" }));
     fireEvent.click(screen.getByRole("button", { name: "as a result" }));
 
-    expect(editor).toHaveValue(`as a result${paragraphResult.originalParagraph}`);
+    expectEditorText(editor, `as a result${paragraphResult.originalParagraph}`);
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
     fireEvent.click(screen.getByRole("button", { name: "检查当前段落" }));

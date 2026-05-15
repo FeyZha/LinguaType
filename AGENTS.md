@@ -23,28 +23,28 @@ LinguaType is:
 
 ## Current Scope
 
-The current product version is v0.2.7.
+The current product version is v0.2.8.
 
-v0.2.7 refines the main writing shell, Writing Archives, setup editing, and outline checking. The main writing UI is an immersive Typora-like integrated workbench: the essay topic reads like an H1 in the document flow, outline points read like paragraph headings, and paragraph text areas should feel borderless and writing-first. It keeps the latest-sentence enhancement, Apply/Cancel, and learning-data save rules unchanged.
+v0.2.8 refines the main writing shell, Writing Archives, setup editing, archive organization, selection actions, Learning Library, Writing Habits, and low-frequency domain classification. The main writing UI is an immersive Typora-like integrated workbench: the essay topic reads like an H1 in the document flow and can be edited directly, outline points read like paragraph headings, and paragraph body blocks use a writing-first `contentEditable` document surface instead of textarea cards. It keeps the latest-sentence enhancement, Apply/Cancel, and learning-data save rules unchanged.
 
 Writing Setup collects topic area, essay topic, and outline before entering the editor. After the user enters the main writing UI, topic area, essay topic, and outline edits should happen through lightweight inline editor controls rather than leaving the editor or opening a setup drawer. Writing Setup is not a landing page or essay generator. It must not call the LLM, generate article content, decide the user's argument, save learning data, or rewrite text by itself.
 
 Writing Setup uses direct topic-area buttons, local preset essay topics, and multiple outline point inputs. Preset topic refresh is local only and must not call the LLM.
 
-The main writing UI may show segmented paragraph inputs based on outline points, but the product still preserves the latest-sentence enhancement contract and range-based Apply behavior. The main UI must not show a separate article-outline management card; outline points should be shown as Typora-like paragraph headings with a low-emphasis inline edit entry.
+The main writing UI may show segmented paragraph blocks based on outline points, but the product still preserves the latest-sentence enhancement contract and range-based Apply behavior. The main UI must not show a separate article-outline management card; outline points should be shown as Typora-like paragraph headings with a low-emphasis inline edit entry. Essay topic H1 and outline headings must not be mixed into the正文 `text` used for latest-sentence extraction.
 
 Writing Archives store local writing drafts as separate local documents. They are localStorage-only, may save title, text, setup, createdAt, updatedAt, and lastOpenedAt, and must not save learning data or trigger extraction. The archive sidebar may be collapsible. Archive item menus may support rename and delete. Archive delete must require confirmation, must only update `linguatype.writingArchives.v1`, and must not clear Learning Library, Correction Events, legacy draft/setup keys, or trigger `/api/extract-learning`. Archive title rename must not automatically change the essay topic.
 
 Outline Check uses `POST /api/check-outline` only after the user confirms inline topic or outline changes. Editing, adding, deleting, opening archive menus, switching archives, deleting archives, or refreshing outline fields must not call the LLM. Outline Check is non-blocking, only checks whether the outline matches the essay topic, only shows suggestions when issues exist, and must not rewrite the outline or generate article content.
 
-Theme Preference supports `light`, `dark`, and `system`. It belongs in the main writing UI only, is UI-only, and must not affect API Settings, LLM provider behavior, Learning Library, Correction Events, Paragraph Health, or Selection Actions.
+Theme Preference supports `light`, `dark`, and `system`. It belongs in the main writing UI only, is UI-only, and must not affect API Settings, LLM provider behavior, Learning Library, Correction Events, Paragraph Health, or Selection Actions. The main UI theme control should remain a lightweight top-right block with only `深色`, `浅色`, and `跟随系统` choices.
 
 Current Sentence suggestions should appear near the editor as an inline diff suggestion bar when possible. They must remain suggestions, not applied text, until the user explicitly clicks Apply.
 
 v0.2.2 preserves the core flow:
 latest sentence -> `/api/enhance-fast` -> code-generated diff -> Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply.
 
-High-frequency UI belongs near the editor. The right sidebar is for low-frequency management: Review status, Learning Library, Writing Habits, Tools / Settings, and Data Control.
+High-frequency UI belongs near the editor. Low-frequency management belongs in left-side navigation that opens middle-stage pages: `表达库 Learning Library`, `写作习惯 Writing Habits`, and unified `设置`. The right side must not regrow a persistent management sidebar; status and paragraph feedback should appear near the editor.
 
 User-facing UI copy should be Chinese-first for Chinese-speaking English learners. Keep feature names in English when they are product capability names, and write key terms bilingually, for example `表达库 Learning Library`, `写作习惯 Writing Habits`, `当前句建议 Current Sentence`, and `API Settings 设置`.
 
@@ -258,6 +258,7 @@ Rules:
 7. Do not render proofreading as a separate always-open panel below the editor.
 8. Personal Dictionary is stored locally in `linguatype.personalDictionary.v1`.
 9. Personal Dictionary suppresses user-approved local proofreading hints where applicable.
+10. Personal Dictionary is not a standalone navigation feature; expose it as a type/category inside `表达库 Learning Library`.
 
 ## Selection Actions
 
@@ -281,7 +282,7 @@ Save to Library:
 
 ## Data Control
 
-Data Control belongs in low-frequency Tools / Settings UI.
+Data Control belongs in the unified low-frequency `设置` page together with API Settings and trigger/disturbance settings.
 
 Supported local actions: Export Learning Library JSON, Export Writing Habits JSON, Clear Learning Library, Clear Writing Habits, Reset API Settings, and View localStorage keys.
 

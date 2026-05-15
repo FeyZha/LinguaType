@@ -12,6 +12,7 @@ import {
   buildParagraphHealthUserPrompt,
   buildParagraphFlowUserPrompt,
   buildSelectionExplainUserPrompt,
+  buildWritingDomainClassifierUserPrompt,
   FAST_ENHANCEMENT_SYSTEM_PROMPT,
   LINGUATYPE_SYSTEM_PROMPT,
   LEARNING_EXTRACTION_SYSTEM_PROMPT,
@@ -19,6 +20,7 @@ import {
   PARAGRAPH_HEALTH_SYSTEM_PROMPT,
   PARAGRAPH_FLOW_SYSTEM_PROMPT,
   SELECTION_EXPLAIN_SYSTEM_PROMPT,
+  WRITING_DOMAIN_CLASSIFIER_SYSTEM_PROMPT,
 } from "../prompts";
 import {
   normalizeEnhancementResult,
@@ -28,8 +30,10 @@ import {
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
   normalizeSelectionExplainResult,
+  normalizeWritingDomainResult,
 } from "../normalize";
 import {
+  classifyWritingDomainResultSchema,
   enhancementResultSchema,
   fastEnhanceModelResultSchema,
   fastEnhanceResultSchema,
@@ -39,6 +43,8 @@ import {
   paragraphHealthResultSchema,
   selectionExplainResultSchema,
   type ApiConfig,
+  type ClassifyWritingDomainInput,
+  type ClassifyWritingDomainResult,
   type EnhanceLatestSentenceInput,
   type EnhanceLatestSentenceResult,
   type FastEnhanceInput,
@@ -265,6 +271,26 @@ export async function explainSelectionWithOpenAICompatibleProvider(
   }
 
   return normalizeSelectionExplainResult(validated.data, input.selectedText);
+}
+
+export async function classifyWritingDomainWithOpenAICompatibleProvider(
+  input: ClassifyWritingDomainInput,
+): Promise<ClassifyWritingDomainResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    WRITING_DOMAIN_CLASSIFIER_SYSTEM_PROMPT,
+    buildWritingDomainClassifierUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = classifyWritingDomainResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid writing domain response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeWritingDomainResult(validated.data);
 }
 
 export async function testOpenAICompatibleConnection(apiConfig: ApiConfig): Promise<boolean> {

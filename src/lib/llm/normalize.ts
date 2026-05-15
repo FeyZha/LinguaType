@@ -1,5 +1,6 @@
 import { containsChinese } from "@/lib/sentence";
 import type {
+  ClassifyWritingDomainResult,
   FastEnhanceModelResult,
   FastEnhanceResult,
   LearningExtractionResult,
@@ -116,6 +117,16 @@ export function normalizeOutlineCheckResult(result: OutlineCheckResult): Outline
   return {
     hasIssues: result.hasIssues && suggestionsZh.length > 0,
     suggestionsZh: result.hasIssues ? suggestionsZh : [],
+  };
+}
+
+export function normalizeWritingDomainResult(result: ClassifyWritingDomainResult): ClassifyWritingDomainResult {
+  return {
+    topicArea: result.topicArea,
+    confidence:
+      typeof result.confidence === "number" && Number.isFinite(result.confidence)
+        ? Math.max(0, Math.min(result.confidence, 1))
+        : 0.5,
   };
 }
 

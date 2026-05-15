@@ -29,6 +29,8 @@ describe("ProofreadingSignalsPanel", () => {
     render(<ProofreadingSignalsPanel result={result} />);
 
     expect(screen.getByRole("button", { name: /1 个问题/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /校对提示：1 个问题/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Proofreading/u)).not.toBeInTheDocument();
     expect(screen.queryByText("文本统计 Text Stats")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /1 个问题/ }));
