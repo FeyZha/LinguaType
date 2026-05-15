@@ -8,16 +8,16 @@
 | 主流程编排 | `src/components/LinguaTypeApp.tsx` | 管理 editor state、setup gating、writing archives、fixed left navigation、workspace view、inline setup edit、API calls、Apply 冲突检测、学习提取、outline check 和 localStorage hydration。 |
 | 写作存档 | `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 保存本地写作稿的标题、正文和 setup；支持新建、切换、重命名、删除和可折叠侧栏；不保存学习数据。 |
 | 写作准备 | `src/components/WritingSetupPanel.tsx`, `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 首次进入时收集领域、主题和大纲点；进入主界面后通过编辑器内联交互修改 setup；不调用 LLM，不生成正文。 |
-| 文档编辑器 | `src/components/WritingEditor.tsx`, `src/lib/editorDocument.ts` | 以 Typora 式 `contentEditable` 文档流根据大纲点展示正文段落、只读大纲标题和轻量内联大纲编辑入口，并把段落拼接为单个草稿文本交给主编排层。 |
-| 当前句建议 | `src/components/EnhancementPopover.tsx`, `src/components/DiffViewer.tsx`, `src/lib/editorDocument.ts` | 在 captured range 所在段落下方以内联建议条展示最新句建议、本地 diff、解释、Apply/Cancel/Regenerate/Copy。 |
+| 文档编辑器 | `src/components/WritingEditor.tsx` | 以原生 `textarea` 承载单块长文本正文，负责光标/选区上报、状态栏、句旁建议入口定位和内联建议展开时的临时句子焦点视图。 |
+| 当前句建议 | `src/components/EnhancementPopover.tsx`, `src/components/DiffViewer.tsx`, `src/lib/sentence.ts` | 展示当前句建议、本地 diff、中文占位表达映射、Apply/Cancel/Regenerate/Copy；已采纳建议复习态只保留换一种说法。 |
 | 主题偏好 | `src/components/ThemePreferenceControl.tsx`, `src/app/globals.css`, `src/lib/storage.ts` | 管理 light/dark/system，只在主写作界面展示为轻量弹出菜单。 |
 | 大纲检查 API | `src/app/api/check-outline/route.ts`, `src/lib/llm/service.ts`, `src/lib/llm/prompts.ts`, `src/lib/llm/types.ts` | 检查大纲是否贴合主题；只提示，不修改。 |
 | Learning Library | `src/components/LearningLibraryPanel.tsx`, `src/lib/storage.ts`, `src/lib/proofreading.ts` | 管理本地表达资产，支持搜索、收藏、复制、插入、删除和导出；个人词典作为类型选项在此管理。 |
 | Writing Habits | `src/components/WritingHabitsPanel.tsx`, `src/lib/storage.ts` | 基于 Correction Events 聚合写作习惯。 |
 | Paragraph Flow | `src/components/ParagraphFlowPanel.tsx`, `src/app/api/check-paragraph-flow/route.ts` | 手动检查当前段落，可返回 revisedParagraph，但不自动 Apply。 |
-| Selection Actions | `src/components/SelectionActionsPopover.tsx`, `src/app/api/explain-selection/route.ts` | Explain selected 和 Save to Library，不改写选中文本；浮层根据选区动态定位并结构化展示解释。 |
+| Selection Actions | `src/components/SelectionActionsPopover.tsx`, `src/app/api/explain-selection/route.ts` | 选中正文后显示轻量功能条，支持 Explain selected、Save to Library 和 Copy selected，不改写选中文本；浮层根据选区动态定位并结构化展示解释。 |
 | Inline Expression Menu | `src/components/InlineExpressionMenu.tsx` | 在编辑器附近插入本地表达或触发手动段落检查。 |
-| Unified Settings | `src/components/LinguaTypeApp.tsx`, `src/components/ApiSettingsModal.tsx`, `src/components/TriggerSettingsPanel.tsx`, `src/components/DataControlPanel.tsx`, `src/lib/storage.ts` | 在中间设置页管理 API Settings、触发与打扰设置、Data Control 和 provider 连接测试。 |
+| Low-frequency settings | `src/components/LinguaTypeApp.tsx`, `src/components/ApiSettingsModal.tsx`, `src/components/TriggerSettingsPanel.tsx`, `src/components/DataControlPanel.tsx`, `src/lib/storage.ts` | 在中间主舞台分别管理 API Settings、触发与打扰设置、Data Control、快捷键帮助和 provider 连接测试。 |
 | 句子工具 | `src/lib/sentence.ts` | 最新句提取、range replacement、当前段落、上下文和 diff。 |
 | 本地存储 | `src/lib/storage.ts` | localStorage keys、迁移、normalize、dedupe、export 和 Writing Habits 聚合。 |
 | LLM contracts | `src/lib/llm/types.ts` | zod schema 和 TypeScript 类型。 |
@@ -31,7 +31,7 @@
 - Storage 迁移、normalize 和 dedupe 集中在 `src/lib/storage.ts`。
 - Writing Archives 只保存正文和 setup，不写入 Learning Library 或 Correction Events；删除 archive 也不得触发学习数据保存。
 - 最新句增强只处理最新非空句，不改写整段。
-- 文档编辑器只是 UI 组织方式；即使使用 `contentEditable` 呈现为 Typora 式文档流，也不改变 Apply/Cancel、空行拼接和 range replacement 规则。
-- 主题 H1 和大纲 H2 不并入正文 `text`；latest-sentence extraction 只基于正文草稿文本。
+- 文档编辑器只是 UI 组织方式；即使临时展开内联建议，也不改变 Apply/Cancel、原生输入、空行和 range replacement 规则。
+- 主题 H1 和 setup 元数据不并入正文 `text`；latest-sentence extraction 只基于正文草稿文本。
 - 大纲检查只在用户确认内联 setup 修改后触发，只提示问题，不生成正文、不改写大纲、不保存学习数据。
 - 高频写作动作放在编辑器附近；低频管理通过左侧固定导航打开中间页面，右侧不得恢复常驻工具侧栏。

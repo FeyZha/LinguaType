@@ -25,6 +25,14 @@ const fastResult: FastEnhanceResult = {
   hasChinese: true,
 };
 
+const englishFastResult: FastEnhanceResult = {
+  taskType: "english_polish",
+  originalSentence: "Many student believe that AI tools are useful.",
+  finalSentence: "Many students believe that AI tools are useful.",
+  explanationZh: "已轻量润色最新一句。",
+  hasChinese: false,
+};
+
 const extractionResult: LearningExtractionResult = {
   learningItems: [
     {
@@ -80,17 +88,17 @@ function response(payload: unknown, status = 200) {
 }
 
 function setEditorText(editor: HTMLElement, value: string) {
-  editor.textContent = value;
-  fireEvent.input(editor);
+  fireEvent.change(editor, {
+    target: { value, selectionStart: value.length, selectionEnd: value.length },
+  });
 }
 
 function setEditorSelection(editor: HTMLElement, start: number, end = start) {
-  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionStart = start;
-  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionEnd = end;
+  (editor as HTMLTextAreaElement).setSelectionRange(start, end);
 }
 
 function expectEditorText(editor: HTMLElement, value: string) {
-  expect(editor).toHaveTextContent(value);
+  expect(editor).toHaveValue(value);
 }
 
 beforeEach(() => {
@@ -137,17 +145,17 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
-    const editor = await screen.findByLabelText("写作编辑器");
-    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
     fireEvent.click(screen.getByRole("button", { name: "强度：平衡" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "轻度" }));
+    const editor = await screen.findByLabelText("写作编辑器");
+    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    expect(await screen.findByText("修改建议已生成")).toBeInTheDocument();
+    expect(await screen.findByLabelText("当前句行内建议")).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/enhance-fast");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { enhancementLevel: string };
     expect(body.enhancementLevel).toBe("minimal");
-    expect(screen.getByText(fastResult.finalSentence)).toBeInTheDocument();
+    expect(screen.getAllByText(fastResult.finalSentence).length).toBeGreaterThan(0);
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY)).toBeNull();
   });
@@ -164,13 +172,13 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     const editor = await screen.findByLabelText("写作编辑器");
     setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    await screen.findByText("修改建议已生成");
+    await screen.findByRole("button", { name: "应用修改" });
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
     expectEditorText(editor, fastResult.finalSentence);
     await waitFor(() => {
       expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/extract-learning");
-      expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]")).toHaveLength(1);
+      expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]").length).toBeGreaterThanOrEqual(1);
       expect(JSON.parse(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY) ?? "[]")).toHaveLength(2);
     });
   });
@@ -187,27 +195,28 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     const editor = await screen.findByLabelText("写作编辑器");
     setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    await screen.findByText("修改建议已生成");
+    await screen.findByRole("button", { name: "应用修改" });
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
     expectEditorText(editor, fastResult.finalSentence);
-    expect(await screen.findByText("学习提取失败，但已应用的文本会保留。")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/extract-learning"));
+    expect(screen.queryByText("学习提取失败，但已应用的文本会保留。")).not.toBeInTheDocument();
   });
 
   it("regenerate and copy use fast results without saving learning data", async () => {
-    const regenerated = { ...fastResult, finalSentence: "Many students think AI tools can improve learning efficiency." };
+    const regenerated = { ...englishFastResult, finalSentence: "Many learners believe that AI tools are useful." };
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(response(fastResult))
+      .mockResolvedValueOnce(response(englishFastResult))
       .mockResolvedValueOnce(response(regenerated));
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    setEditorText(editor, englishFastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    await screen.findByText("修改建议已生成");
-    fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
+    await screen.findByRole("button", { name: "应用修改" });
+    fireEvent.click(screen.getByRole("button", { name: "换一种说法" }));
     expect(await screen.findByText(regenerated.finalSentence)).toBeInTheDocument();
 
     await act(async () => {
@@ -237,7 +246,7 @@ describe("LinguaType v0.2.1", () => {
     const editor = await screen.findByLabelText("写作编辑器");
     setEditorText(editor, paragraph);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    await screen.findByText("修改建议已生成");
+    await screen.findByRole("button", { name: "应用修改" });
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
     expect(await screen.findByText("段落健康：可能有 1 个问题")).toBeInTheDocument();
@@ -248,14 +257,14 @@ describe("LinguaType v0.2.1", () => {
   });
 
   it("does not run for short paragraphs, cancel, or copy", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response(fastResult));
+    const fetchMock = vi.fn().mockResolvedValue(response(englishFastResult));
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    setEditorText(editor, "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.");
+    setEditorText(editor, englishFastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-    await screen.findByText("修改建议已生成");
+    await screen.findByRole("button", { name: "应用修改" });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
     });

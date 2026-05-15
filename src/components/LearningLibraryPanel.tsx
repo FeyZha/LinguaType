@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { waapi } from "animejs/waapi";
+import { stagger } from "animejs/utils";
 import {
   ClipboardDocumentIcon,
   MagnifyingGlassIcon,
@@ -17,6 +19,15 @@ const TYPE_LABELS: Record<LearningItemType, string> = {
   phrase: "短语",
   collocation: "搭配",
   sentence_pattern: "句型",
+};
+
+const LIBRARY_MOTION_PROFILE = "library-unified-rise";
+const LIBRARY_MOTION_DURATION = "420";
+const LIBRARY_MOTION_STAGGER = "32";
+const LIBRARY_MOTION_ATTRS = {
+  "data-library-motion-profile": LIBRARY_MOTION_PROFILE,
+  "data-library-motion-duration": LIBRARY_MOTION_DURATION,
+  "data-library-motion-stagger": LIBRARY_MOTION_STAGGER,
 };
 
 type LibraryTypeFilter = LearningItemType | "all" | "dictionary";
@@ -39,6 +50,7 @@ export function LearningLibraryPanel({
   onToggleFavorite,
   onInsert,
 }: LearningLibraryPanelProps) {
+  const panelRef = useRef<HTMLElement | null>(null);
   const [query, setQuery] = useState("");
   const [type, setType] = useState<LibraryTypeFilter>("all");
   const [difficultyLevel, setDifficultyLevel] = useState<DifficultyFilter>("all");
@@ -87,9 +99,33 @@ export function LearningLibraryPanel({
 
   const showDictionary = type === "dictionary";
 
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) {
+      return;
+    }
+    const items = Array.from(panel.querySelectorAll<HTMLElement>("[data-library-motion-item]"));
+    if (items.length === 0 || typeof items[0].animate !== "function") {
+      return;
+    }
+    waapi.animate(items, {
+      opacity: [0, 1],
+      transform: ["translateY(16px)", "translateY(0px)"],
+      duration: 420,
+      delay: stagger(32),
+      ease: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+  }, [showDictionary, visibleItems.length]);
+
   return (
-    <section className="text-[var(--lt-text)]">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <section
+      ref={panelRef}
+      aria-label="表达库内容动效"
+      data-library-motion="unified-rise"
+      data-library-motion-profile={LIBRARY_MOTION_PROFILE}
+      className="text-[var(--lt-text)]"
+    >
+      <header data-library-motion-item {...LIBRARY_MOTION_ATTRS} className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-serif text-[38px] font-normal leading-tight">表达库</h1>
           <p className="mt-2 text-base leading-7 text-[var(--lt-muted)]">沉淀可复用表达，随时插入当前写作。</p>
@@ -106,7 +142,12 @@ export function LearningLibraryPanel({
 
       {exportMessage ? <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">{exportMessage}</p> : null}
 
-      <div className="mt-7 space-y-4">
+      <div
+        aria-label="表达库筛选控制区"
+        data-library-motion-item
+        {...LIBRARY_MOTION_ATTRS}
+        className="mt-7 space-y-4"
+      >
         <label className="relative block">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-2 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--lt-muted)]" />
           <input
@@ -200,13 +241,17 @@ export function LearningLibraryPanel({
           onRemove={removeDictionaryTerm}
         />
       ) : visibleItems.length === 0 ? (
-        <p className="mt-8 border-t border-[var(--lt-border)] pt-6 text-sm leading-6 text-[var(--lt-muted)]">
+        <p data-library-motion-item className="mt-8 border-t border-[var(--lt-border)] pt-6 text-sm leading-6 text-[var(--lt-muted)]">
           应用句子建议后，有价值的表达会保存到这里。
         </p>
       ) : (
-        <ul className="mt-8 divide-y divide-[var(--lt-border)]">
+        <ul
+          aria-label="表达库条目列表"
+          {...LIBRARY_MOTION_ATTRS}
+          className="mt-8 divide-y divide-[var(--lt-border)]"
+        >
           {visibleItems.map((item) => (
-            <li key={item.id} className="group py-5">
+            <li key={item.id} data-library-motion-item {...LIBRARY_MOTION_ATTRS} className="group py-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

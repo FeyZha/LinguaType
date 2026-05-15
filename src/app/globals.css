@@ -16,6 +16,7 @@
   --lt-accent: #a9583e;
   --lt-accent-soft: rgba(204, 120, 92, 0.12);
   --lt-accent-soft-strong: rgba(204, 120, 92, 0.18);
+  --lt-warning: #d4a017;
   --lt-shadow: rgba(20, 20, 19, 0.06);
   --lt-shadow-strong: rgba(20, 20, 19, 0.14);
   color: var(--lt-text);
@@ -36,6 +37,7 @@
   --lt-accent: #e8a55a;
   --lt-accent-soft: rgba(232, 165, 90, 0.14);
   --lt-accent-soft-strong: rgba(232, 165, 90, 0.22);
+  --lt-warning: #e8a55a;
   --lt-shadow: rgba(0, 0, 0, 0.28);
   --lt-shadow-strong: rgba(0, 0, 0, 0.38);
   color: var(--lt-text);
@@ -54,6 +56,18 @@ body {
   font-family:
     "Aptos", "Inter", "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
   letter-spacing: 0;
+}
+
+.lt-writing-textarea::selection,
+.lt-writing-surface ::selection {
+  color: var(--lt-text);
+  background: rgba(169, 88, 62, 0.24);
+}
+
+:root[data-theme="dark"] .lt-writing-textarea::selection,
+:root[data-theme="dark"] .lt-writing-surface ::selection {
+  color: var(--lt-text);
+  background: rgba(232, 165, 90, 0.34);
 }
 
 html,

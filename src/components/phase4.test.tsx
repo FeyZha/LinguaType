@@ -65,17 +65,17 @@ function response(payload: unknown, status = 200) {
 }
 
 function setEditorText(editor: HTMLElement, value: string) {
-  editor.textContent = value;
-  fireEvent.input(editor);
+  fireEvent.change(editor, {
+    target: { value, selectionStart: value.length, selectionEnd: value.length },
+  });
 }
 
 function setEditorSelection(editor: HTMLElement, start: number, end = start) {
-  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionStart = start;
-  (editor as HTMLElement & { selectionStart: number; selectionEnd: number }).selectionEnd = end;
+  (editor as HTMLTextAreaElement).setSelectionRange(start, end);
 }
 
 function expectEditorText(editor: HTMLElement, value: string) {
-  expect(editor).toHaveTextContent(value);
+  expect(editor).toHaveValue(value);
 }
 
 function longParagraph(sentence = fastResult.originalSentence) {
@@ -125,7 +125,7 @@ afterEach(() => {
 });
 
 describe("LinguaType v0.2.2 current sentence popover", () => {
-  it("opens immediately with the original sentence while enhancement is still checking", async () => {
+  it("keeps the editor quiet while enhancement is still checking, then opens the result", async () => {
     let resolveEnhancement: (response: Response) => void = () => {};
     const enhancementPromise = new Promise<Response>((resolve) => {
       resolveEnhancement = resolve;
@@ -141,9 +141,9 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     setEditorText(editor, fastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    expect(await screen.findByText("当前句建议")).toBeInTheDocument();
-    expect(screen.getAllByText(fastResult.originalSentence).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("检查中...")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/enhance-fast", expect.anything()));
+    expect(screen.queryByText("当前句建议")).not.toBeInTheDocument();
+    expect(screen.queryByText("检查中...")).not.toBeInTheDocument();
 
     resolveEnhancement(response(fastResult));
     expect(await screen.findByText(fastResult.explanationZh)).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe("LinguaType v0.2.2 settings and data control", () => {
     for (let index = 0; index < 3; index += 1) {
       setEditorText(editor, longParagraph(fastResult.originalSentence));
       fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-      await screen.findByText("当前句建议");
+      await screen.findByRole("button", { name: "应用修改" });
       await screen.findByText(fastResult.explanationZh);
       fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
       await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());

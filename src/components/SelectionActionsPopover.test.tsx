@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 
 describe("SelectionActionsPopover", () => {
-  it("shows only the explain icon before the user requests an explanation", () => {
+  it("shows a compact toolbar before the user requests an explanation", () => {
     const onExplain = vi.fn();
 
     render(
@@ -17,7 +17,13 @@ describe("SelectionActionsPopover", () => {
       />,
     );
 
+    const toolbar = screen.getByLabelText("选中文本功能条");
+    expect(toolbar).toHaveAttribute("data-selection-toolbar", "true");
+    expect(toolbar).toHaveStyle({ left: "120px", top: "80px" });
     expect(screen.getByRole("button", { name: "解释选中内容" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存到表达库" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "复制选中文本" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "关闭选中文本操作" })).toBeInTheDocument();
     expect(screen.queryByText("开始解释")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "解释选中内容" }));
