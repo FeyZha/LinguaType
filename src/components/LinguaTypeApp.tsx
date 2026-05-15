@@ -12,7 +12,7 @@ import { InlineExpressionMenu } from "./InlineExpressionMenu";
 import { LearningLibraryPanel } from "./LearningLibraryPanel";
 import { ParagraphFlowPanel } from "./ParagraphFlowPanel";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
-import { EmptyState, ErrorState, LoadingState } from "./StateViews";
+import { EmptyState, ErrorState } from "./StateViews";
 import { ThemePreferenceControl } from "./ThemePreferenceControl";
 import { TriggerSettingsPanel } from "./TriggerSettingsPanel";
 import { useDismissableLayer } from "./useDismissableLayer";
@@ -35,17 +35,20 @@ import {
 } from "./HeroIcons";
 import {
   createWordDiff,
+  endsWithSentenceBoundary,
+  extractChinesePlaceholderSentence,
+  extractChinesePlaceholderSentences,
   extractCurrentParagraph,
-  extractLatestSentence,
+  extractCurrentSentence,
   getCurrentParagraph,
   getPreviousContext,
   replaceLatestSentence,
   replaceRange,
   type ParagraphRange,
   type SentenceRange,
+  type ChinesePlaceholderSentenceRange,
 } from "@/lib/sentence";
 import { createParagraphFingerprint } from "@/lib/llm/normalize";
-import { findParagraphIndexForRange, splitTextIntoParagraphs } from "@/lib/editorDocument";
 import { TOPIC_OPTIONS } from "@/lib/topicOptions";
 import {
   API_SETTINGS_STORAGE_KEY,
@@ -107,11 +110,40 @@ type PendingEnhancement = {
   latestSentenceRange: SentenceRange;
   originalSentence: string;
   requestInput: Omit<FastEnhanceInput, "apiConfig">;
+  source?: "manual" | "placeholder";
+  placeholderRequestKey?: string;
+  placeholderRange?: ChinesePlaceholderSentenceRange;
+  placeholderHint?: PlaceholderLearningHint;
+  applied?: boolean;
   result?: FastEnhanceResult;
 };
 
 type CompletedEnhancement = PendingEnhancement & {
   result: FastEnhanceResult;
+};
+
+type SuggestionDisplayMode = "hidden" | "expanded";
+
+type ReviewedSuggestion = CompletedEnhancement & {
+  reviewedRange: SentenceRange;
+  displaySentence: string;
+  applied: boolean;
+};
+
+type PlaceholderSuggestionRecord = CompletedEnhancement & {
+  id: string;
+  archiveId: string | null;
+  requestKey: string;
+  markerState: "available" | "reviewed";
+  reviewedRange: SentenceRange;
+  displaySentence: string;
+  applied: boolean;
+};
+
+type PlaceholderLearningHint = {
+  sourceText: string;
+  targetText: string;
+  structure: string;
 };
 
 type PendingParagraphCheck = {
@@ -180,7 +212,12 @@ export function LinguaTypeApp() {
   const skipNextArchiveAutoSaveRef = useRef(false);
   const appliedEditsSinceHealthRef = useRef(0);
   const workspaceExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const placeholderTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paragraphHealthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ignoredPlaceholderRequestKeyRef = useRef("");
+  const placeholderRequestKeysRef = useRef<Set<string>>(new Set());
   const [text, setText] = useState("");
+  const [editorSelection, setEditorSelection] = useState({ start: 0, end: 0 });
   const [writingMode, setWritingMode] = useState<WritingMode>("natural");
   const [enhancementLevel, setEnhancementLevel] = useState<EnhancementLevel>("balanced");
   const [apiSettings, setApiSettings] = useState<ApiConfig>(() => defaultApiSettings());
@@ -208,12 +245,16 @@ export function LinguaTypeApp() {
   const [isOutlineChecking, setIsOutlineChecking] = useState(false);
   const [error, setError] = useState<ErrorMessage | null>(null);
   const [paragraphMessage, setParagraphMessage] = useState("");
-  const [learningExtractionMessage, setLearningExtractionMessage] = useState("");
+  const [, setLearningExtractionMessage] = useState("");
   const [empty, setEmpty] = useState(false);
   const [conflictMessage, setConflictMessage] = useState("");
   const [paragraphConflictMessage, setParagraphConflictMessage] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [suggestionDisplayMode, setSuggestionDisplayMode] = useState<SuggestionDisplayMode>("hidden");
+  const [reviewedSuggestion, setReviewedSuggestion] = useState<ReviewedSuggestion | null>(null);
+  const [placeholderSuggestions, setPlaceholderSuggestions] = useState<PlaceholderSuggestionRecord[]>([]);
+  const [activePlaceholderInsight, setActivePlaceholderInsight] = useState(false);
   const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("editor");
@@ -224,6 +265,7 @@ export function LinguaTypeApp() {
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const [renamingArchiveId, setRenamingArchiveId] = useState<string | null>(null);
   const [inlineSetupEdit, setInlineSetupEdit] = useState<InlineSetupEditState>({ kind: "none" });
+  const [hasUnseenLearningUpdates, setHasUnseenLearningUpdates] = useState(false);
 
   function ensureWritableArchiveState(state: WritingArchivesState): WritingArchivesState {
     if (state.items.length === 0) {
@@ -266,6 +308,12 @@ export function LinguaTypeApp() {
     return () => {
       if (workspaceExitTimerRef.current) {
         clearTimeout(workspaceExitTimerRef.current);
+      }
+      if (placeholderTriggerTimerRef.current) {
+        clearTimeout(placeholderTriggerTimerRef.current);
+      }
+      if (paragraphHealthTimerRef.current) {
+        clearTimeout(paragraphHealthTimerRef.current);
       }
     };
   }, []);
@@ -382,21 +430,97 @@ export function LinguaTypeApp() {
     return createWordDiff(pendingParagraph.originalParagraph, pendingParagraph.result.revisedParagraph);
   }, [pendingParagraph]);
 
-  const pendingSuggestionParagraphIndex = useMemo(() => {
-    if (!pending) {
-      return undefined;
-    }
-
-    return findParagraphIndexForRange(
-      splitTextIntoParagraphs(pending.snapshotFullText, writingSetup?.outlinePoints?.length ?? 1),
-      pending.latestSentenceRange,
-    );
-  }, [pending, writingSetup?.outlinePoints]);
-
   const proofreadingResult = useMemo(
     () => analyzeProofreading(text, personalDictionary),
     [text, personalDictionary],
   );
+
+  useEffect(() => {
+    if (placeholderTriggerTimerRef.current) {
+      clearTimeout(placeholderTriggerTimerRef.current);
+      placeholderTriggerTimerRef.current = null;
+    }
+
+    if (
+      !isHydrated
+      || isRegenerating
+      || (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model))
+    ) {
+      return;
+    }
+
+    const snapshotFullText = text;
+    const archiveId = writingArchives.activeId;
+    const pendingRanges = extractChinesePlaceholderSentences(snapshotFullText).filter((range) => {
+      const requestKey = createPlaceholderRequestKey(range, archiveId);
+      if (
+        requestKey === ignoredPlaceholderRequestKeyRef.current
+        || requestKey === pending?.placeholderRequestKey
+        || placeholderRequestKeysRef.current.has(requestKey)
+      ) {
+        return false;
+      }
+      return !placeholderSuggestions.some(
+        (suggestion) =>
+          suggestion.archiveId === archiveId
+          && (suggestion.requestKey === requestKey || suggestion.originalSentence === range.sentence),
+      );
+    });
+
+    if (pendingRanges.length === 0) {
+      return;
+    }
+
+    placeholderTriggerTimerRef.current = setTimeout(() => {
+      for (const range of pendingRanges) {
+        void enhanceChinesePlaceholderRange("pause", snapshotFullText, range, false);
+      }
+    }, 800);
+
+    return () => {
+      if (placeholderTriggerTimerRef.current) {
+        clearTimeout(placeholderTriggerTimerRef.current);
+        placeholderTriggerTimerRef.current = null;
+      }
+    };
+  }, [
+    apiSettings.apiKey,
+    apiSettings.baseUrl,
+    apiSettings.mockMode,
+    apiSettings.model,
+    isHydrated,
+    isRegenerating,
+    pending?.placeholderRequestKey,
+    placeholderSuggestions,
+    text,
+    writingArchives.activeId,
+  ]);
+
+  useEffect(() => {
+    if (activeWorkspaceView === "library") {
+      setHasUnseenLearningUpdates(false);
+    }
+  }, [activeWorkspaceView]);
+
+  useEffect(() => {
+    if (paragraphHealthTimerRef.current) {
+      clearTimeout(paragraphHealthTimerRef.current);
+      paragraphHealthTimerRef.current = null;
+    }
+    if (!paragraphHealthNotice) {
+      return;
+    }
+    paragraphHealthTimerRef.current = setTimeout(() => {
+      setParagraphHealthNotice(null);
+      paragraphHealthTimerRef.current = null;
+    }, 6000);
+    return () => {
+      if (paragraphHealthTimerRef.current) {
+        clearTimeout(paragraphHealthTimerRef.current);
+        paragraphHealthTimerRef.current = null;
+      }
+    };
+  }, [paragraphHealthNotice]);
 
   const activeArchive = useMemo(
     () => writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null,
@@ -464,6 +588,23 @@ export function LinguaTypeApp() {
     });
   }
 
+  function resetEditorSuggestionState() {
+    if (placeholderTriggerTimerRef.current) {
+      clearTimeout(placeholderTriggerTimerRef.current);
+      placeholderTriggerTimerRef.current = null;
+    }
+    setPending(null);
+    setReviewedSuggestion(null);
+    setSuggestionDisplayMode("hidden");
+    setActivePlaceholderInsight(false);
+    setConflictMessage("");
+    setCopyMessage("");
+    setStatusMessage("");
+    setError(null);
+    setEmpty(false);
+    ignoredPlaceholderRequestKeyRef.current = "";
+  }
+
   function createNewArchive() {
     const now = new Date().toISOString();
     const item = createBlankArchive(now);
@@ -478,6 +619,7 @@ export function LinguaTypeApp() {
     if (item.setup) {
       saveWritingSetup(localStorage, item.setup);
     }
+    resetEditorSuggestionState();
     setOutlineCheckResult(null);
     setOutlineCheckMessage("");
   }
@@ -519,6 +661,7 @@ export function LinguaTypeApp() {
     if (archive.setup) {
       saveWritingSetup(localStorage, archive.setup);
     }
+    resetEditorSuggestionState();
     setOutlineCheckResult(null);
     setOutlineCheckMessage("");
   }
@@ -581,6 +724,7 @@ export function LinguaTypeApp() {
       if (nextActive.setup) {
         saveWritingSetup(localStorage, nextActive.setup);
       }
+      resetEditorSuggestionState();
       setOutlineCheckResult(null);
       setOutlineCheckMessage("");
     }
@@ -727,6 +871,19 @@ export function LinguaTypeApp() {
     localStorage.setItem(LEARNING_HISTORY_STORAGE_KEY, JSON.stringify(items));
   }
 
+  function markLearningLibraryUpdated() {
+    if (activeWorkspaceView !== "library") {
+      setHasUnseenLearningUpdates(true);
+    }
+  }
+
+  function handleWorkspaceViewChange(view: WorkspaceView) {
+    if (view === "library") {
+      setHasUnseenLearningUpdates(false);
+    }
+    requestWorkspaceView(view);
+  }
+
   function persistCorrectionEvents(items: CorrectionEvent[]) {
     setCorrectionEvents(items);
     localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(items));
@@ -737,19 +894,314 @@ export function LinguaTypeApp() {
     setPersonalDictionary(normalized);
   }
 
+  function rememberReviewedSuggestion(
+    completed: CompletedEnhancement,
+    reviewedRange: SentenceRange,
+    displaySentence: string,
+    applied: boolean,
+    snapshotFullText: string,
+  ) {
+    setReviewedSuggestion({
+      ...completed,
+      reviewedRange,
+      displaySentence,
+      applied,
+      latestSentenceRange: reviewedRange,
+      snapshotFullText,
+    });
+  }
+
+  function openReviewedSuggestion() {
+    if (!reviewedSuggestion) {
+      return;
+    }
+    setActivePlaceholderInsight(false);
+    setPending({
+      ...reviewedSuggestion,
+      latestSentenceRange: reviewedSuggestion.reviewedRange,
+      snapshotFullText: text,
+    });
+    setSuggestionDisplayMode("expanded");
+    requestWorkspaceView("editor");
+  }
+
+  function resolvePlaceholderSuggestionRange(
+    suggestion: PlaceholderSuggestionRecord,
+    currentText = text,
+  ): SentenceRange | null {
+    const candidates = [
+      suggestion.displaySentence,
+      suggestion.result.finalSentence,
+      suggestion.originalSentence,
+    ].filter((candidate, index, list) => candidate.trim() && list.indexOf(candidate) === index);
+
+    for (const range of [suggestion.reviewedRange, suggestion.latestSentenceRange]) {
+      const currentSlice = currentText.slice(range.start, range.end);
+      if (candidates.includes(currentSlice)) {
+        return {
+          sentence: currentSlice,
+          start: range.start,
+          end: range.end,
+        };
+      }
+    }
+
+    for (const candidate of candidates) {
+      const index = currentText.indexOf(candidate);
+      if (index >= 0) {
+        return {
+          sentence: candidate,
+          start: index,
+          end: index + candidate.length,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function resolvePlaceholderMarkerRange(
+    suggestion: PlaceholderSuggestionRecord,
+    sentenceRange: SentenceRange,
+    currentText = text,
+  ): SentenceRange {
+    const sentence = currentText.slice(sentenceRange.start, sentenceRange.end);
+    const targetText = suggestion.applied ? suggestion.placeholderHint?.targetText : "";
+    const targetIndex = targetText ? sentence.indexOf(targetText) : -1;
+    if (targetIndex >= 0 && targetText) {
+      return {
+        sentence: targetText,
+        start: sentenceRange.start + targetIndex,
+        end: sentenceRange.start + targetIndex + targetText.length,
+      };
+    }
+
+    const placeholderRange = suggestion.placeholderRange;
+    const placeholders = placeholderRange?.placeholders ?? [];
+    if (!suggestion.applied && placeholderRange && placeholders.length > 0) {
+      const first = placeholders[0];
+      const last = placeholders[placeholders.length - 1];
+      const sourceStart = first.start - placeholderRange.start;
+      const sourceEnd = last.end - placeholderRange.start;
+      const sourceText = placeholderRange.sentence.slice(sourceStart, sourceEnd);
+      const sourceIndex = sourceText ? sentence.indexOf(sourceText) : -1;
+      if (sourceIndex >= 0 && sourceText) {
+        return {
+          sentence: sourceText,
+          start: sentenceRange.start + sourceIndex,
+          end: sentenceRange.start + sourceIndex + sourceText.length,
+        };
+      }
+    }
+
+    return sentenceRange;
+  }
+
+  function upsertPlaceholderSuggestion(record: PlaceholderSuggestionRecord) {
+    setPlaceholderSuggestions((current) => {
+      const existingIndex = current.findIndex(
+        (item) => item.archiveId === record.archiveId && item.requestKey === record.requestKey,
+      );
+      if (existingIndex < 0) {
+        return [...current, record];
+      }
+      return current.map((item, index) => (index === existingIndex ? record : item));
+    });
+  }
+
+  function markPlaceholderSuggestionReviewed(
+    completed: CompletedEnhancement,
+    reviewedRange: SentenceRange,
+    displaySentence: string,
+    applied: boolean,
+    snapshotFullText: string,
+  ) {
+    if (!completed.placeholderRequestKey || !completed.result) {
+      return;
+    }
+    upsertPlaceholderSuggestion({
+      ...completed,
+      id: completed.requestId,
+      archiveId: writingArchives.activeId,
+      requestKey: completed.placeholderRequestKey,
+      markerState: "reviewed",
+      reviewedRange,
+      displaySentence,
+      applied,
+      latestSentenceRange: reviewedRange,
+      snapshotFullText,
+    });
+  }
+
+  function openPlaceholderSuggestion(id: string) {
+    const suggestion = placeholderSuggestions.find(
+      (item) => item.id === id && item.archiveId === writingArchives.activeId,
+    );
+    if (!suggestion) {
+      return;
+    }
+    const resolvedRange = resolvePlaceholderSuggestionRange(suggestion);
+    if (!resolvedRange) {
+      return;
+    }
+
+    setActivePlaceholderInsight(false);
+    setPending({
+      ...suggestion,
+      latestSentenceRange: resolvedRange,
+      originalSentence: suggestion.displaySentence,
+      snapshotFullText: text,
+    });
+    setSuggestionDisplayMode("expanded");
+    requestWorkspaceView("editor");
+  }
+
+  function createPlaceholderRequestKey(
+    range: ChinesePlaceholderSentenceRange,
+    archiveId = writingArchives.activeId,
+  ): string {
+    return `${archiveId ?? "draft"}:${range.sentence.trim()}`;
+  }
+
+  function createPlaceholderHint(
+    range: ChinesePlaceholderSentenceRange,
+    result: FastEnhanceResult,
+  ): PlaceholderLearningHint | undefined {
+    const rawSourceText = range.placeholders.map((placeholder) => placeholder.text.trim()).filter(Boolean).join(" / ");
+    if (!rawSourceText) {
+      return undefined;
+    }
+
+    const rawTargetText = extractPlaceholderReplacement(range, result.finalSentence).trim();
+    if (!rawTargetText) {
+      return undefined;
+    }
+
+    const insight = refinePlaceholderInsight(rawSourceText, rawTargetText, result.finalSentence);
+
+    return {
+      sourceText: insight.sourceText,
+      targetText: insight.targetText,
+      structure: insight.structure ?? inferPlaceholderStructure(range, insight.targetText, result.explanationZh),
+    };
+  }
+
+  function refinePlaceholderInsight(
+    sourceText: string,
+    targetText: string,
+    finalSentence: string,
+  ): { sourceText: string; targetText: string; structure?: string } {
+    const compactSource = sourceText.replace(/[，。！？；、\s]/gu, "");
+    if (compactSource.includes("会火") && /\bgo viral\b/iu.test(finalSentence)) {
+      return {
+        sourceText: "会火",
+        targetText: "go viral",
+        structure: "结构：go viral 表示迅速走红、广受关注",
+      };
+    }
+
+    return { sourceText, targetText };
+  }
+
+  function extractPlaceholderReplacement(range: ChinesePlaceholderSentenceRange, finalSentence: string): string {
+    if (range.placeholders.length !== 1) {
+      return finalSentence;
+    }
+
+    const placeholder = range.placeholders[0];
+    const relativeStart = placeholder.start - range.start;
+    const relativeEnd = placeholder.end - range.start;
+    const prefix = range.sentence.slice(0, relativeStart);
+    const suffix = range.sentence.slice(relativeEnd);
+    let candidateStart = 0;
+    let candidateEnd = finalSentence.length;
+
+    if (prefix.trim()) {
+      const prefixIndex = finalSentence.indexOf(prefix);
+      if (prefixIndex >= 0) {
+        candidateStart = prefixIndex + prefix.length;
+      }
+    }
+
+    if (suffix.trim()) {
+      const suffixIndex = finalSentence.indexOf(suffix, candidateStart);
+      if (suffixIndex >= 0) {
+        candidateEnd = suffixIndex;
+      }
+    }
+
+    const candidate = finalSentence.slice(candidateStart, candidateEnd).trim();
+    return candidate || finalSentence;
+  }
+
+  function inferPlaceholderStructure(
+    range: ChinesePlaceholderSentenceRange,
+    targetText: string,
+    explanationZh?: string,
+  ): string {
+    const firstPlaceholder = range.placeholders[0];
+    const prefix = range.sentence.slice(0, firstPlaceholder.start - range.start).trimEnd().toLowerCase();
+    const target = targetText.toLowerCase();
+
+    if (/\black$/u.test(prefix) && target.includes("ability to")) {
+      return "结构：lack + the ability to + verb";
+    }
+    if (target.includes("effectively")) {
+      return "结构：doing something effectively";
+    }
+
+    const firstExplanation = explanationZh?.split(/[。.!?\n]/u)[0]?.trim();
+    if (firstExplanation) {
+      return firstExplanation.startsWith("结构：") ? firstExplanation : `结构：${firstExplanation}`;
+    }
+
+    return "结构：把中文占位转成英文表达单元，保留原句逻辑";
+  }
+
+  function persistPlaceholderLearningAsset(applied: CompletedEnhancement) {
+    const hint = applied.placeholderHint;
+    if (!hint?.targetText.trim()) {
+      return;
+    }
+
+    const item: LearningItemDraft = {
+      type: "phrase",
+      content: hint.targetText,
+      chineseMeaning: hint.sourceText,
+      usageNote: hint.structure,
+      difficultyLevel: 2,
+      tags: ["中文占位"],
+    };
+    const nextLibrary = upsertLearningItems(learningLibrary, [item], {
+      sourceSentence: applied.result.finalSentence,
+      writingMode: applied.requestInput.writingMode,
+    });
+    persistLearningLibrary(nextLibrary);
+    markLearningLibraryUpdated();
+  }
+
   function handleEditorTextChange(value: string) {
     setText(value);
+    const cursorPosition = editorRef.current?.getSelectionRange().end ?? value.length;
+    setEditorSelection((current) => (
+      current.end === cursorPosition && current.start === cursorPosition
+        ? current
+        : { start: cursorPosition, end: cursorPosition }
+    ));
     if (!pending) {
       return;
     }
     if (value !== pending.snapshotFullText) {
-      setConflictMessage("增强后你又修改了编辑器内容。请重新增强最新一句，避免覆盖新内容。");
+      setConflictMessage("建议生成后你又修改了编辑器内容。请重新处理当前句，避免覆盖新内容。");
       return;
     }
     setConflictMessage("");
   }
 
   function ensureApiSettings(): boolean {
+    if (apiSettings.mockMode) {
+      return true;
+    }
     if (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model) {
       requestWorkspaceView("api");
       setError({ message: "需要先填写 API Settings 设置。" });
@@ -776,6 +1228,126 @@ export function LinguaTypeApp() {
     return payload as FastEnhanceResult;
   }
 
+  async function enhanceChinesePlaceholderRange(
+    trigger: "pause" | "boundary" | "manual",
+    snapshotFullText: string,
+    range: ChinesePlaceholderSentenceRange,
+    expandAfterResult: boolean,
+    force = false,
+  ): Promise<boolean> {
+    if (isRegenerating || !range.sentence.trim() || !endsWithSentenceBoundary(range.sentence)) {
+      return false;
+    }
+
+    const archiveId = writingArchives.activeId;
+    const requestKey = createPlaceholderRequestKey(range, archiveId);
+    if (
+      !force
+      && (
+        requestKey === ignoredPlaceholderRequestKeyRef.current
+        || requestKey === pending?.placeholderRequestKey
+        || placeholderRequestKeysRef.current.has(requestKey)
+        || placeholderSuggestions.some(
+          (suggestion) =>
+            suggestion.archiveId === archiveId
+            && (suggestion.requestKey === requestKey || suggestion.originalSentence === range.sentence),
+        )
+      )
+    ) {
+      return false;
+    }
+
+    if (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model)) {
+      if (trigger === "manual") {
+        ensureApiSettings();
+      }
+      return false;
+    }
+
+    const requestId = crypto.randomUUID();
+    const requestInput: Omit<FastEnhanceInput, "apiConfig"> = {
+      fullText: snapshotFullText,
+      latestSentence: range.sentence,
+      previousContext: withWritingSetupContext(getPreviousContext(snapshotFullText, range.start), writingSetup),
+      currentParagraph: getCurrentParagraph(snapshotFullText, range.start),
+      writingMode,
+      enhancementLevel,
+    };
+
+    placeholderRequestKeysRef.current.add(requestKey);
+    if (force && ignoredPlaceholderRequestKeyRef.current === requestKey) {
+      ignoredPlaceholderRequestKeyRef.current = "";
+    }
+    setError(null);
+    setEmpty(false);
+    setConflictMessage("");
+    setCopyMessage("");
+    setLearningExtractionMessage("");
+    setSelectionAction(null);
+    setStatusMessage("");
+    if (expandAfterResult) {
+      setSuggestionDisplayMode("hidden");
+      setIsLoading(true);
+    }
+
+    try {
+      const result = await requestEnhancement(requestInput);
+      const record: PlaceholderSuggestionRecord = {
+        requestId,
+        id: requestId,
+        archiveId,
+        requestKey,
+        markerState: "available",
+        snapshotFullText,
+        latestSentenceRange: range,
+        reviewedRange: range,
+        displaySentence: range.sentence,
+        applied: false,
+        originalSentence: range.sentence,
+        requestInput,
+        source: "placeholder",
+        placeholderRequestKey: requestKey,
+        placeholderRange: range,
+        placeholderHint: createPlaceholderHint(range, result),
+        result,
+      };
+      upsertPlaceholderSuggestion(record);
+      if (expandAfterResult) {
+        setPending(record);
+        setSuggestionDisplayMode("expanded");
+      }
+      setStatusMessage("");
+      return true;
+    } catch (caught) {
+      const payload = caught as { error?: string; rawResponse?: string };
+      if (trigger === "manual") {
+        setError({
+          message: payload.error ?? "当前句建议生成失败。请检查 API Settings 后重试。",
+          rawResponse: payload.rawResponse,
+        });
+      }
+      setStatusMessage("");
+      return false;
+    } finally {
+      if (expandAfterResult) {
+        setIsLoading(false);
+      }
+    }
+  }
+
+  async function enhanceChinesePlaceholderSentence(
+    trigger: "pause" | "boundary" | "manual",
+    snapshotFullText = text,
+    cursorPosition = editorSelection.end || snapshotFullText.length,
+    force = false,
+  ): Promise<boolean> {
+    const range = extractChinesePlaceholderSentence(snapshotFullText, cursorPosition);
+    if (!range) {
+      return false;
+    }
+    return enhanceChinesePlaceholderRange(trigger, snapshotFullText, range, trigger === "manual", force);
+  }
+
   async function enhanceLatestSentence() {
     setError(null);
     setEmpty(false);
@@ -784,8 +1356,24 @@ export function LinguaTypeApp() {
     setLearningExtractionMessage("");
     setSelectionAction(null);
 
-    const range = extractLatestSentence(text);
+    const cursorPosition = editorRef.current?.getSelectionRange().end ?? editorSelection.end ?? text.length;
+    const placeholderRange = extractChinesePlaceholderSentence(text, cursorPosition);
+    if (placeholderRange) {
+      if (!endsWithSentenceBoundary(placeholderRange.sentence)) {
+        setStatusMessage("");
+        return;
+      }
+      await enhanceChinesePlaceholderSentence("manual", text, cursorPosition, true);
+      return;
+    }
+
+    const range = extractCurrentSentence(text, cursorPosition);
     if (!range.sentence.trim()) {
+      setEmpty(true);
+      setStatusMessage("");
+      return;
+    }
+    if (!endsWithSentenceBoundary(range.sentence)) {
       setEmpty(true);
       setStatusMessage("");
       return;
@@ -806,13 +1394,15 @@ export function LinguaTypeApp() {
       writingMode,
       enhancementLevel,
     };
-    setStatusMessage("正在增强...");
+    setStatusMessage("");
+    setSuggestionDisplayMode("hidden");
     setPending({
       requestId,
       snapshotFullText,
       latestSentenceRange: range,
       originalSentence: range.sentence,
       requestInput,
+      source: "manual",
     });
     setIsLoading(true);
 
@@ -824,9 +1414,11 @@ export function LinguaTypeApp() {
         latestSentenceRange: range,
         originalSentence: range.sentence,
         requestInput,
+        source: "manual",
         result,
       });
-      setStatusMessage("建议已生成");
+      setStatusMessage("");
+      setSuggestionDisplayMode("expanded");
     } catch (caught) {
       const payload = caught as { error?: string; rawResponse?: string };
       setError({
@@ -843,18 +1435,54 @@ export function LinguaTypeApp() {
     if (!pending?.result || isLoading || isRegenerating) {
       return;
     }
+    const keepReviewOnly = Boolean(pending.applied);
     const requestId = crypto.randomUUID();
-    const nextPending: PendingEnhancement = { ...pending, requestId, result: undefined };
+    const nextPending: PendingEnhancement = { ...pending, requestId, placeholderHint: undefined, result: undefined };
     setConflictMessage("");
     setCopyMessage("");
-    setStatusMessage("正在增强...");
+    setStatusMessage("");
+    setActivePlaceholderInsight(false);
+    setSuggestionDisplayMode("expanded");
     setPending(nextPending);
     setIsRegenerating(true);
 
     try {
       const result = await requestEnhancement(pending.requestInput);
-      setPending({ ...nextPending, result });
-      setStatusMessage("已重新生成");
+      const regenerated = {
+        ...nextPending,
+        placeholderHint: nextPending.placeholderRange ? createPlaceholderHint(nextPending.placeholderRange, result) : undefined,
+        result,
+      };
+      setPending(regenerated);
+      if (regenerated.placeholderRequestKey && regenerated.placeholderRange) {
+        const resolvedRange = resolvePlaceholderSuggestionRange(
+          {
+            ...regenerated,
+            id: regenerated.requestId,
+            archiveId: writingArchives.activeId,
+            requestKey: regenerated.placeholderRequestKey,
+              markerState: "reviewed",
+              reviewedRange: regenerated.latestSentenceRange,
+              displaySentence: regenerated.originalSentence,
+              applied: keepReviewOnly,
+              result,
+            },
+            text,
+        ) ?? regenerated.latestSentenceRange;
+        upsertPlaceholderSuggestion({
+          ...regenerated,
+          id: regenerated.requestId,
+          archiveId: writingArchives.activeId,
+          requestKey: regenerated.placeholderRequestKey,
+            markerState: "reviewed",
+            reviewedRange: resolvedRange,
+            displaySentence: regenerated.originalSentence,
+            applied: keepReviewOnly,
+            latestSentenceRange: resolvedRange,
+            result,
+          });
+      }
+      setStatusMessage("");
     } catch (caught) {
       const payload = caught as { error?: string; rawResponse?: string };
       setError({
@@ -867,32 +1495,39 @@ export function LinguaTypeApp() {
   }
 
   function applyEnhancement() {
-    if (!pending?.result) {
+    if (!pending?.result || pending.applied) {
       return;
     }
     const completed: CompletedEnhancement = { ...pending, result: pending.result };
 
     if (text !== completed.snapshotFullText) {
-      setConflictMessage("增强后你又修改了编辑器内容。请重新增强最新一句，避免覆盖新内容。");
+      setConflictMessage("建议生成后你又修改了编辑器内容。请重新处理当前句，避免覆盖新内容。");
       return;
     }
 
     const nextText = replaceLatestSentence(text, completed.latestSentenceRange, completed.result.finalSentence);
+    const reviewedRange: SentenceRange = {
+      sentence: completed.result.finalSentence,
+      start: completed.latestSentenceRange.start,
+      end: completed.latestSentenceRange.start + completed.result.finalSentence.length,
+    };
     const paragraphRange = extractCurrentParagraph(
       nextText,
       completed.latestSentenceRange.start + completed.result.finalSentence.length,
     );
 
     setText(nextText);
-    if (triggerSettings.popoverBehavior.autoCloseAfterApply) {
-      setPending(null);
-    }
+    setPending(null);
+    setActivePlaceholderInsight(false);
+    rememberReviewedSuggestion(completed, reviewedRange, completed.result.finalSentence, true, nextText);
+    markPlaceholderSuggestionReviewed(completed, reviewedRange, completed.result.finalSentence, true, nextText);
+    setSuggestionDisplayMode("hidden");
     setConflictMessage("");
     setCopyMessage("");
-    setLearningExtractionMessage("学习提取 Learning extraction 正在后台进行");
-    setStatusMessage("已应用 Applied");
+    setStatusMessage("");
     requestAnimationFrame(() => editorRef.current?.focus());
 
+    persistPlaceholderLearningAsset(completed);
     void runLearningExtraction(completed, nextText, paragraphRange.paragraph);
     void maybeRunParagraphHealthAfterApply(nextText, paragraphRange);
   }
@@ -922,8 +1557,9 @@ export function LinguaTypeApp() {
         throw payload;
       }
 
+      const extraction = payload as LearningExtractionResult;
       setLearningLibrary((current) => {
-        const nextLibrary = upsertLearningItems(current, (payload as LearningExtractionResult).learningItems, {
+        const nextLibrary = upsertLearningItems(current, extraction.learningItems, {
           sourceSentence: applied.result.finalSentence,
           writingMode: applied.requestInput.writingMode,
         });
@@ -932,18 +1568,21 @@ export function LinguaTypeApp() {
         return nextLibrary;
       });
       setCorrectionEvents((current) => {
-        const nextEvents = upsertCorrectionEvents(current, (payload as LearningExtractionResult).correctionEvents, {
+        const nextEvents = upsertCorrectionEvents(current, extraction.correctionEvents, {
           sourceSentence: applied.result.finalSentence,
           writingMode: applied.requestInput.writingMode,
         });
         localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(nextEvents));
         return nextEvents;
       });
-      setLearningExtractionMessage("学习内容已保存到 Learning Library / Writing Habits");
-      setStatusMessage("学习内容已保存");
+      if (extraction.learningItems.length > 0) {
+        markLearningLibraryUpdated();
+      }
+      setLearningExtractionMessage("");
+      setStatusMessage("");
     } catch {
-      setLearningExtractionMessage("学习提取失败，但已应用的文本会保留。");
-      setStatusMessage("学习提取失败");
+      setLearningExtractionMessage("");
+      setStatusMessage("");
     }
   }
 
@@ -1043,7 +1682,9 @@ export function LinguaTypeApp() {
     if (!paragraphHealthNotice) {
       return;
     }
-    await runParagraphFlowCheck(paragraphHealthNotice.snapshotFullText, paragraphHealthNotice.paragraphRange);
+    const notice = paragraphHealthNotice;
+    setParagraphHealthNotice(null);
+    await runParagraphFlowCheck(notice.snapshotFullText, notice.paragraphRange);
   }
 
   async function runParagraphFlowCheck(snapshotFullText: string, range: ParagraphRange) {
@@ -1217,6 +1858,11 @@ export function LinguaTypeApp() {
     anchorRect: DOMRect;
     containerRect: DOMRect;
   }) {
+    setEditorSelection((current) => (
+      current.start === selection.start && current.end === selection.end
+        ? current
+        : { start: selection.start, end: selection.end }
+    ));
     const selectedText = selection.text.trim();
     if (!selectedText || selection.start === selection.end || !isEnglishSelection(selectedText)) {
       setSelectionAction(null);
@@ -1293,6 +1939,7 @@ export function LinguaTypeApp() {
       writingMode,
     });
     persistLearningLibrary(nextLibrary);
+    markLearningLibraryUpdated();
     setSelectionAction({
       ...selectionAction,
       message: "已保存到表达库",
@@ -1305,6 +1952,7 @@ export function LinguaTypeApp() {
 
   function clearLearningLibrary() {
     persistLearningLibrary([]);
+    setHasUnseenLearningUpdates(false);
   }
 
   function clearWritingHabits() {
@@ -1312,7 +1960,18 @@ export function LinguaTypeApp() {
   }
 
   function closeCurrentSuggestion() {
+    const isAppliedReview = Boolean(pending?.applied);
+    if (pending?.result && !isAppliedReview) {
+      const completed: CompletedEnhancement = { ...pending, result: pending.result };
+      rememberReviewedSuggestion(completed, pending.latestSentenceRange, pending.originalSentence, false, text);
+      markPlaceholderSuggestionReviewed(completed, pending.latestSentenceRange, pending.originalSentence, false, text);
+    }
+    if (pending?.placeholderRequestKey && !isAppliedReview) {
+      ignoredPlaceholderRequestKeyRef.current = pending.placeholderRequestKey;
+    }
     setPending(null);
+    setActivePlaceholderInsight(false);
+    setSuggestionDisplayMode("hidden");
     setConflictMessage("");
     setCopyMessage("");
     setStatusMessage("");
@@ -1329,6 +1988,33 @@ export function LinguaTypeApp() {
   }
 
   const workspaceMotionState = pendingWorkspaceView && activeWorkspaceView !== "editor" ? "exiting" : "entering";
+  const pendingIsAppliedReview = Boolean(pending?.placeholderRequestKey && pending.applied);
+  const suggestionMarkers = [
+    ...placeholderSuggestions.flatMap((suggestion) => {
+      if (suggestion.archiveId !== writingArchives.activeId) {
+        return [];
+      }
+      const range = resolvePlaceholderSuggestionRange(suggestion);
+      if (!range) {
+        return [];
+      }
+      const markerRange = resolvePlaceholderMarkerRange(suggestion, range);
+      return [{
+        id: suggestion.id,
+        range: markerRange,
+        state: suggestion.markerState,
+        onOpen: () => openPlaceholderSuggestion(suggestion.id),
+      }];
+    }),
+    ...(!pending && reviewedSuggestion && !reviewedSuggestion.placeholderRequestKey
+      ? [{
+          id: reviewedSuggestion.requestId,
+          range: reviewedSuggestion.reviewedRange,
+          state: "reviewed" as const,
+          onOpen: openReviewedSuggestion,
+        }]
+      : []),
+  ];
 
   return (
     <main className="h-screen overflow-hidden bg-[var(--lt-bg)] text-[var(--lt-text)]">
@@ -1342,10 +2028,11 @@ export function LinguaTypeApp() {
           archives={writingArchives}
           collapsed={archiveSidebarCollapsed}
           activeView={activeWorkspaceView}
+          hasLearningUpdate={hasUnseenLearningUpdates}
           openMenuArchiveId={openArchiveMenuId}
           deleteCandidateId={deleteCandidateId}
           renamingArchiveId={renamingArchiveId}
-          onViewChange={requestWorkspaceView}
+          onViewChange={handleWorkspaceViewChange}
           onCollapse={() => setArchiveSidebarCollapsed(true)}
           onExpand={() => setArchiveSidebarCollapsed(false)}
           onCreate={() => {
@@ -1393,11 +2080,14 @@ export function LinguaTypeApp() {
               ref={writingSurfaceRef}
               aria-label="沉浸式写作区"
               data-document-motion-reason={documentMotionReason}
-              className={`mx-auto flex min-h-[calc(100vh-88px)] w-full max-w-[920px] flex-col gap-8 px-8 pb-0 transition-[max-width] ${
-                archiveSidebarCollapsed ? "xl:max-w-[1020px]" : ""
-              }`}
+              className="flex min-h-[calc(100vh-88px)] w-full flex-col gap-8 px-8 pb-0"
             >
-              <section className="px-1">
+              <section
+                data-writing-column="true"
+                className={`mx-auto w-full max-w-[920px] px-4 transition-[max-width] sm:px-8 ${
+                  archiveSidebarCollapsed ? "xl:max-w-[1020px]" : ""
+                }`}
+              >
                 <InlineSetupControls
                   activeArchive={activeArchive}
                   setup={writingSetup}
@@ -1432,6 +2122,21 @@ export function LinguaTypeApp() {
                   proofreadingResult={proofreadingResult}
                   triggerSettings={triggerSettings}
                   topicAreaLabel={topicAreaDisplayLabel(writingSetup)}
+                  wideLayout={archiveSidebarCollapsed}
+                  suggestionMarkers={suggestionMarkers}
+                  focusedSuggestionSentence={
+                    pending?.result && suggestionDisplayMode === "expanded"
+                      ? pending.originalSentence
+                      : ""
+                  }
+                  focusedSuggestionRange={
+                    pending?.result && suggestionDisplayMode === "expanded"
+                      ? pending.latestSentenceRange
+                      : null
+                  }
+                  focusedSuggestionSourceText={pending?.placeholderHint?.sourceText ?? ""}
+                  activeSuggestionSource={activePlaceholderInsight}
+                  onFocusedSuggestionSourceClick={() => setActivePlaceholderInsight(true)}
                   onChange={handleEditorTextChange}
                   onWritingModeChange={setWritingMode}
                   onEnhancementLevelChange={setEnhancementLevel}
@@ -1457,12 +2162,18 @@ export function LinguaTypeApp() {
                     }
                     closeCurrentSuggestion();
                   }}
-                  inlineSuggestionParagraphIndex={pendingSuggestionParagraphIndex}
+                  onApplySuggestionShortcut={applyEnhancement}
+                  onRegenerateSuggestionShortcut={regenerateEnhancement}
+                  inlineSuggestionReviewOnly={pendingIsAppliedReview}
                   inlineSuggestion={
-                    pending ? (
+                    pending?.result && suggestionDisplayMode === "expanded" ? (
                       <EnhancementPopover
                         originalSentence={pending.originalSentence}
                         result={pending.result}
+                        placeholderHint={pending.placeholderHint}
+                        isPlaceholderSuggestion={pending.source === "placeholder"}
+                        isReviewOnly={pendingIsAppliedReview}
+                        activePlaceholderFocus={activePlaceholderInsight}
                         diffParts={diffParts}
                         conflictMessage={conflictMessage}
                         copyMessage={copyMessage}
@@ -1498,23 +2209,23 @@ export function LinguaTypeApp() {
                 ) : null}
               </div>
 
-              {statusMessage || learningExtractionMessage ? (
-                <section className="rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-sm text-[var(--lt-muted)]">
-                  {statusMessage ? <p>{statusMessage}</p> : null}
-                  {learningExtractionMessage ? <p>{learningExtractionMessage}</p> : null}
-                </section>
-              ) : null}
-
               {paragraphHealthNotice ? (
-                <section className="rounded-md bg-sky-500/[0.08] px-3 py-2 text-sm text-sky-900">
+                <section className="pointer-events-auto absolute bottom-12 right-8 z-40 w-[min(360px,calc(100%-4rem))] rounded-md border border-[var(--lt-border)] bg-[var(--lt-menu-bg)] px-3 py-2 text-sm text-[var(--lt-text)] shadow-[0_18px_42px_var(--lt-shadow-strong)] backdrop-blur-xl">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>段落健康：可能有 {paragraphHealthNotice.result.issueCount} 个问题</span>
                     <button
                       type="button"
                       onClick={() => void viewParagraphHealthSuggestions()}
-                      className="rounded-md bg-sky-500/[0.12] px-2 py-1 text-xs font-medium text-sky-900 transition hover:bg-sky-500/[0.18]"
+                      className="rounded-md bg-[var(--lt-surface-soft)] px-2 py-1 text-xs font-medium text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
                     >
                       查看建议
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setParagraphHealthNotice(null)}
+                      className="text-xs text-[var(--lt-muted)] transition hover:text-[var(--lt-text)]"
+                    >
+                      忽略
                     </button>
                   </div>
                 </section>
@@ -1536,7 +2247,6 @@ export function LinguaTypeApp() {
               ) : null}
 
               {empty ? <EmptyState /> : null}
-              {isLoading ? <LoadingState /> : null}
               {error ? <ErrorState message={error.message} rawResponse={error.rawResponse} /> : null}
             </section>
           ) : null}
@@ -1660,9 +2370,11 @@ function AnimatedWorkspacePage({
   children: ReactNode;
 }) {
   const pageRef = useRef<HTMLElement | null>(null);
-  const motionDuration = 820;
+  const isLibraryPage = view === "library";
+  const motionDuration = isLibraryPage ? 560 : 820;
   const exitMotionDuration = WORKSPACE_EXIT_MOTION_DURATION;
-  const motionDistance = 72;
+  const motionDistance = isLibraryPage ? 24 : 72;
+  const motionProfile = isLibraryPage ? "library-unified-rise" : "workspace-soft-rise";
 
   useEffect(() => {
     const page = pageRef.current;
@@ -1696,14 +2408,17 @@ function AnimatedWorkspacePage({
 
     waapi.animate(page, {
       opacity: [0.06, 1],
-      transform: [`translateY(${motionDistance}px) scale(0.96)`, "translateY(0px) scale(1)"],
-      filter: ["blur(16px)", "blur(0px)"],
+      transform: [
+        `translateY(${motionDistance}px) scale(${isLibraryPage ? 0.99 : 0.96})`,
+        "translateY(0px) scale(1)",
+      ],
+      filter: [isLibraryPage ? "blur(5px)" : "blur(16px)", "blur(0px)"],
       duration: motionDuration,
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
 
     const sweep = page.querySelector<HTMLElement>("[data-motion-sweep]");
-    if (sweep && typeof sweep.animate === "function") {
+    if (sweep && !isLibraryPage && typeof sweep.animate === "function") {
       waapi.animate(sweep, {
         opacity: [0, 0.58, 0],
         transform: ["scaleX(0)", "scaleX(1)", "scaleX(1)"],
@@ -1713,7 +2428,7 @@ function AnimatedWorkspacePage({
     }
 
     const motionItems = Array.from(
-      page.querySelectorAll<HTMLElement>("h1, h2, button, label, li, [data-motion-item]"),
+      page.querySelectorAll<HTMLElement>("[data-library-motion-item], h1, h2, button, label, li, [data-motion-item]"),
     ).slice(0, 18);
     if (motionItems.length === 0 || typeof motionItems[0].animate !== "function") {
       return;
@@ -1721,19 +2436,20 @@ function AnimatedWorkspacePage({
 
     waapi.animate(motionItems, {
       opacity: [0, 1],
-      transform: ["translateY(34px)", "translateY(0px)"],
-      duration: 720,
-      delay: stagger(70),
+      transform: [isLibraryPage ? "translateY(16px)" : "translateY(34px)", "translateY(0px)"],
+      duration: isLibraryPage ? 420 : 720,
+      delay: stagger(isLibraryPage ? 32 : 70),
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
-  }, [exitMotionDuration, motionDistance, motionDuration, motionState, view]);
+  }, [exitMotionDuration, isLibraryPage, motionDistance, motionDuration, motionState, view]);
 
   return (
     <section
       ref={pageRef}
       aria-label={ariaLabel}
       data-workspace-motion={view}
-      data-motion-intensity="noticeable"
+      data-motion-intensity={isLibraryPage ? "subtle" : "noticeable"}
+      data-motion-profile={motionProfile}
       data-motion-state={motionState}
       data-motion-duration={String(motionDuration)}
       data-motion-exit-duration={String(exitMotionDuration)}
@@ -1850,6 +2566,7 @@ function ArchiveSidebar({
   archives,
   collapsed,
   activeView,
+  hasLearningUpdate,
   openMenuArchiveId,
   deleteCandidateId,
   renamingArchiveId,
@@ -1869,6 +2586,7 @@ function ArchiveSidebar({
   archives: WritingArchivesState;
   collapsed: boolean;
   activeView: WorkspaceView;
+  hasLearningUpdate: boolean;
   openMenuArchiveId: string | null;
   deleteCandidateId: string | null;
   renamingArchiveId: string | null;
@@ -2166,13 +2884,19 @@ function ArchiveSidebar({
               type="button"
               onClick={() => toggleWorkspaceView(item.id)}
               aria-label={`打开${item.label}`}
-              className={`grid h-9 w-9 place-items-center rounded-md text-sm transition ${
+              className={`relative grid h-9 w-9 place-items-center rounded-md text-sm transition ${
                 activeView === item.id
                   ? "bg-[var(--lt-accent-soft)] text-[var(--lt-accent)]"
                   : "hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
               }`}
             >
               <item.icon className="h-5 w-5" />
+              {item.id === "library" && hasLearningUpdate ? (
+                <span
+                  aria-label="表达库有新内容"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--lt-accent)]"
+                />
+              ) : null}
             </button>
           ))}
           <button
@@ -2462,7 +3186,7 @@ function ArchiveSidebar({
             key={item.id}
             type="button"
             onClick={() => toggleWorkspaceView(item.id)}
-            className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
+            className={`relative flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
               activeView === item.id
                 ? "bg-[var(--lt-accent-soft)] text-[var(--lt-accent)]"
                 : "text-[var(--lt-text)] hover:bg-[var(--lt-surface-hover)]"
@@ -2470,6 +3194,12 @@ function ArchiveSidebar({
           >
             <item.icon className="h-[18px] w-[18px] text-[var(--lt-muted)]" />
             {item.label}
+            {item.id === "library" && hasLearningUpdate ? (
+              <span
+                aria-label="表达库有新内容"
+                className="ml-auto h-2 w-2 rounded-full bg-[var(--lt-accent)]"
+              />
+            ) : null}
           </button>
         ))}
       </nav>
@@ -2549,6 +3279,7 @@ function InlineSetupControls({
         onBlur={commitTitle}
         onKeyDown={handleTitleKeyDown}
         className="max-w-[860px] whitespace-pre-wrap break-words font-serif text-[38px] font-normal leading-[1.18] text-[var(--lt-text)] outline-none empty:before:text-[var(--lt-faint)] empty:before:content-[attr(data-placeholder)]"
+        data-writing-title="true"
         data-placeholder="未命名写作"
       >
         {title}
@@ -2579,11 +3310,20 @@ function archiveDisplayTitle(item: WritingArchiveItem): string {
 function archiveSubtitle(item: WritingArchiveItem): string {
   const wordCount = countEnglishWords(item.text);
   const updated = formatArchiveTime(item.updatedAt);
-  return wordCount > 0 ? `${updated} · ${wordCount} 词` : updated;
+  const domain = archiveDomainLabel(item);
+  return [domain, updated, wordCount > 0 ? `${wordCount} 词` : ""].filter(Boolean).join(" · ");
 }
 
 function archiveDomain(item: WritingArchiveItem): WritingTopicArea {
   return item.setup?.topicArea ?? "custom";
+}
+
+function archiveDomainLabel(item: WritingArchiveItem): string {
+  const domain = archiveDomain(item);
+  if (domain === "custom") {
+    return item.setup?.customTopicArea?.trim() || DOMAIN_OPTIONS.find((option) => option.value === "custom")?.label || "自定义";
+  }
+  return DOMAIN_OPTIONS.find((option) => option.value === domain)?.label ?? domain;
 }
 
 function normalizeClassificationText(text: string): string {
@@ -2615,6 +3355,10 @@ function formatArchiveTime(value: string): string {
   if (Number.isNaN(date.getTime())) {
     return "刚刚";
   }
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return `今天 ${date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  }
   return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
 }
 
@@ -2626,7 +3370,6 @@ function withWritingSetupContext(previousContext: string, setup: WritingSetup | 
   const contextLines = [
     topicArea ? `写作领域: ${topicArea}` : "",
     setup.essayTopic ? `文章主题: ${setup.essayTopic}` : "",
-    setup.outlinePoints.length > 0 ? `用户大纲: ${setup.outlinePoints.join(" / ")}` : "",
   ].filter(Boolean);
   if (contextLines.length === 0) {
     return previousContext;

@@ -14,7 +14,10 @@ describe("WritingHabitsPanel", () => {
     expect(visual).toHaveAttribute("data-motion-library", "animejs");
     expect(screen.getByLabelText("修正节奏摘要")).toBeInTheDocument();
     expect(screen.getByLabelText("习惯频率摘要")).toBeInTheDocument();
-    expect(screen.queryByLabelText("写作习惯趋势图")).not.toBeInTheDocument();
+    const trendChart = screen.getByLabelText("写作习惯趋势图");
+    expect(trendChart).toHaveAttribute("data-habit-chart-state", "ready");
+    expect(within(trendChart).getByLabelText("5/11 20 次")).toBeInTheDocument();
+    expect(within(trendChart).getByText("20 次")).toBeInTheDocument();
 
     const insightList = screen.getByLabelText("写作习惯洞察列表");
     expect(insightList).toHaveAttribute("data-reactbits-reference", "animated-list");
@@ -35,6 +38,14 @@ describe("WritingHabitsPanel", () => {
     fireEvent.click(deleteButton);
 
     expect(onDeleteType).toHaveBeenCalledWith("chinese_transfer");
+  });
+
+  it("shows a readable empty state instead of a blank chart when there is no habit data", () => {
+    render(<WritingHabitsPanel events={[]} onDeleteType={vi.fn()} />);
+
+    const trendChart = screen.getByLabelText("写作习惯趋势图");
+    expect(trendChart).toHaveAttribute("data-habit-chart-state", "empty");
+    expect(screen.getByText("还没有近 7 天修正记录。")).toBeInTheDocument();
   });
 });
 

@@ -13,12 +13,13 @@ import {
 } from "@/lib/storage";
 
 function setEditorText(editor: HTMLElement, value: string) {
-  editor.textContent = value;
-  fireEvent.input(editor);
+  fireEvent.change(editor, {
+    target: { value, selectionStart: value.length, selectionEnd: value.length },
+  });
 }
 
 function expectEditorText(editor: HTMLElement, value: string) {
-  expect(editor).toHaveTextContent(value);
+  expect(editor).toHaveValue(value);
 }
 
 beforeEach(() => {
@@ -235,6 +236,8 @@ describe("LinguaType v0.2.7 editor shell", () => {
     if (!customNewest || !technologyOlder) {
       throw new Error("Expected archive buttons to be rendered.");
     }
+    expect(customNewest).toHaveTextContent("自定义 ·");
+    expect(customNewest).toHaveTextContent("3 词");
     expect(Boolean(customNewest.compareDocumentPosition(technologyOlder) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
 
     fireEvent.click(domainSelect);
@@ -327,11 +330,50 @@ describe("LinguaType v0.2.7 editor shell", () => {
     expectEditorText(await screen.findByLabelText("写作编辑器"), "Existing draft sentence.");
     fireEvent.click(screen.getByRole("button", { name: "表达库" }));
     expect(screen.getByRole("heading", { name: "表达库" })).toBeInTheDocument();
+    expect(screen.getByLabelText("表达库页面")).toHaveAttribute("data-motion-profile", "library-unified-rise");
+    expect(screen.getByLabelText("表达库内容动效")).toHaveAttribute("data-library-motion", "unified-rise");
 
     fireEvent.click(screen.getByRole("button", { name: "表达库" }));
 
     expect(screen.getByLabelText("表达库页面")).toHaveAttribute("data-motion-state", "exiting");
     await waitFor(() => expect(screen.getByLabelText("写作编辑器")).toBeInTheDocument());
+  });
+
+  it("uses one motion profile for Learning Library controls and list content", async () => {
+    localStorage.setItem(
+      LEARNING_LIBRARY_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: "library-motion-1",
+          type: "phrase",
+          content: "seize the strategic high ground",
+          chineseMeaning: "抢占制高点",
+          usageNote: "Used in business or technology writing.",
+          sourceSentence: "Major tech companies strive to achieve breakthroughs in core technologies.",
+          writingMode: "business",
+          createdAt: "2026-05-15T00:00:00.000Z",
+          updatedAt: "2026-05-15T00:00:00.000Z",
+          useCount: 1,
+          favorite: false,
+          tags: [],
+          difficultyLevel: 4,
+        },
+      ]),
+    );
+
+    render(<LinguaTypeApp />);
+
+    await screen.findByLabelText("写作编辑器");
+    fireEvent.click(screen.getByRole("button", { name: "表达库" }));
+
+    const controls = await screen.findByLabelText("表达库筛选控制区");
+    const list = screen.getByLabelText("表达库条目列表");
+    expect(controls).toHaveAttribute("data-library-motion-profile", "library-unified-rise");
+    expect(list).toHaveAttribute("data-library-motion-profile", "library-unified-rise");
+    expect(controls).toHaveAttribute("data-library-motion-duration", "420");
+    expect(list).toHaveAttribute("data-library-motion-duration", "420");
+    expect(controls).toHaveAttribute("data-library-motion-stagger", "32");
+    expect(list).toHaveAttribute("data-library-motion-stagger", "32");
   });
 
   it("collapses the writing archive sidebar without losing the current editor text", async () => {
@@ -475,7 +517,7 @@ describe("LinguaType v0.2.7 editor shell", () => {
     expect(localStorage.getItem(WRITING_ARCHIVES_STORAGE_KEY)).toBe(rawArchiveStorage);
   });
 
-  it("uses an immersive document flow with topic and outline headings while preserving paragraph joining", async () => {
+  it("uses one native long-text editor while keeping the document title in flow", async () => {
     localStorage.setItem(DRAFT_STORAGE_KEY, "Opening paragraph.\n\nSecond paragraph.");
     localStorage.setItem(
       WRITING_SETUP_STORAGE_KEY,
@@ -492,10 +534,10 @@ describe("LinguaType v0.2.7 editor shell", () => {
 
     expect(await screen.findByLabelText("沉浸式写作区")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "AI topic" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: /Context/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: /Counterpoint/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: /Context/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: /Counterpoint/ })).not.toBeInTheDocument();
 
-    setEditorText(screen.getByLabelText("第 2 段正文"), "Updated second paragraph.");
+    setEditorText(screen.getByLabelText("写作编辑器"), "Opening paragraph.\n\nUpdated second paragraph.");
 
     await waitFor(() => {
       const archives = JSON.parse(localStorage.getItem(WRITING_ARCHIVES_STORAGE_KEY) ?? "{}");

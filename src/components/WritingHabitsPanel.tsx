@@ -26,6 +26,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
   const maxTrendValue = Math.max(1, ...trendPoints.map((point) => point.value));
   const maxInsightCount = Math.max(1, ...insights.map((insight) => insight.count));
   const topInsight = insights[0] ?? null;
+  const hasTrendData = trendPoints.some((point) => point.value > 0);
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -88,19 +89,36 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
                 <span className="text-xs text-[var(--lt-muted)]">累计</span>
               </div>
             </div>
-            <div className="mt-6 grid grid-cols-7 items-end gap-3" aria-hidden="true">
-              {trendPoints.map((point) => (
-                <div key={point.label} className="grid gap-2">
-                  <div className="flex h-12 items-end border-b border-[var(--lt-border)]">
-                    <span
-                      data-habit-quiet-bar
-                      className="block w-full rounded-full bg-[var(--lt-text)]/30"
-                      style={{ height: `${Math.max(3, Math.round((point.value / maxTrendValue) * 42))}px` }}
-                    />
+            <div
+              aria-label="写作习惯趋势图"
+              data-habit-chart-state={hasTrendData ? "ready" : "empty"}
+              className="mt-6"
+            >
+              <div className="grid grid-cols-7 items-end gap-3">
+                {trendPoints.map((point) => (
+                  <div key={point.label} className="grid min-w-0 gap-2">
+                    <div className="flex h-16 items-end border-b border-[var(--lt-border)]">
+                      <span
+                        aria-label={`${point.label} ${point.value} 次`}
+                        data-habit-quiet-bar
+                        className="block w-full rounded-t-[4px]"
+                        style={{
+                          height: `${point.value > 0 ? Math.max(8, Math.round((point.value / maxTrendValue) * 52)) : 2}px`,
+                          backgroundColor: point.value > 0 ? "var(--lt-accent)" : "var(--lt-border)",
+                          opacity: point.value > 0 ? 0.78 : 1,
+                        }}
+                      />
+                    </div>
+                    <span className="truncate text-center text-[10px] text-[var(--lt-faint)]">{point.label}</span>
+                    <span className="min-h-4 truncate text-center text-[10px] text-[var(--lt-muted)]">
+                      {point.value > 0 ? `${point.value} 次` : ""}
+                    </span>
                   </div>
-                  <span className="truncate text-center text-[10px] text-[var(--lt-faint)]">{point.label}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+              {!hasTrendData ? (
+                <p className="mt-3 text-xs text-[var(--lt-muted)]">还没有近 7 天修正记录。</p>
+              ) : null}
             </div>
           </div>
 

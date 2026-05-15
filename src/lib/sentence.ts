@@ -6,6 +6,16 @@ export type SentenceRange = {
   end: number;
 };
 
+export type ChinesePlaceholder = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+export type ChinesePlaceholderSentenceRange = SentenceRange & {
+  placeholders: ChinesePlaceholder[];
+};
+
 export type ParagraphRange = {
   paragraph: string;
   start: number;
@@ -30,6 +40,26 @@ export function containsChinese(text: string): boolean {
 
 function isSentenceBoundary(char: string): boolean {
   return SENTENCE_BOUNDARIES.has(char);
+}
+
+export function endsWithSentenceBoundary(text: string): boolean {
+  return /[.!?;。？！；]\s*$|\n\s*$/u.test(text);
+}
+
+export function detectChinesePlaceholders(text: string): ChinesePlaceholder[] {
+  const placeholders: ChinesePlaceholder[] = [];
+  const pattern = /[\u3400-\u9fff]+(?:[\s、，：；。！？]*[\u3400-\u9fff]+)*/gu;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    placeholders.push({
+      text: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+
+  return placeholders;
 }
 
 export function extractLatestSentence(fullText: string): SentenceRange {
@@ -62,6 +92,121 @@ export function extractLatestSentence(fullText: string): SentenceRange {
     start,
     end: detectionEnd,
   };
+}
+
+export function extractCurrentSentence(fullText: string, cursorPosition = fullText.length): SentenceRange {
+  const detectionText = fullText.replace(/\s+$/u, "");
+  const detectionEnd = detectionText.length;
+
+  if (detectionEnd === 0) {
+    return { sentence: "", start: 0, end: 0 };
+  }
+
+  let cursor = Number.isFinite(cursorPosition) ? cursorPosition : detectionEnd;
+  cursor = Math.max(0, Math.min(cursor, detectionEnd));
+
+  let sentenceEnd = cursor;
+  const previousChar = sentenceEnd > 0 ? fullText[sentenceEnd - 1] : "";
+  let leftSearchIndex = isSentenceBoundary(previousChar) ? sentenceEnd - 2 : sentenceEnd - 1;
+
+  if (!isSentenceBoundary(previousChar)) {
+    let rightSearchIndex = sentenceEnd;
+    while (rightSearchIndex < detectionEnd) {
+      if (isSentenceBoundary(fullText[rightSearchIndex])) {
+        sentenceEnd = rightSearchIndex + 1;
+        break;
+      }
+      rightSearchIndex += 1;
+    }
+    if (rightSearchIndex >= detectionEnd) {
+      sentenceEnd = detectionEnd;
+    }
+  }
+
+  let boundaryIndex = -1;
+  while (leftSearchIndex >= 0) {
+    if (isSentenceBoundary(fullText[leftSearchIndex])) {
+      boundaryIndex = leftSearchIndex;
+      break;
+    }
+    leftSearchIndex -= 1;
+  }
+
+  let start = boundaryIndex + 1;
+  while (start < sentenceEnd && /\s/u.test(fullText[start])) {
+    start += 1;
+  }
+
+  return {
+    sentence: fullText.slice(start, sentenceEnd),
+    start,
+    end: sentenceEnd,
+  };
+}
+
+export function extractChinesePlaceholderSentence(
+  fullText: string,
+  cursorPosition = fullText.length,
+): ChinesePlaceholderSentenceRange | null {
+  const range = extractCurrentSentence(fullText, cursorPosition);
+  const placeholders = detectChinesePlaceholders(range.sentence).map((placeholder) => ({
+    ...placeholder,
+    start: range.start + placeholder.start,
+    end: range.start + placeholder.end,
+  }));
+
+  if (range.sentence.trim().length === 0 || placeholders.length === 0) {
+    return null;
+  }
+
+  return {
+    ...range,
+    placeholders,
+  };
+}
+
+export function extractChinesePlaceholderSentences(fullText: string): ChinesePlaceholderSentenceRange[] {
+  const ranges: ChinesePlaceholderSentenceRange[] = [];
+  let rawStart = 0;
+
+  for (let index = 0; index < fullText.length; index += 1) {
+    if (!isSentenceBoundary(fullText[index])) {
+      continue;
+    }
+
+    const rawEnd = index + 1;
+    addChinesePlaceholderSentenceRange(ranges, fullText, rawStart, rawEnd);
+    rawStart = rawEnd;
+  }
+
+  return ranges;
+}
+
+function addChinesePlaceholderSentenceRange(
+  ranges: ChinesePlaceholderSentenceRange[],
+  fullText: string,
+  rawStart: number,
+  rawEnd: number,
+) {
+  let start = rawStart;
+  let end = rawEnd;
+  while (start < end && /\s/u.test(fullText[start])) {
+    start += 1;
+  }
+  while (end > start && /\s/u.test(fullText[end - 1]) && fullText[end - 1] !== "\n") {
+    end -= 1;
+  }
+
+  const sentence = fullText.slice(start, end);
+  const placeholders = detectChinesePlaceholders(sentence).map((placeholder) => ({
+    ...placeholder,
+    start: start + placeholder.start,
+    end: start + placeholder.end,
+  }));
+
+  if (sentence.trim() && placeholders.length > 0 && endsWithSentenceBoundary(sentence)) {
+    ranges.push({ sentence, start, end, placeholders });
+  }
 }
 
 export function replaceLatestSentence(

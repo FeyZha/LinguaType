@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { BookOpenIcon, SparklesIcon } from "./HeroIcons";
+import { useRef, useState } from "react";
+import { BookOpenIcon, ClipboardDocumentIcon, SparklesIcon } from "./HeroIcons";
 import { useDismissableLayer } from "./useDismissableLayer";
 import type { SelectionExplainResult } from "@/lib/llm/types";
 
@@ -29,24 +29,23 @@ export function SelectionActionsPopover({
   onClose,
 }: SelectionActionsPopoverProps) {
   const layerRef = useRef<HTMLElement | null>(null);
+  const [copyMessage, setCopyMessage] = useState("");
   useDismissableLayer(layerRef, onClose, true);
-  const showPanel = requested || isLoading || Boolean(explanation) || Boolean(message);
 
-  if (!showPanel) {
-    return (
-      <button
-        type="button"
-        onClick={onExplain}
-        aria-label="解释选中内容"
-        ref={(element) => {
-          layerRef.current = element;
-        }}
-        className="absolute z-30 grid h-9 w-9 place-items-center rounded-full bg-[var(--lt-text)] text-[var(--lt-bg)] shadow-[0_12px_32px_var(--lt-shadow-strong)] transition hover:opacity-90"
-        style={{ left: position?.left ?? 16, top: position?.top ?? 16 }}
-      >
-        <SparklesIcon className="h-4 w-4" />
-      </button>
-    );
+  const showPanel = requested || isLoading || Boolean(explanation) || Boolean(message) || Boolean(copyMessage);
+
+  async function copySelectedText() {
+    if (!navigator.clipboard?.writeText) {
+      setCopyMessage("当前浏览器不支持直接复制");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(selectedText);
+      setCopyMessage("已复制选中文本");
+    } catch {
+      setCopyMessage("复制失败");
+    }
   }
 
   return (
@@ -54,58 +53,79 @@ export function SelectionActionsPopover({
       ref={(element) => {
         layerRef.current = element;
       }}
-      className="absolute z-30 w-[min(380px,calc(100%-2rem))] rounded-lg bg-[var(--lt-menu-bg)] p-4 text-[var(--lt-text)] shadow-[0_16px_48px_var(--lt-shadow-strong)] ring-1 ring-[var(--lt-border)]"
+      aria-label="选中文本功能条"
+      data-selection-toolbar="true"
+      className={`absolute z-30 text-[var(--lt-text)] shadow-[0_16px_48px_var(--lt-shadow-strong)] ring-1 ring-[var(--lt-border)] ${
+        showPanel
+          ? "w-[min(380px,calc(100%-2rem))] rounded-lg bg-[var(--lt-menu-bg)] p-4"
+          : "inline-flex rounded-[7px] bg-[var(--lt-menu-bg)] p-1"
+      }`}
       style={{ left: position?.left ?? 16, top: position?.top ?? 16 }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">解释选中内容</h2>
-          <p className="mt-1 break-words text-xs text-[var(--lt-muted)]">{selectedText}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="关闭选中文本操作"
-          className="rounded-md bg-[var(--lt-surface-soft)] px-2 py-1 text-xs text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
-        >
-          Esc
-        </button>
-      </div>
-      {!explanation ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+      <div className={showPanel ? "flex items-start justify-between gap-3" : "flex items-center gap-1"}>
+        {showPanel ? (
+          <div>
+            <h2 className="text-sm font-semibold">解释选中内容</h2>
+            <p className="mt-1 break-words text-xs text-[var(--lt-muted)]">{selectedText}</p>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={onExplain}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-md bg-[var(--lt-text)] px-3 py-2 text-sm font-medium text-[var(--lt-bg)] transition opacity-95 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-45"
+            aria-label="解释选中内容"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
           >
             <SparklesIcon className="h-4 w-4" />
-            {isLoading ? "正在解释..." : "开始解释"}
+            <span>{isLoading ? "解释中" : "解释"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            aria-label="保存到表达库"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
+          >
+            <BookOpenIcon className="h-4 w-4" />
+            <span>保存</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void copySelectedText()}
+            aria-label="复制选中文本"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
+          >
+            <ClipboardDocumentIcon className="h-4 w-4" />
+            <span>复制</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭选中文本操作"
+            className="rounded-md px-2 py-1.5 text-sm text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
+          >
+            Esc
           </button>
         </div>
+      </div>
+
+      {showPanel ? (
+        <>
+          {isLoading ? <p className="mt-3 text-sm text-[var(--lt-muted)]">正在解释选中文本...</p> : null}
+          {explanation ? (
+            <div className="mt-3 grid gap-3 text-sm text-[var(--lt-muted)]">
+              <ExplainBlock title="含义" body={explanation.meaningZh} />
+              <ExplainBlock title="用法" body={explanation.usageNoteZh} />
+              <ExplainBlock title="语境作用" body={explanation.contextRoleZh || "结合当前上下文理解这个表达的作用。"} />
+              <ExplainBlock title="表达类型" body={expressionTypeLabel(explanation.expressionType)} />
+            </div>
+          ) : null}
+        </>
       ) : null}
-      {isLoading ? <p className="mt-3 text-sm text-[var(--lt-muted)]">正在解释选中文本...</p> : null}
-      {explanation ? (
-        <div className="mt-3 grid gap-3 text-sm text-[var(--lt-muted)]">
-          <ExplainBlock title="含义" body={explanation.meaningZh} />
-          <ExplainBlock title="用法" body={explanation.usageNoteZh} />
-          <ExplainBlock title="语境作用" body={explanation.contextRoleZh || "结合当前上下文理解这个表达的作用。"} />
-          <ExplainBlock title="表达类型" body={expressionTypeLabel(explanation.expressionType)} />
-        </div>
-      ) : null}
-      {explanation ? (
-        <button
-          type="button"
-          onClick={onSave}
-          className="mt-4 inline-flex items-center gap-2 rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-sm text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
-        >
-          <BookOpenIcon className="h-4 w-4" />
-          保存到表达库
-        </button>
-      ) : null}
-      {message ? (
-        <p className="mt-3 rounded-md bg-emerald-500/[0.08] px-3 py-2 text-sm text-emerald-900">
-          {message}
+
+      {message || copyMessage ? (
+        <p className="mt-3 rounded-md bg-emerald-500/[0.08] px-3 py-2 text-sm text-emerald-900 dark:text-emerald-200">
+          {message || copyMessage}
         </p>
       ) : null}
     </section>

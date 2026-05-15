@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   containsChinese,
   createWordDiff,
+  detectChinesePlaceholders,
+  endsWithSentenceBoundary,
+  extractChinesePlaceholderSentence,
+  extractChinesePlaceholderSentences,
   extractCurrentParagraph,
+  extractCurrentSentence,
   extractLatestSentence,
   getCurrentParagraph,
   getPreviousContext,
@@ -30,6 +35,53 @@ describe("latest sentence utilities", () => {
     const result = extractLatestSentence(text);
     expect(result.sentence).toBe("Many student believe AI can \u63d0\u9ad8\u5b66\u4e60\u6548\u7387");
     expect(text.slice(result.start, result.end)).toBe(result.sentence);
+  });
+
+  it("extracts the sentence around the cursor instead of forcing the last sentence", () => {
+    const text = "First sentence. I found that many students lack 自主学习能力. Final sentence.";
+    const cursor = text.indexOf("自主学习能力") + "自主学习能力".length;
+    const result = extractCurrentSentence(text, cursor);
+
+    expect(result.sentence).toBe("I found that many students lack 自主学习能力.");
+    expect(text.slice(result.start, result.end)).toBe(result.sentence);
+  });
+
+  it("detects Chinese placeholders inside the current sentence", () => {
+    const text = "Last week, I joined a project. I found that many students lack 自主学习能力.";
+    const result = extractChinesePlaceholderSentence(text, text.length);
+
+    expect(result?.sentence).toBe("I found that many students lack 自主学习能力.");
+    expect(result?.placeholders).toEqual([
+      {
+        text: "自主学习能力",
+        start: text.indexOf("自主学习能力"),
+        end: text.indexOf("自主学习能力") + "自主学习能力".length,
+      },
+    ]);
+  });
+
+  it("extracts all complete Chinese placeholder sentences without touching unfinished text", () => {
+    const text =
+      "I found that many students lack \u81ea\u4e3b\u5b66\u4e60\u80fd\u529b. This may \u5f71\u54cd young people's values. One unfinished \u7247\u6bb5";
+    const results = extractChinesePlaceholderSentences(text);
+
+    expect(results.map((result) => result.sentence)).toEqual([
+      "I found that many students lack \u81ea\u4e3b\u5b66\u4e60\u80fd\u529b.",
+      "This may \u5f71\u54cd young people's values.",
+    ]);
+    expect(results.every((result) => text.slice(result.start, result.end) === result.sentence)).toBe(true);
+  });
+
+  it("keeps adjacent Chinese words in one lightweight placeholder unit", () => {
+    const result = detectChinesePlaceholders("This may 影响 young people's 学习 动力.");
+
+    expect(result.map((placeholder) => placeholder.text)).toEqual(["影响", "学习 动力"]);
+  });
+
+  it("recognizes punctuation and newline as sentence completion boundaries", () => {
+    expect(endsWithSentenceBoundary("This affects 学习效率.")).toBe(true);
+    expect(endsWithSentenceBoundary("This affects 学习效率\n")).toBe(true);
+    expect(endsWithSentenceBoundary("This affects 学习效率")).toBe(false);
   });
 
   it("uses newlines as sentence boundaries", () => {
