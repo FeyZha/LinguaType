@@ -78,7 +78,8 @@ describe("storage constants", () => {
   it("defaults to JSON mode off and enough tokens for structured responses", () => {
     const settings = defaultApiSettings();
     expect(settings.supportsJsonMode).toBe(false);
-    expect(settings.maxTokens).toBeGreaterThanOrEqual(1600);
+    expect(settings.maxTokens).toBe(20000);
+    expect(settings.mockMode).toBe(false);
   });
 });
 
@@ -259,7 +260,7 @@ describe("v0.2.2  storage", () => {
     expect(loaded.inlineExpressionMenuTrigger).toBe("ctrl_k");
     expect(loaded.popoverBehavior).toEqual({
       autoCloseAfterApply: true,
-      escapeCloses: false,
+      escapeCloses: true,
       suppressLargePanelAutoOpen: true,
     });
 
@@ -402,7 +403,8 @@ describe("learning library storage", () => {
 
     expect(filterLearningLibrary(items, { query: "知识" }).map((item) => item.id)).toEqual(["b"]);
     expect(filterLearningLibrary(items, { type: "phrase" }).map((item) => item.id)).toEqual(["a"]);
-    expect(filterLearningLibrary(items, { writingMode: "academic" }).map((item) => item.id)).toEqual(["b"]);
+    expect(filterLearningLibrary(items, { writingMode: "academic" }).map((item) => item.id)).toEqual(["b", "a"]);
+    expect(filterLearningLibrary(items, { difficultyLevel: 3 }).map((item) => item.id)).toEqual([]);
     expect(filterLearningLibrary(items, { favoriteOnly: true }).map((item) => item.id)).toEqual(["b"]);
     expect(filterLearningLibrary(items, { sortBy: "useCount" }).map((item) => item.id)).toEqual(["a", "b"]);
     expect(filterLearningLibrary(items, { sortBy: "updatedAt" }).map((item) => item.id)).toEqual(["b", "a"]);
@@ -501,7 +503,7 @@ describe("correction events and writing habits", () => {
     expect(result).toEqual([]);
   });
 
-  it("aggregates correction events into writing habits instead of raw issue logs", () => {
+  it("aggregates correction events into writing habits with 10/30 count thresholds instead of raw issue logs", () => {
     const items: CorrectionEvent[] = [
       {
         id: "grammar-1",
@@ -513,7 +515,19 @@ describe("correction events and writing habits", () => {
         writingMode: "natural",
         createdAt: now,
         updatedAt: now,
-        useCount: 1,
+        useCount: 10,
+      },
+      {
+        id: "word-order-1",
+        before: "innovation speed",
+        after: "the speed of innovation",
+        type: "word_order",
+        reason: "Use a natural noun phrase.",
+        sourceSentence: "The speed of innovation matters.",
+        writingMode: "natural",
+        createdAt: now,
+        updatedAt: "2026-05-12T04:00:00.000Z",
+        useCount: 11,
       },
       {
         id: "collocation-1",
@@ -525,7 +539,7 @@ describe("correction events and writing habits", () => {
         writingMode: "academic",
         createdAt: now,
         updatedAt: now,
-        useCount: 3,
+        useCount: 20,
       },
       {
         id: "collocation-2",
@@ -537,7 +551,7 @@ describe("correction events and writing habits", () => {
         writingMode: "academic",
         createdAt: now,
         updatedAt: "2026-05-12T03:00:00.000Z",
-        useCount: 2,
+        useCount: 11,
       },
     ];
 
@@ -546,11 +560,12 @@ describe("correction events and writing habits", () => {
     expect(insights[0]).toMatchObject({
       type: "collocation",
       titleZh: "搭配问题",
-      count: 5,
+      count: 31,
       severity: "high",
     });
     expect(insights[0].examples).toHaveLength(2);
-    expect(insights[1]).toMatchObject({ type: "other", count: 1, severity: "low" });
+    expect(insights[1]).toMatchObject({ type: "word_order", count: 11, severity: "medium" });
+    expect(insights[2]).toMatchObject({ type: "other", count: 10, severity: "low" });
     expect(JSON.parse(exportWritingHabitsJson(items))[0].type).toBe("collocation");
   });
 });

@@ -5,6 +5,7 @@ import type {
   ParagraphCheckInput,
   ParagraphHealthInput,
   OutlineCheckInput,
+  ClassifyWritingDomainInput,
   SelectionExplainInput,
 } from "./types";
 
@@ -151,6 +152,18 @@ Rules:
 7. Return valid JSON only.
 8. Do not include Markdown or HTML.`;
 
+export const WRITING_DOMAIN_CLASSIFIER_SYSTEM_PROMPT = `You are LinguaType's low-frequency writing domain classifier.
+
+Classify the user's writing into one of the allowed preset domains only.
+
+Rules:
+1. Do not rewrite the text.
+2. Do not generate article content.
+3. Do not judge essay quality.
+4. Use custom when the domain is unclear or mixed.
+5. Return valid JSON only.
+6. Do not include Markdown or HTML.`;
+
 export function buildFastEnhancementUserPrompt(input: FastEnhanceInput): string {
   return `Input variables:
 Writing mode: ${input.writingMode}
@@ -206,7 +219,8 @@ Return JSON exactly in this shape:
       "type": "phrase | collocation | sentence_pattern",
       "content": "...",
       "chineseMeaning": "...",
-      "usageNote": "simple Chinese note"
+      "usageNote": "simple Chinese note",
+      "difficultyLevel": 1
     }
   ],
   "correctionEvents": [
@@ -221,6 +235,7 @@ Return JSON exactly in this shape:
 
 Important:
 - Extract from the applied original/final sentence pair only.
+- difficultyLevel must be an integer from 1 to 5. Use 1 for very common beginner expressions and 5 for advanced academic or idiomatic usage.
 - Do not revise the sentence again.
 - Do not include any revised sentence field.
 - Skip empty or meaningless items.
@@ -394,5 +409,34 @@ Important:
 - Check only whether the outline supports the essay topic.
 - Do not write topic sentences, body paragraphs, or examples for the user.
 - If no issue is found, set hasIssues to false and suggestionsZh to [].
+- Return only JSON.`;
+}
+
+export function buildWritingDomainClassifierUserPrompt(input: ClassifyWritingDomainInput): string {
+  return `Input variables:
+Title: ${input.title}
+Outline points: ${(input.outlinePoints ?? []).join(" / ")}
+Full text: ${input.fullText}
+
+Allowed domains:
+- technology
+- personal_growth
+- history
+- art
+- education
+- society
+- environment
+- business
+- custom
+
+Return JSON exactly in this shape:
+{
+  "topicArea": "technology | personal_growth | history | art | education | society | environment | business | custom",
+  "confidence": 0.5
+}
+
+Important:
+- Choose only one value from allowed domains.
+- If the writing is too short, unclear, or mixed, return custom.
 - Return only JSON.`;
 }

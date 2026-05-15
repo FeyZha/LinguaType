@@ -41,53 +41,58 @@ export function NextExpressionToolbox({ history, writingMode, onInsert }: NextEx
   const recalled = useMemo(() => recallLearningItems(history, writingMode).slice(0, 4), [history, writingMode]);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4">
+    <section className="text-[#1c1c1c]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">表达工具箱 Expression Toolbox</h2>
-          <p className="mt-1 text-xs text-slate-500">先选择写作意图，再插入合适的表达。</p>
+          <h2 className="text-base font-semibold text-[#1c1c1c]">表达工具箱 Expression Toolbox</h2>
+          <p className="mt-1 text-xs leading-5 text-[#1c1c1c]/50">先选择写作意图，再插入合适的表达。</p>
         </div>
-        <span className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-500">LLM 未调用</span>
+        <span className="rounded-md bg-black/[0.035] px-2 py-1 text-xs text-[#1c1c1c]/45">LLM 未调用</span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
         {INTENTIONS.map((intention) => (
           <button
             type="button"
             key={intention.value}
             onClick={() => setSelected(intention.value)}
-            className={`rounded-md border px-2.5 py-1.5 text-xs ${
+            className={`rounded-md px-2.5 py-1.5 text-xs transition ${
               selected === intention.value
-                ? "border-moss bg-moss text-white"
-                : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                ? "bg-[#1c1c1c] text-[#fcfbf8]"
+                : "bg-black/[0.035] text-[#1c1c1c]/65 hover:bg-black/[0.06] hover:text-[#1c1c1c]"
             }`}
           >
             {intention.label}
           </button>
         ))}
       </div>
-      <div className="mt-3 space-y-2">
+
+      <div className="mt-4 space-y-2">
         {TEMPLATES[selected].map((template) => (
           <button
             type="button"
             key={template}
             onClick={() => onInsert(template)}
-            className="block w-full rounded-md bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-skysoft/60"
+            className="block w-full rounded-md bg-black/[0.025] px-3 py-2 text-left text-sm text-[#1c1c1c]/72 transition hover:bg-black/[0.05] hover:text-[#1c1c1c]"
           >
             {template}
           </button>
         ))}
       </div>
+
       {recalled.length > 0 ? (
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">条件召回 Conditional recall</h3>
-          <p className="mt-2 text-xs text-slate-500">{selectedMeta.condition}</p>
+        <div className="mt-5 pt-1">
+          <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[#1c1c1c]/40">
+            条件召回 Conditional recall
+          </h3>
+          <p className="mt-2 text-xs leading-5 text-[#1c1c1c]/50">{selectedMeta.condition}</p>
           <div className="mt-2 space-y-2">
             {recalled.map((item) => (
               <button
                 type="button"
                 key={item.id}
                 onClick={() => onInsert(item.content)}
-                className="block w-full rounded-md bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-skysoft/60"
+                className="block w-full rounded-md bg-black/[0.025] px-3 py-2 text-left text-sm text-[#1c1c1c]/72 transition hover:bg-black/[0.05] hover:text-[#1c1c1c]"
               >
                 {item.content}
               </button>

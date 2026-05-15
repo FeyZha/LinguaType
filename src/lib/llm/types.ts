@@ -59,6 +59,7 @@ export const learningItemDraftSchema = z.object({
   content: z.string(),
   chineseMeaning: z.string(),
   usageNote: z.string(),
+  difficultyLevel: z.number().int().min(1).max(5).optional(),
   tags: z.array(z.string()).optional(),
   topic: z.string().optional(),
 });
@@ -310,3 +311,31 @@ export const outlineCheckResultSchema = z.object({
   suggestionsZh: z.array(z.string()),
 });
 export type OutlineCheckResult = z.infer<typeof outlineCheckResultSchema>;
+
+export const writingDomainSchema = z.enum([
+  "technology",
+  "personal_growth",
+  "history",
+  "art",
+  "education",
+  "society",
+  "environment",
+  "business",
+  "custom",
+]);
+export type WritingDomain = z.infer<typeof writingDomainSchema>;
+
+export const classifyWritingDomainRequestSchema = z.object({
+  title: z.string(),
+  fullText: z.string(),
+  outlinePoints: z.array(z.string()).optional().default([]),
+  allowedDomains: z.array(writingDomainSchema),
+  apiConfig: apiConfigSchema,
+});
+export type ClassifyWritingDomainInput = z.infer<typeof classifyWritingDomainRequestSchema>;
+
+export const classifyWritingDomainResultSchema = z.object({
+  topicArea: writingDomainSchema,
+  confidence: z.number().min(0).max(1).optional().default(0.5),
+});
+export type ClassifyWritingDomainResult = z.infer<typeof classifyWritingDomainResultSchema>;

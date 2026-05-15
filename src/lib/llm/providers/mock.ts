@@ -8,8 +8,11 @@ import {
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
   normalizeSelectionExplainResult,
+  normalizeWritingDomainResult,
 } from "../normalize";
 import type {
+  ClassifyWritingDomainInput,
+  ClassifyWritingDomainResult,
   CorrectionDraft,
   CorrectionEventDraft,
   EnhanceLatestSentenceInput,
@@ -149,6 +152,7 @@ export async function extractLearningWithMockProvider(
       content: item.after,
       chineseMeaning: item.before,
       usageNote: item.reason,
+      difficultyLevel: item.type === "collocation" ? 3 : 2,
     })),
     correctionEvents: used.map((item) => ({
       before: item.before,
@@ -194,6 +198,7 @@ export async function enhanceWithMockProvider(
       content: item.after,
       chineseMeaning: item.before,
       usageNote: item.reason,
+      difficultyLevel: item.type === "collocation" ? 3 : 2,
     })),
   };
 
@@ -287,6 +292,25 @@ export async function explainSelectionWithMockProvider(
     },
     selectedText,
   );
+}
+
+export async function classifyWritingDomainWithMockProvider(
+  input: ClassifyWritingDomainInput,
+): Promise<ClassifyWritingDomainResult> {
+  const corpus = `${input.title} ${input.outlinePoints?.join(" ") ?? ""} ${input.fullText}`.toLowerCase();
+  if (/\b(ai|software|database|technology|tech|app|algorithm|digital)\b/u.test(corpus)) {
+    return normalizeWritingDomainResult({ topicArea: "technology", confidence: 0.74 });
+  }
+  if (/\b(student|education|school|teacher|learning|academic)\b/u.test(corpus)) {
+    return normalizeWritingDomainResult({ topicArea: "education", confidence: 0.72 });
+  }
+  if (/\b(environment|climate|pollution|carbon|nature)\b/u.test(corpus)) {
+    return normalizeWritingDomainResult({ topicArea: "environment", confidence: 0.72 });
+  }
+  if (/\b(company|market|business|consumer|brand)\b/u.test(corpus)) {
+    return normalizeWritingDomainResult({ topicArea: "business", confidence: 0.7 });
+  }
+  return normalizeWritingDomainResult({ topicArea: "custom", confidence: 0.45 });
 }
 
 function mapCorrectionEventType(item: CorrectionDraft): CorrectionEventDraft["type"] {

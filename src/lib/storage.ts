@@ -58,6 +58,9 @@ export type WritingArchiveItem = {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt?: string;
+  topicAreaSource?: "auto" | "manual";
+  topicAreaClassifiedAt?: string;
+  topicAreaClassifiedText?: string;
 };
 
 export type WritingArchivesState = {
@@ -99,9 +102,12 @@ export type LearningLibraryFilters = {
   query?: string;
   type?: LearningItemType | "all";
   writingMode?: WritingMode | "all";
+  difficultyLevel?: LearningItemDifficulty | "all";
   favoriteOnly?: boolean;
   sortBy?: "updatedAt" | "useCount";
 };
+
+export type LearningItemDifficulty = 1 | 2 | 3 | 4 | 5;
 
 export function defaultApiSettings(): ApiConfig {
   return {
@@ -111,9 +117,9 @@ export function defaultApiSettings(): ApiConfig {
     apiKey: "",
     model: "",
     temperature: 0.2,
-    maxTokens: 1800,
+    maxTokens: 20000,
     supportsJsonMode: false,
-    mockMode: true,
+    mockMode: false,
   };
 }
 
@@ -134,7 +140,7 @@ export function defaultTriggerSettings(): TriggerSettings {
 
 export function defaultWritingSetup(now = new Date().toISOString()): WritingSetup {
   return {
-    topicArea: "technology",
+    topicArea: "custom",
     essayTopic: "",
     outlinePoints: ["", "", ""],
     outline: "",
@@ -327,6 +333,7 @@ export function upsertLearningItems(
       favorite: false,
       tags: item.tags ?? [],
       topic: item.topic,
+      difficultyLevel: normalizeDifficulty(item.difficultyLevel),
     });
   }
 
@@ -441,7 +448,11 @@ export function filterLearningLibrary(
       if (filters.type && filters.type !== "all" && item.type !== filters.type) {
         return false;
       }
-      if (filters.writingMode && filters.writingMode !== "all" && item.writingMode !== filters.writingMode) {
+      if (
+        filters.difficultyLevel &&
+        filters.difficultyLevel !== "all" &&
+        item.difficultyLevel !== filters.difficultyLevel
+      ) {
         return false;
       }
       if (filters.favoriteOnly && !item.favorite) {
@@ -476,13 +487,13 @@ export function aggregateWritingHabits(events: CorrectionEvent[]): WritingHabitI
     .map(([type, group]) => {
       const count = group.reduce((sum, event) => sum + Math.max(1, event.useCount), 0);
       const sortedExamples = [...group].sort(
-        (a, b) => b.useCount - a.useCount || b.updatedAt.localeCompare(a.updatedAt),
+        (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.useCount - a.useCount,
       );
       const updatedAt = sortedExamples.reduce(
         (latest, event) => (event.updatedAt > latest ? event.updatedAt : latest),
         sortedExamples[0]?.updatedAt ?? new Date().toISOString(),
       );
-      const severity: WritingHabitInsight["severity"] = count >= 5 ? "high" : count >= 3 ? "medium" : "low";
+      const severity: WritingHabitInsight["severity"] = count >= 31 ? "high" : count >= 11 ? "medium" : "low";
       const meta = WRITING_HABIT_META[type];
 
       return {
@@ -604,9 +615,7 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
       autoCloseAfterApply: typeof popoverBehavior.autoCloseAfterApply === "boolean"
         ? popoverBehavior.autoCloseAfterApply
         : defaults.popoverBehavior.autoCloseAfterApply,
-      escapeCloses: typeof popoverBehavior.escapeCloses === "boolean"
-        ? popoverBehavior.escapeCloses
-        : defaults.popoverBehavior.escapeCloses,
+      escapeCloses: true,
       suppressLargePanelAutoOpen: typeof popoverBehavior.suppressLargePanelAutoOpen === "boolean"
         ? popoverBehavior.suppressLargePanelAutoOpen
         : defaults.popoverBehavior.suppressLargePanelAutoOpen,
@@ -617,7 +626,7 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
 function normalizeWritingSetup(value: Record<string, unknown>): WritingSetup {
   const defaults = defaultWritingSetup();
   const topicArea = isWritingTopicArea(value.topicArea) ? value.topicArea : defaults.topicArea;
-  const customTopicArea = stringOr(value.customTopicArea, "").trim();
+  const customTopicArea = value.topicArea === "custom" ? stringOr(value.customTopicArea, "").trim() : "";
   const outlinePoints = normalizeOutlinePoints(value.outlinePoints, stringOr(value.outline, ""));
   const outline = outlinePoints.join("\n");
   return {
@@ -652,6 +661,9 @@ function normalizeWritingArchiveItem(value: Record<string, unknown>): WritingArc
     createdAt,
     updatedAt: stringOr(value.updatedAt, createdAt),
     lastOpenedAt: typeof value.lastOpenedAt === "string" ? value.lastOpenedAt : undefined,
+    topicAreaSource: isTopicAreaSource(value.topicAreaSource) ? value.topicAreaSource : undefined,
+    topicAreaClassifiedAt: typeof value.topicAreaClassifiedAt === "string" ? value.topicAreaClassifiedAt : undefined,
+    topicAreaClassifiedText: typeof value.topicAreaClassifiedText === "string" ? value.topicAreaClassifiedText : undefined,
   };
 }
 
@@ -692,6 +704,7 @@ function normalizeLearningItem(item: Record<string, unknown>, fallbackNow?: stri
     favorite: typeof item.favorite === "boolean" ? item.favorite : false,
     tags: Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : [],
     topic: typeof item.topic === "string" ? item.topic : undefined,
+    difficultyLevel: normalizeDifficulty(item.difficultyLevel),
   };
 }
 
@@ -818,6 +831,20 @@ function isWritingTopicArea(value: unknown): value is WritingTopicArea {
     value === "business" ||
     value === "custom"
   );
+}
+
+function isTopicAreaSource(value: unknown): value is "auto" | "manual" {
+  return value === "auto" || value === "manual";
+}
+
+function normalizeDifficulty(value: unknown): LearningItemDifficulty {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const normalized = Math.floor(value);
+    if (normalized >= 1 && normalized <= 5) {
+      return normalized as LearningItemDifficulty;
+    }
+  }
+  return 3;
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {

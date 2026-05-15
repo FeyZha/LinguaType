@@ -1,6 +1,6 @@
 {
   "name": "linguatype",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,6 +10,7 @@
     "test": "node scripts/run-vitest.mjs"
   },
   "dependencies": {
+    "animejs": "^4.4.1",
     "diff": "^5.2.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
