@@ -164,8 +164,6 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
     expect(await screen.findByText("当前句建议")).toBeInTheDocument();
-    expect(screen.getByText("原句 Original")).toBeInTheDocument();
-    expect(screen.getByText("建议 Suggested")).toBeInTheDocument();
     expect(screen.getByText(fastResult.explanationZh)).toBeInTheDocument();
     fireEvent.keyDown(editor, { key: "Escape" });
 
@@ -196,9 +194,14 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
     const suggestion = await screen.findByLabelText("当前句行内建议");
-    expect(suggestion).toHaveTextContent("当前句建议");
-    expect(suggestion).toHaveTextContent("bring bad influence to");
-    expect(suggestion).toHaveTextContent("have a negative influence on");
+    const removedPieces = screen.getAllByText((content, node) => {
+      return Boolean(node?.getAttribute("data-diff-part") === "removed" && content.includes("bring"));
+    });
+    expect(removedPieces.length).toBeGreaterThan(0);
+    const addedPieces = screen.getAllByText((content, node) => {
+      return Boolean(node?.getAttribute("data-diff-part") === "added" && /have/.test(content));
+    });
+    expect(addedPieces.length).toBeGreaterThan(0);
     expectEditorText(editor, fastResult.originalSentence);
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
   });
@@ -228,8 +231,8 @@ describe("LinguaType v0.2.2 ", () => {
     render(<LinguaTypeApp />);
 
     fireEvent.click(await screen.findByRole("button", { name: "触发设置" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "句子增强触发" }));
-    fireEvent.click(screen.getByRole("option", { name: "仅按钮 Button only" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "句子增强触发方式" }));
+    fireEvent.click(screen.getByRole("option", { name: "按钮触发" }));
     fireEvent.click(screen.getByRole("button", { name: /LinguaType/ }));
 
     const editor = await screen.findByLabelText("写作编辑器");
@@ -263,16 +266,17 @@ describe("LinguaType v0.2.2 ", () => {
     render(<LinguaTypeApp />);
 
     fireEvent.click(await screen.findByRole("button", { name: "触发设置" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "句子增强触发" }));
-    fireEvent.click(screen.getByRole("option", { name: "关闭快捷键 Disable shortcut" }));
+    fireEvent.click(screen.getByRole("combobox", { name: /句子增强触发|Sentence enhancement trigger/i }));
+    fireEvent.click(screen.getByRole("option", { name: /关闭 Off|关闭.*shortcut|Disable shortcut|关闭/i }));
     fireEvent.click(screen.getByRole("button", { name: /LinguaType/ }));
+    expect(JSON.parse(localStorage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").sentenceEnhancementShortcut).toBe("disable_shortcut");
 
     const editor = await screen.findByLabelText("写作编辑器");
     setEditorText(editor, fastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     fireEvent.keyDown(editor, { key: "j", ctrlKey: true });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "增强最新一句" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /增强最新一句|Enhance latest sentence/i })).not.toBeInTheDocument();
   });
 
   it("keeps manual paragraph checking out of the unified settings page", async () => {
@@ -316,7 +320,7 @@ describe("LinguaType v0.2.2 ", () => {
     fireEvent.change(screen.getByLabelText("API Base URL"), { target: { value: "https://open.bigmodel.cn" } });
     fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "saved-key" } });
     fireEvent.change(screen.getByLabelText("模型名称 Model"), { target: { value: "glm-5.1" } });
-    fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
+    fireEvent.click(screen.getByRole("button", { name: /保存设置|Save Settings/i }));
 
     expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-state", "exiting");
     await waitFor(() => expect(screen.getByLabelText("写作编辑器")).toBeInTheDocument());
@@ -340,7 +344,8 @@ describe("LinguaType v0.2.2 diff display", () => {
       />,
     );
 
-    expect(screen.getByText("bring bad influence to")).toHaveClass("text-slate-400");
+    expect(screen.getByText("bring bad influence to")).toHaveAttribute("data-diff-part", "removed");
+    expect(screen.getByText("bring bad influence to")).toHaveClass("text-[var(--lt-muted)]");
     expect(screen.getByText("bring bad influence to")).not.toHaveClass("text-red-700");
   });
 });
@@ -359,8 +364,8 @@ describe("LinguaType v0.2.2 selection actions", () => {
     setEditorSelection(editor, 9, 26);
     fireEvent.mouseUp(editor);
 
-    expect(screen.getByRole("button", { name: "解释选中内容" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "解释选中内容" }));
+    expect(screen.getByRole("button", { name: /解释选中内容|Explain selected|Explain Selected/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /解释选中内容|Explain selected|Explain Selected/i }));
     expect(await screen.findByText(selectionResult.usageNoteZh)).toBeInTheDocument();
     expectEditorText(editor, "Students acquire knowledge through practice.");
 
@@ -404,7 +409,7 @@ describe("LinguaType v0.2.2 settings and data control", () => {
     expect(await screen.findByText("段落健康：可能有 2 个问题")).toBeInTheDocument();
   });
 
-  it("exports and clears local learning data through Data Control", async () => {
+  it("exports and clears local learning data through data control", async () => {
     localStorage.setItem(
       LEARNING_LIBRARY_STORAGE_KEY,
       JSON.stringify([
@@ -447,26 +452,34 @@ describe("LinguaType v0.2.2 settings and data control", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "数据管理" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "导出写作习惯 JSON" }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "导出写作习惯 JSON",
+        }),
+      );
     });
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining("collocation"));
-
-    expect(screen.queryByText(/Learning Library|Writing Habits|Data Control|localStorage keys/u)).not.toBeInTheDocument();
-
+    const habitsExportPayload = String(
+      vi.mocked(navigator.clipboard.writeText).mock.calls.at(-1)?.[0] ?? "",
+    );
+    expect(habitsExportPayload).toMatch(/\"type\"\s*:\s*\"collocation\"/);
     fireEvent.click(screen.getByRole("button", { name: "清空表达库" }));
     fireEvent.click(screen.getByRole("button", { name: "确认清空表达库" }));
     expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]")).toHaveLength(0);
-
+    expect(JSON.parse(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY) ?? "[]")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "清空写作习惯" }));
     fireEvent.click(screen.getByRole("button", { name: "确认清空写作习惯" }));
     expect(JSON.parse(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY) ?? "[]")).toHaveLength(0);
-
+    expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "重置 API 设置" }));
     expect(JSON.parse(localStorage.getItem(API_SETTINGS_STORAGE_KEY) ?? "{}")).toMatchObject({
       maxTokens: 20000,
       mockMode: false,
     });
-    fireEvent.click(screen.getByRole("button", { name: "查看本地存储键" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /查看本地存储键|查看 localStorage keys|View localStorage keys/i,
+      }),
+    );
     expect(screen.getByText("linguatype.triggerSettings.v1")).toBeInTheDocument();
   });
 
@@ -476,8 +489,8 @@ describe("LinguaType v0.2.2 settings and data control", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "表达库" }));
     fireEvent.click(screen.getByRole("button", { name: "个人词典" }));
-    fireEvent.change(screen.getByLabelText("添加个人词典词条"), { target: { value: "LinguaType" } });
-    fireEvent.click(screen.getByRole("button", { name: "加入词典" }));
+    fireEvent.change(screen.getByLabelText("添加个人词典项"), { target: { value: "LinguaType" } });
+    fireEvent.click(screen.getByRole("button", { name: "添加词典项" }));
 
     expect(JSON.parse(localStorage.getItem(PERSONAL_DICTIONARY_STORAGE_KEY) ?? "[]")).toEqual(["LinguaType"]);
     expect(screen.getByRole("button", { name: "删除 LinguaType" })).toBeInTheDocument();

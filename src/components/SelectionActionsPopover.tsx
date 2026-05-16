@@ -54,13 +54,14 @@ export function SelectionActionsPopover({
         layerRef.current = element;
       }}
       aria-label="选中文本功能条"
+      data-selection-placement="above"
       data-selection-toolbar="true"
-      className={`absolute z-30 text-[var(--lt-text)] shadow-[0_16px_48px_var(--lt-shadow-strong)] ring-1 ring-[var(--lt-border)] ${
+      className={`fixed z-50 text-[var(--lt-text)] shadow-[0_10px_34px_var(--lt-shadow)] ring-1 ring-[var(--lt-border)] ${
         showPanel
           ? "w-[min(380px,calc(100%-2rem))] rounded-lg bg-[var(--lt-menu-bg)] p-4"
           : "inline-flex rounded-[7px] bg-[var(--lt-menu-bg)] p-1"
       }`}
-      style={{ left: position?.left ?? 16, top: position?.top ?? 16 }}
+      style={{ left: position?.left ?? 16, top: position?.top ?? 16, transform: "translate(0, calc(-100% - 8px))" }}
     >
       <div className={showPanel ? "flex items-start justify-between gap-3" : "flex items-center gap-1"}>
         {showPanel ? (

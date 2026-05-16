@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+﻿import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ProofreadingSignalsPanel } from "./ProofreadingSignalsPanel";
 import type { ProofreadingResult } from "@/lib/proofreading";
@@ -14,8 +14,8 @@ const result: ProofreadingResult = {
     {
       id: "grammar-0",
       type: "grammar",
-      titleZh: "重复词 Grammar",
-      messageZh: "可能重复输入了 They。",
+      titleZh: "重复",
+      messageZh: "可能重复输入：They。",
       excerpt: "They they",
       replacement: "They",
       start: 0,
@@ -25,19 +25,10 @@ const result: ProofreadingResult = {
 };
 
 describe("ProofreadingSignalsPanel", () => {
-  it("collapses into an issue count and expands stats only after click", () => {
+  it("renders compact proofreading status without an expandable panel", () => {
     render(<ProofreadingSignalsPanel result={result} />);
 
-    expect(screen.getByRole("button", { name: /1 个问题/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /校对提示：1 个问题/ })).toBeInTheDocument();
-    expect(screen.queryByText(/Proofreading/u)).not.toBeInTheDocument();
-    expect(screen.queryByText("文本统计 Text Stats")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /1 个问题/ }));
-
-    expect(screen.getByText("文本统计 Text Stats")).toBeInTheDocument();
-    expect(screen.getByText("12 words")).toBeInTheDocument();
-    expect(screen.getByText("2 sentences")).toBeInTheDocument();
-    expect(screen.getByText("They they")).toBeInTheDocument();
+    expect(screen.getByText("文本校对：1 条提示")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /文本校对/u })).not.toBeInTheDocument();
   });
 });

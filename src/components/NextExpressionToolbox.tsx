@@ -12,12 +12,12 @@ export type WritingIntention =
   | "summarize_point";
 
 const INTENTIONS: Array<{ value: WritingIntention; label: string; condition: string }> = [
-  { value: "explain_reason", label: "解释原因 Explain reason", condition: "想解释原因时，可以使用：" },
-  { value: "show_result", label: "说明结果 Show result", condition: "想说明结果时，可以使用：" },
-  { value: "give_example", label: "举例 Give example", condition: "想举例时，可以使用：" },
-  { value: "add_contrast", label: "转折对比 Add contrast", condition: "想转折或对比时，可以使用：" },
-  { value: "make_concession", label: "让步 Make concession", condition: "想表达让步时，可以使用：" },
-  { value: "summarize_point", label: "总结 Summarize", condition: "想总结观点时，可以使用：" },
+  { value: "explain_reason", label: "解释原因", condition: "想解释原因时，可以使用：" },
+  { value: "show_result", label: "说明结果", condition: "想说明结果时，可以使用：" },
+  { value: "give_example", label: "举例", condition: "想举例时，可以使用：" },
+  { value: "add_contrast", label: "转折对比", condition: "想转折或对比时，可以使用：" },
+  { value: "make_concession", label: "让步", condition: "想表达让步时，可以使用：" },
+  { value: "summarize_point", label: "总结", condition: "想总结观点时，可以使用：" },
 ];
 
 const TEMPLATES: Record<WritingIntention, string[]> = {
@@ -44,10 +44,10 @@ export function NextExpressionToolbox({ history, writingMode, onInsert }: NextEx
     <section className="text-[#1c1c1c]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-[#1c1c1c]">表达工具箱 Expression Toolbox</h2>
+          <h2 className="text-base font-semibold text-[#1c1c1c]">表达工具</h2>
           <p className="mt-1 text-xs leading-5 text-[#1c1c1c]/50">先选择写作意图，再插入合适的表达。</p>
         </div>
-        <span className="rounded-md bg-black/[0.035] px-2 py-1 text-xs text-[#1c1c1c]/45">LLM 未调用</span>
+        <span className="rounded-md bg-black/[0.035] px-2 py-1 text-xs text-[#1c1c1c]/45">未调用模型</span>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
@@ -83,7 +83,7 @@ export function NextExpressionToolbox({ history, writingMode, onInsert }: NextEx
       {recalled.length > 0 ? (
         <div className="mt-5 pt-1">
           <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[#1c1c1c]/40">
-            条件召回 Conditional recall
+            条件召回
           </h3>
           <p className="mt-2 text-xs leading-5 text-[#1c1c1c]/50">{selectedMeta.condition}</p>
           <div className="mt-2 space-y-2">

@@ -176,6 +176,14 @@ export function StarIcon(props: IconProps) {
   );
 }
 
+export function CheckCircleIcon(props: IconProps) {
+  return (
+    <HeroIcon {...props}>
+      <path d="M12 2.25A9.75 9.75 0 1 0 21.75 12 9.76 9.76 0 0 0 12 2.25Zm4.28 7.03-5.02 7.58a1 1 0 0 1-1.44.2l-3.6-2.53a1 1 0 1 1 1.16-1.64l2.75 1.94 4.5-6.8a1 1 0 1 1 1.63 1.08Z" />
+    </HeroIcon>
+  );
+}
+
 export function ClipboardDocumentIcon(props: IconProps) {
   return (
     <HeroIcon {...props}>

@@ -93,8 +93,8 @@ function collectCommonTypos(text: string, dictionary: Set<string>, signals: Proo
     signals.push({
       id: "",
       type: "grammar",
-      titleZh: "疑似拼写 Grammar",
-      messageZh: `可能是常见拼写错误，可改为 ${replacement}。`,
+      titleZh: "语法",
+      messageZh: `可能是拼写错误，建议改为 ${replacement}。`,
       excerpt: word,
       replacement,
       start: match.index,
@@ -112,8 +112,8 @@ function collectDuplicateWords(text: string, dictionary: Set<string>, signals: P
     signals.push({
       id: "",
       type: "grammar",
-      titleZh: "重复词 Grammar",
-      messageZh: `可能重复输入了 ${repeated}。`,
+      titleZh: "重复",
+      messageZh: `可能重复输入：${repeated}。`,
       excerpt: match[0],
       replacement: repeated,
       start: match.index,
@@ -127,8 +127,8 @@ function collectPunctuationSpacing(text: string, signals: ProofreadingSignal[]) 
     signals.push({
       id: "",
       type: "punctuation",
-      titleZh: "标点空格 Punctuation",
-      messageZh: "英文标点后通常需要空格。",
+      titleZh: "标点符号",
+      messageZh: "英文标点后通常应保留空格。",
       excerpt: match[0],
       replacement: `${match[1]}${match[2]} ${match[3]}`,
       start: match.index,
@@ -142,8 +142,8 @@ function collectRepeatedPunctuation(text: string, signals: ProofreadingSignal[])
     signals.push({
       id: "",
       type: "punctuation",
-      titleZh: "重复标点 Punctuation",
-      messageZh: "连续标点会显得语气过重，正式写作中建议保留一个。",
+      titleZh: "重复标点",
+      messageZh: "重复标点会影响可读性，请按习惯保留一个。",
       excerpt: match[0],
       replacement: match[0][0],
       start: match.index,
@@ -157,8 +157,8 @@ function collectStyleSignals(text: string, signals: ProofreadingSignal[]) {
     signals.push({
       id: "",
       type: "style",
-      titleZh: "表达强度 Style",
-      messageZh: "very + adjective 可以保留；如果想更自然，可以考虑更具体的形容词。",
+      titleZh: "表达强度",
+      messageZh: "可考虑用更自然的词组替换，避免用词过度强调。",
       excerpt: match[0],
       start: match.index,
       end: match.index + match[0].length,
@@ -176,8 +176,8 @@ function collectLengthSignals(text: string, signals: ProofreadingSignal[]) {
     signals.push({
       id: "",
       type: "length",
-      titleZh: "句子偏长 Sentence length",
-      messageZh: `这句大约 ${wordCount} 个英文词。可以保留，也可以拆成两句降低阅读负担。`,
+      titleZh: "句子偏长",
+      messageZh: `该句词数为 ${wordCount}，建议拆分为两个更短句子，减少阅读负担。`,
       excerpt: excerpt.length > 96 ? `${excerpt.slice(0, 96).trim()}...` : excerpt,
       start: sentence.start,
       end: sentence.end,
@@ -187,7 +187,7 @@ function collectLengthSignals(text: string, signals: ProofreadingSignal[]) {
 
 function splitSentences(text: string): Array<{ text: string; start: number; end: number }> {
   const sentences: Array<{ text: string; start: number; end: number }> = [];
-  for (const match of text.matchAll(/[^.!?。！？]+[.!?。！？]?/gu)) {
+  for (const match of text.matchAll(/[^.!?。]+[.!?。]/gu)) {
     sentences.push({
       text: match[0],
       start: match.index,

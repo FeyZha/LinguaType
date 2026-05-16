@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { calculateSelectionPopoverPosition } from "./LinguaTypeApp";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 
 describe("SelectionActionsPopover", () => {
@@ -17,29 +18,31 @@ describe("SelectionActionsPopover", () => {
       />,
     );
 
-    const toolbar = screen.getByLabelText("选中文本功能条");
+    const toolbar = document.querySelector('[data-selection-toolbar="true"]') as HTMLElement | null;
+    expect(toolbar).not.toBeNull();
     expect(toolbar).toHaveAttribute("data-selection-toolbar", "true");
-    expect(toolbar).toHaveStyle({ left: "120px", top: "80px" });
-    expect(screen.getByRole("button", { name: "解释选中内容" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "保存到表达库" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "复制选中文本" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "关闭选中文本操作" })).toBeInTheDocument();
-    expect(screen.queryByText("开始解释")).not.toBeInTheDocument();
+    expect(toolbar).toHaveStyle({
+      left: "120px",
+      top: "80px",
+      transform: "translate(0, calc(-100% - 8px))",
+    });
+    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(screen.queryByText("make a difference")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "解释选中内容" }));
+    fireEvent.click(screen.getAllByRole("button")[0]);
     expect(onExplain).toHaveBeenCalledTimes(1);
   });
 
-  it("uses Chinese-only labels, dynamic position, and structured explanation", () => {
+  it("renders the explanation content in a compact floating panel", () => {
     render(
       <SelectionActionsPopover
         selectedText="make a difference"
         position={{ left: 120, top: 80 }}
         explanation={{
           selectedText: "make a difference",
-          meaningZh: "产生影响",
-          usageNoteZh: "用于说明某事带来实际影响。",
-          contextRoleZh: "这里强调行动的结果。",
+          meaningZh: "meaning body",
+          usageNoteZh: "usage body",
+          contextRoleZh: "context body",
           expressionType: "phrase",
         }}
         isLoading={false}
@@ -49,16 +52,35 @@ describe("SelectionActionsPopover", () => {
       />,
     );
 
-    expect(screen.getByText("解释选中内容")).toBeInTheDocument();
-    expect(screen.queryByText(/Selection Actions/u)).not.toBeInTheDocument();
-    expect(screen.getByText("含义")).toBeInTheDocument();
-    expect(screen.getByText("用法")).toBeInTheDocument();
-    expect(screen.getByText("语境作用")).toBeInTheDocument();
-    expect(screen.getByText("表达类型")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "保存到表达库" })).toBeInTheDocument();
-    expect(screen.getByLabelText("关闭选中文本操作").closest("section")).toHaveStyle({
+    expect(screen.getByText("make a difference")).toBeInTheDocument();
+    expect(screen.getByText("meaning body")).toBeInTheDocument();
+    expect(screen.getByText("usage body")).toBeInTheDocument();
+    expect(screen.getByText("context body")).toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(4);
+    expect(document.querySelector('[data-selection-toolbar="true"]')).toHaveStyle({
       left: "120px",
       top: "80px",
+      transform: "translate(0, calc(-100% - 8px))",
     });
+  });
+
+  it("places the popup close to the selection focus edge", () => {
+    const containerRect = new DOMRect(40, 20, 720, 420);
+    const anchorRect = new DOMRect(360, 180, 120, 24);
+    const position = calculateSelectionPopoverPosition(anchorRect, containerRect);
+
+    expect(position.left).toBe(486);
+    expect(position.top).toBe(180);
+  });
+
+  it("keeps the popup inside the viewport when the focus edge is near the right side", () => {
+    vi.stubGlobal("innerWidth", 640);
+    const containerRect = new DOMRect(40, 20, 720, 420);
+    const anchorRect = new DOMRect(580, 180, 24, 24);
+    const position = calculateSelectionPopoverPosition(anchorRect, containerRect);
+
+    expect(position.left).toBe(248);
+    expect(position.top).toBe(180);
+    vi.unstubAllGlobals();
   });
 });

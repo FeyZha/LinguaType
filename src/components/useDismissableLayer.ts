@@ -26,10 +26,12 @@ export function useDismissableLayer<T extends HTMLElement>(
       }
     }
 
+    document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("mousedown", handlePointerDown, true);
     document.addEventListener("touchstart", handlePointerDown, true);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("mousedown", handlePointerDown, true);
       document.removeEventListener("touchstart", handlePointerDown, true);
       document.removeEventListener("keydown", handleKeyDown);

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+﻿import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LinguaTypeApp } from "./LinguaTypeApp";
 import {
@@ -312,6 +312,68 @@ describe("LinguaType v0.2.7 editor shell", () => {
     });
   });
 
+  it("keeps archive switching local and uses a soft page-turn motion", async () => {
+    const longDraft = `${Array.from({ length: 130 }, (_, index) => `word${index}`).join(" ")}.`;
+    localStorage.setItem(
+      API_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        ...defaultApiSettings(),
+        baseUrl: "https://api.example.test",
+        apiKey: "test-key",
+        model: "test-model",
+      }),
+    );
+    localStorage.setItem(
+      WRITING_ARCHIVES_STORAGE_KEY,
+      JSON.stringify({
+        activeId: "archive-current",
+        items: [
+          {
+            id: "archive-current",
+            title: "Current long draft",
+            text: longDraft,
+            setup: {
+              topicArea: "technology",
+              essayTopic: "Current long draft",
+              outlinePoints: ["Point"],
+              outline: "Point",
+              updatedAt: "2026-05-15T00:00:00.000Z",
+            },
+            createdAt: "2026-05-15T00:00:00.000Z",
+            updatedAt: "2026-05-15T00:00:00.000Z",
+            lastOpenedAt: "2026-05-15T00:00:00.000Z",
+          },
+          {
+            id: "archive-target",
+            title: "Target draft",
+            text: "Target draft text.",
+            setup: {
+              topicArea: "education",
+              essayTopic: "Target draft",
+              outlinePoints: ["Point"],
+              outline: "Point",
+              updatedAt: "2026-05-14T00:00:00.000Z",
+            },
+            createdAt: "2026-05-14T00:00:00.000Z",
+            updatedAt: "2026-05-14T00:00:00.000Z",
+            lastOpenedAt: "2026-05-14T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    const fetchMock = vi.mocked(fetch);
+    render(<LinguaTypeApp />);
+
+    await screen.findByLabelText("写作编辑器");
+    fireEvent.click(screen.getByRole("button", { name: /^Target draft/u }));
+
+    await waitFor(() => expectEditorText(screen.getByLabelText("写作编辑器"), "Target draft text."));
+    expect(screen.getByLabelText("沉浸式写作区")).toHaveAttribute("data-page-turn-motion", "soft-page-turn");
+    expect(screen.getByLabelText("沉浸式写作区")).toHaveAttribute("data-document-motion-reason", "switch");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("toggles low-frequency navigation pages back to the writing editor", async () => {
     localStorage.setItem(DRAFT_STORAGE_KEY, "Existing draft sentence.");
     localStorage.setItem(
@@ -534,6 +596,13 @@ describe("LinguaType v0.2.7 editor shell", () => {
 
     expect(await screen.findByLabelText("沉浸式写作区")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "AI topic" })).toBeInTheDocument();
+    const metadata = screen.getByText(/最后修改/u).closest("[data-document-metadata='true']");
+    expect(metadata).toBeTruthy();
+    expect(metadata).toHaveClass("text-[11px]", "text-[var(--lt-faint)]");
+    expect(metadata).toHaveTextContent("4 词");
+    expect(metadata).toHaveTextContent("2 句");
+    expect(metadata).toHaveTextContent("2 段");
+    expect(metadata).toHaveTextContent("教育");
     expect(screen.queryByRole("heading", { level: 2, name: /Context/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2, name: /Counterpoint/ })).not.toBeInTheDocument();
 

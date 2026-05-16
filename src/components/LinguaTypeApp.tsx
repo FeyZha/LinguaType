@@ -56,6 +56,9 @@ import {
   DRAFT_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
+  loadPlaceholderSuggestionCache,
+  removePlaceholderSuggestionCacheForArchive,
+  upsertPlaceholderSuggestionCache,
   WRITING_ARCHIVES_STORAGE_KEY,
   defaultWritingSetup,
   defaultApiSettings,
@@ -75,6 +78,7 @@ import {
   saveThemeSettings,
   saveTriggerSettings,
   saveWritingSetup,
+  type PlaceholderSuggestionCacheRecord,
   type ThemeSettings,
   upsertCorrectionEvents,
   upsertLearningItems,
@@ -214,6 +218,7 @@ export function LinguaTypeApp() {
   const workspaceExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placeholderTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paragraphHealthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const documentMotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoredPlaceholderRequestKeyRef = useRef("");
   const placeholderRequestKeysRef = useRef<Set<string>>(new Set());
   const [text, setText] = useState("");
@@ -254,12 +259,14 @@ export function LinguaTypeApp() {
   const [suggestionDisplayMode, setSuggestionDisplayMode] = useState<SuggestionDisplayMode>("hidden");
   const [reviewedSuggestion, setReviewedSuggestion] = useState<ReviewedSuggestion | null>(null);
   const [placeholderSuggestions, setPlaceholderSuggestions] = useState<PlaceholderSuggestionRecord[]>([]);
+  const [placeholderSuggestionCache, setPlaceholderSuggestionCache] = useState<PlaceholderSuggestionCacheRecord[]>([]);
   const [activePlaceholderInsight, setActivePlaceholderInsight] = useState(false);
+  const [activeSuggestionDiffId, setActiveSuggestionDiffId] = useState<string | null>(null);
   const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("editor");
   const [pendingWorkspaceView, setPendingWorkspaceView] = useState<WorkspaceView | null>(null);
-  const [documentMotionReason, setDocumentMotionReason] = useState<"idle" | "new">("idle");
+  const [documentMotionReason, setDocumentMotionReason] = useState<"idle" | "new" | "switch">("idle");
   const [archiveSidebarCollapsed, setArchiveSidebarCollapsed] = useState(false);
   const [openArchiveMenuId, setOpenArchiveMenuId] = useState<string | null>(null);
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
@@ -306,6 +313,10 @@ export function LinguaTypeApp() {
 
   useEffect(() => {
     return () => {
+      if (documentMotionTimerRef.current) {
+        clearTimeout(documentMotionTimerRef.current);
+        documentMotionTimerRef.current = null;
+      }
       if (workspaceExitTimerRef.current) {
         clearTimeout(workspaceExitTimerRef.current);
       }
@@ -319,6 +330,11 @@ export function LinguaTypeApp() {
   }, []);
 
   useEffect(() => {
+    if (documentMotionTimerRef.current) {
+      clearTimeout(documentMotionTimerRef.current);
+      documentMotionTimerRef.current = null;
+    }
+
     if (documentMotionReason === "idle") {
       return;
     }
@@ -328,12 +344,18 @@ export function LinguaTypeApp() {
     }
 
     waapi.animate(surface, {
-      opacity: [0.28, 1],
-      transform: ["translateY(26px)", "translateY(0px)"],
-      filter: ["blur(10px)", "blur(0px)"],
+      opacity: [0.22, 1],
+      transform: ["translateX(-12px) rotateY(2deg)", "translateX(0px) rotateY(0deg)"],
+      transformOrigin: ["left center", "left center"],
+      filter: ["blur(8px)", "blur(0px)"],
       duration: 520,
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
+
+    documentMotionTimerRef.current = setTimeout(() => {
+      setDocumentMotionReason("idle");
+      documentMotionTimerRef.current = null;
+    }, 560);
   }, [documentMotionReason, writingArchives.activeId]);
 
   useEffect(() => {
@@ -346,9 +368,11 @@ export function LinguaTypeApp() {
     if (ensuredArchives !== storedArchives && !shouldPreserveExistingArchiveStorage) {
       saveWritingArchives(localStorage, ensuredArchives);
     }
+    const activeText = activeArchive?.text ?? localStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
+    const activeSetup = activeArchive?.setup ?? storedSetup;
     setWritingArchives(ensuredArchives);
-    setText(activeArchive?.text ?? localStorage.getItem(DRAFT_STORAGE_KEY) ?? "");
-    setWritingSetup(activeArchive?.setup ?? storedSetup);
+    setText(activeText);
+    setWritingSetup(activeSetup);
     setThemeSettings(loadThemeSettingsFromStorage(localStorage));
     const storedSettings = localStorage.getItem(API_SETTINGS_STORAGE_KEY);
     if (storedSettings) {
@@ -359,9 +383,28 @@ export function LinguaTypeApp() {
     setPersonalDictionary(loadPersonalDictionaryFromStorage(localStorage));
     setTriggerSettings(loadTriggerSettingsFromStorage(localStorage));
     healthCacheRef.current = loadParagraphHealthCache(localStorage);
+    const placeholderCache = loadPlaceholderSuggestionCache(localStorage);
+    setPlaceholderSuggestionCache(placeholderCache);
+    setPlaceholderSuggestions(
+      derivePlaceholderSuggestionStateFromCache(
+        placeholderCache,
+        activeText,
+        ensuredArchives.activeId,
+        activeSetup,
+        writingMode,
+        enhancementLevel,
+      ),
+    );
     skipNextArchiveAutoSaveRef.current = true;
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+    hydratePlaceholderSuggestionsFromCache();
+  }, [isHydrated, placeholderSuggestionCache, text, writingArchives.activeId, writingMode, enhancementLevel, writingSetup?.topicArea, writingSetup?.customTopicArea]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -430,6 +473,10 @@ export function LinguaTypeApp() {
     return createWordDiff(pendingParagraph.originalParagraph, pendingParagraph.result.revisedParagraph);
   }, [pendingParagraph]);
 
+  useEffect(() => {
+    setActiveSuggestionDiffId(null);
+  }, [pending?.requestId, pending?.originalSentence, suggestionDisplayMode]);
+
   const proofreadingResult = useMemo(
     () => analyzeProofreading(text, personalDictionary),
     [text, personalDictionary],
@@ -460,11 +507,7 @@ export function LinguaTypeApp() {
       ) {
         return false;
       }
-      return !placeholderSuggestions.some(
-        (suggestion) =>
-          suggestion.archiveId === archiveId
-          && (suggestion.requestKey === requestKey || suggestion.originalSentence === range.sentence),
-      );
+      return !hasPlaceholderSuggestionRequestKey(requestKey, archiveId);
     });
 
     if (pendingRanges.length === 0) {
@@ -494,6 +537,11 @@ export function LinguaTypeApp() {
     placeholderSuggestions,
     text,
     writingArchives.activeId,
+    writingMode,
+    enhancementLevel,
+    writingSetup?.topicArea,
+    writingSetup?.customTopicArea,
+    placeholderSuggestionCache,
   ]);
 
   useEffect(() => {
@@ -526,6 +574,230 @@ export function LinguaTypeApp() {
     () => writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null,
     [writingArchives],
   );
+
+  function getPlaceholderDomain(setup: WritingSetup | null): string {
+    if (setup?.topicArea === "custom") {
+      return setup.customTopicArea?.trim() || "custom";
+    }
+    return setup?.topicArea || "custom";
+  }
+
+  function buildPendingRequestInputFromSnapshot(
+    snapshotFullText: string,
+    range: SentenceRange,
+    mode: WritingMode,
+    level: EnhancementLevel,
+    setup: WritingSetup | null,
+  ): Omit<FastEnhanceInput, "apiConfig"> {
+    return {
+      fullText: snapshotFullText,
+      latestSentence: range.sentence,
+      previousContext: withWritingSetupContext(getPreviousContext(snapshotFullText, range.start), setup),
+      currentParagraph: getCurrentParagraph(snapshotFullText, range.start),
+      writingMode: mode,
+      enhancementLevel: level,
+    };
+  }
+
+  type PlaceholderRequestParsedContext = {
+    writingMode: WritingMode;
+    enhancementLevel: EnhancementLevel;
+    domain: string;
+  };
+
+  function parsePlaceholderRequestContext(
+    requestKey: string,
+    fallbackMode: WritingMode,
+    fallbackLevel: EnhancementLevel,
+    fallbackDomain: string,
+  ): PlaceholderRequestParsedContext {
+    const [, mode, level, domain] = requestKey.split("|");
+    return {
+      writingMode: mode === "natural" || mode === "ielts" || mode === "academic" || mode === "business" || mode === "concise" ? mode : fallbackMode,
+      enhancementLevel:
+        level === "minimal" || level === "balanced" || level === "polished" ? level : fallbackLevel,
+      domain: domain || fallbackDomain,
+    };
+  }
+
+  function hydratePlaceholderSuggestionsFromCache(): void {
+    const next = derivePlaceholderSuggestionStateFromCache(
+      placeholderSuggestionCache,
+      text,
+      writingArchives.activeId,
+      writingSetup,
+      writingMode,
+      enhancementLevel,
+    );
+    setPlaceholderSuggestions(next);
+  }
+
+  function buildPlaceholderSuggestionFromCache(
+    item: PlaceholderSuggestionCacheRecord,
+    snapshotText: string,
+    activeArchiveId: string | null,
+  ): PlaceholderSuggestionRecord | null {
+    const context = parsePlaceholderRequestContext(
+      item.requestKey,
+      writingMode,
+      enhancementLevel,
+      getPlaceholderDomain(writingSetup),
+    );
+    const match = resolveCachedPlaceholderSuggestionRange(item, snapshotText, activeArchiveId, context);
+    if (!match) {
+      return null;
+    }
+    return buildPlaceholderSuggestionRecordFromCache(
+      item,
+      snapshotText,
+      writingSetup,
+      match.sentenceRange,
+      match.placeholderRange,
+    );
+  }
+
+  function getPlaceholderSuggestionByRequestKey(
+    requestKey: string,
+    snapshotText: string,
+    archiveId: string | null,
+  ): PlaceholderSuggestionRecord | null {
+    const inMemory = placeholderSuggestions.find(
+      (item) => item.archiveId === archiveId && item.requestKey === requestKey,
+    );
+    if (inMemory) {
+      return inMemory;
+    }
+
+    const cached = placeholderSuggestionCache.find((item) => item.archiveId === archiveId && item.requestKey === requestKey);
+    if (!cached) {
+      return null;
+    }
+    return buildPlaceholderSuggestionFromCache(cached, snapshotText, archiveId);
+  }
+
+  function hasPlaceholderSuggestionRequestKey(requestKey: string, archiveId: string | null): boolean {
+    return (
+      placeholderSuggestions.some((item) => item.archiveId === archiveId && item.requestKey === requestKey)
+      || placeholderSuggestionCache.some((item) => item.archiveId === archiveId && item.requestKey === requestKey)
+    );
+  }
+
+  function buildPlaceholderSuggestionRecordFromCache(
+    item: PlaceholderSuggestionCacheRecord,
+    snapshotFullText: string,
+    setup: WritingSetup | null,
+    sentenceRange: SentenceRange,
+    placeholderRange?: ChinesePlaceholderSentenceRange,
+  ): PlaceholderSuggestionRecord {
+    const displaySentence = item.reviewed ? item.finalSentence : item.originalSentence;
+    const placeholderHint = item.placeholderHint
+      ? {
+          sourceText: item.placeholderHint.sourceText,
+          targetText: item.placeholderHint.targetText,
+          structure: item.placeholderHint.structure ?? "",
+        }
+      : undefined;
+    return {
+      requestId: item.id,
+      source: "placeholder",
+      snapshotFullText,
+      latestSentenceRange: sentenceRange,
+      originalSentence: item.originalSentence,
+      requestInput: buildPendingRequestInputFromSnapshot(
+        snapshotFullText,
+        sentenceRange,
+        item.requestInputSnapshot.writingMode,
+        item.requestInputSnapshot.enhancementLevel,
+        setup,
+      ),
+      result: {
+        taskType: item.taskType,
+        originalSentence: item.originalSentence,
+        finalSentence: item.finalSentence,
+        explanationZh: item.explanationZh,
+        hasChinese: item.hasChinese,
+      },
+      id: item.id,
+      archiveId: item.archiveId,
+      requestKey: item.requestKey,
+      markerState: item.reviewed ? "reviewed" : item.markerState,
+      reviewedRange: sentenceRange,
+      displaySentence,
+      applied: item.reviewed,
+      placeholderRequestKey: item.requestKey,
+      placeholderRange: placeholderRange ?? item.placeholderRange,
+      placeholderHint,
+    };
+  }
+
+  function resolveCachedPlaceholderSuggestionRange(
+    item: PlaceholderSuggestionCacheRecord,
+    snapshotText: string,
+    activeArchiveId: string | null,
+    context: PlaceholderRequestParsedContext,
+  ): { sentenceRange: SentenceRange; placeholderRange?: ChinesePlaceholderSentenceRange } | null {
+    const placeholderRange = extractChinesePlaceholderSentences(snapshotText).find((range) => {
+      const key = createPlaceholderRequestKey(range, activeArchiveId, context);
+      return key === item.requestKey || range.sentence.trim() === item.originalSentence.trim();
+    });
+    if (placeholderRange) {
+      return { sentenceRange: placeholderRange, placeholderRange };
+    }
+
+    const candidates = item.reviewed
+      ? [item.finalSentence, item.originalSentence]
+      : [item.originalSentence, item.finalSentence];
+    for (const candidate of candidates) {
+      const normalized = candidate.trim();
+      if (!normalized) {
+        continue;
+      }
+      const index = snapshotText.indexOf(normalized);
+      if (index >= 0) {
+        return {
+          sentenceRange: {
+            sentence: normalized,
+            start: index,
+            end: index + normalized.length,
+          },
+          placeholderRange: item.placeholderRange,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function derivePlaceholderSuggestionStateFromCache(
+    cache: PlaceholderSuggestionCacheRecord[],
+    snapshotText: string,
+    activeArchiveId: string | null,
+    setup: WritingSetup | null,
+    mode: WritingMode,
+    level: EnhancementLevel,
+  ): PlaceholderSuggestionRecord[] {
+    const domain = getPlaceholderDomain(setup);
+    return cache
+      .filter(
+        (item) =>
+          item.archiveId === activeArchiveId &&
+          item.requestInputSnapshot.writingMode === mode &&
+          item.requestInputSnapshot.enhancementLevel === level &&
+          item.requestInputSnapshot.domain === domain,
+      )
+      .map((item) => {
+        const match = resolveCachedPlaceholderSuggestionRange(item, snapshotText, activeArchiveId, {
+          writingMode: mode,
+          enhancementLevel: level,
+          domain,
+        });
+        return match
+          ? buildPlaceholderSuggestionRecordFromCache(item, snapshotText, setup, match.sentenceRange, match.placeholderRange)
+          : null;
+      })
+      .filter((suggestion): suggestion is PlaceholderSuggestionRecord => Boolean(suggestion))
+      .sort((a, b) => b.reviewedRange.start - a.reviewedRange.start);
+  }
 
   function saveSettings(settings: ApiConfig) {
     const normalized = {
@@ -619,6 +891,7 @@ export function LinguaTypeApp() {
     if (item.setup) {
       saveWritingSetup(localStorage, item.setup);
     }
+    setPlaceholderSuggestions([]);
     resetEditorSuggestionState();
     setOutlineCheckResult(null);
     setOutlineCheckMessage("");
@@ -641,9 +914,8 @@ export function LinguaTypeApp() {
     if (!archive) {
       return;
     }
-    const currentArchive = writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null;
-    if (currentArchive && currentArchive.id !== id) {
-      void maybeClassifyArchiveDomain(currentArchive);
+    if (archive.id === writingArchives.activeId) {
+      return;
     }
     const now = new Date().toISOString();
     const nextArchive = { ...archive, lastOpenedAt: now };
@@ -658,9 +930,11 @@ export function LinguaTypeApp() {
     });
     setText(archive.text);
     setWritingSetup(archive.setup);
+    setDocumentMotionReason("switch");
     if (archive.setup) {
       saveWritingSetup(localStorage, archive.setup);
     }
+    setPlaceholderSuggestions([]);
     resetEditorSuggestionState();
     setOutlineCheckResult(null);
     setOutlineCheckMessage("");
@@ -715,6 +989,10 @@ export function LinguaTypeApp() {
     };
     setWritingArchives(nextState);
     saveWritingArchives(localStorage, nextState);
+    setPlaceholderSuggestionCache((current) => removePlaceholderSuggestionCacheForArchive(localStorage, current, id));
+    if (writingArchives.activeId !== id) {
+      setPlaceholderSuggestions((current) => current.filter((item) => item.archiveId !== id));
+    }
     setOpenArchiveMenuId(null);
     setDeleteCandidateId(null);
     setRenamingArchiveId(null);
@@ -792,7 +1070,7 @@ export function LinguaTypeApp() {
         topicArea: inlineSetupEdit.draftArea,
         customTopicArea: inlineSetupEdit.draftArea === "custom" ? inlineSetupEdit.draftCustomArea : undefined,
       },
-      true,
+      false,
     );
   }
 
@@ -824,7 +1102,7 @@ export function LinguaTypeApp() {
       return;
     }
     const outlinePoints = setup.outlinePoints.filter((_, pointIndex) => pointIndex !== index);
-    saveInlineSetup({ ...setup, outlinePoints, outline: outlinePoints.join("\n") }, true);
+    saveInlineSetup({ ...setup, outlinePoints, outline: outlinePoints.join("\n") }, false);
   }
 
   async function checkOutlineConsistency(setup: WritingSetup, outlinePoints: string[], signal: AbortSignal) {
@@ -1007,6 +1285,37 @@ export function LinguaTypeApp() {
       }
       return current.map((item, index) => (index === existingIndex ? record : item));
     });
+    setPlaceholderSuggestionCache((current) => {
+      const context = parsePlaceholderRequestContext(
+        record.requestKey,
+        record.requestInput.writingMode,
+        record.requestInput.enhancementLevel,
+        getPlaceholderDomain(writingSetup),
+      );
+      const cacheRecord: PlaceholderSuggestionCacheRecord = {
+        id: record.id,
+        requestKey: record.requestKey,
+        requestInputSnapshot: {
+          writingMode: context.writingMode,
+          enhancementLevel: context.enhancementLevel,
+          domain: context.domain,
+        },
+        archiveId: record.archiveId,
+        originalSentence: record.originalSentence,
+        finalSentence: record.result.finalSentence,
+        explanationZh: record.result.explanationZh,
+        taskType: record.result.taskType,
+        hasChinese: record.result.hasChinese,
+        markerState: record.markerState,
+        reviewed: record.applied,
+        latestSentenceRange: record.latestSentenceRange,
+        reviewedRange: record.reviewedRange,
+        placeholderRange: record.placeholderRange,
+        placeholderHint: record.placeholderHint,
+        updatedAt: new Date().toISOString(),
+      };
+      return upsertPlaceholderSuggestionCache(localStorage, current, cacheRecord);
+    });
   }
 
   function markPlaceholderSuggestionReviewed(
@@ -1034,9 +1343,15 @@ export function LinguaTypeApp() {
   }
 
   function openPlaceholderSuggestion(id: string) {
-    const suggestion = placeholderSuggestions.find(
+    const inMemorySuggestion = placeholderSuggestions.find(
       (item) => item.id === id && item.archiveId === writingArchives.activeId,
     );
+    const cachedSuggestion = placeholderSuggestionCache.find(
+      (item) => item.id === id && item.archiveId === writingArchives.activeId,
+    );
+    const suggestion =
+      inMemorySuggestion
+      ?? (cachedSuggestion ? buildPlaceholderSuggestionFromCache(cachedSuggestion, text, writingArchives.activeId) : null);
     if (!suggestion) {
       return;
     }
@@ -1059,8 +1374,17 @@ export function LinguaTypeApp() {
   function createPlaceholderRequestKey(
     range: ChinesePlaceholderSentenceRange,
     archiveId = writingArchives.activeId,
+    context: {
+      writingMode: WritingMode;
+      enhancementLevel: EnhancementLevel;
+      domain: string;
+    } = {
+      writingMode,
+      enhancementLevel,
+      domain: getPlaceholderDomain(writingSetup),
+    },
   ): string {
-    return `${archiveId ?? "draft"}:${range.sentence.trim()}`;
+    return `${archiveId ?? "draft"}|${context.writingMode}|${context.enhancementLevel}|${context.domain}|${range.sentence.trim()}`;
   }
 
   function createPlaceholderHint(
@@ -1158,28 +1482,6 @@ export function LinguaTypeApp() {
     return "结构：把中文占位转成英文表达单元，保留原句逻辑";
   }
 
-  function persistPlaceholderLearningAsset(applied: CompletedEnhancement) {
-    const hint = applied.placeholderHint;
-    if (!hint?.targetText.trim()) {
-      return;
-    }
-
-    const item: LearningItemDraft = {
-      type: "phrase",
-      content: hint.targetText,
-      chineseMeaning: hint.sourceText,
-      usageNote: hint.structure,
-      difficultyLevel: 2,
-      tags: ["中文占位"],
-    };
-    const nextLibrary = upsertLearningItems(learningLibrary, [item], {
-      sourceSentence: applied.result.finalSentence,
-      writingMode: applied.requestInput.writingMode,
-    });
-    persistLearningLibrary(nextLibrary);
-    markLearningLibraryUpdated();
-  }
-
   function handleEditorTextChange(value: string) {
     setText(value);
     const cursorPosition = editorRef.current?.getSelectionRange().end ?? value.length;
@@ -1204,7 +1506,7 @@ export function LinguaTypeApp() {
     }
     if (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model) {
       requestWorkspaceView("api");
-      setError({ message: "需要先填写 API Settings 设置。" });
+      setError({ message: "需要先填写 API 设置。" });
       return false;
     }
     return true;
@@ -1242,19 +1544,31 @@ export function LinguaTypeApp() {
     const archiveId = writingArchives.activeId;
     const requestKey = createPlaceholderRequestKey(range, archiveId);
     if (
-      !force
-      && (
-        requestKey === ignoredPlaceholderRequestKeyRef.current
-        || requestKey === pending?.placeholderRequestKey
-        || placeholderRequestKeysRef.current.has(requestKey)
-        || placeholderSuggestions.some(
-          (suggestion) =>
-            suggestion.archiveId === archiveId
-            && (suggestion.requestKey === requestKey || suggestion.originalSentence === range.sentence),
-        )
-      )
+      requestKey === ignoredPlaceholderRequestKeyRef.current
+      || requestKey === pending?.placeholderRequestKey
+      || placeholderRequestKeysRef.current.has(requestKey)
     ) {
       return false;
+    }
+
+    const cachedSuggestion = getPlaceholderSuggestionByRequestKey(requestKey, snapshotFullText, archiveId);
+    if (cachedSuggestion) {
+      if (expandAfterResult) {
+        const resolvedRange = resolvePlaceholderSuggestionRange(cachedSuggestion, snapshotFullText) ?? range;
+        setSuggestionDisplayMode("expanded");
+        setPending({
+          ...cachedSuggestion,
+          snapshotFullText,
+          latestSentenceRange: resolvedRange,
+          originalSentence: resolvedRange.sentence,
+        });
+      }
+      setStatusMessage("");
+      return true;
+    }
+
+    if (!force && hasPlaceholderSuggestionRequestKey(requestKey, archiveId)) {
+      return true;
     }
 
     if (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model)) {
@@ -1322,13 +1636,14 @@ export function LinguaTypeApp() {
       const payload = caught as { error?: string; rawResponse?: string };
       if (trigger === "manual") {
         setError({
-          message: payload.error ?? "当前句建议生成失败。请检查 API Settings 后重试。",
+          message: payload.error ?? "当前句建议生成失败。请检查 API 设置后重试。",
           rawResponse: payload.rawResponse,
         });
       }
       setStatusMessage("");
       return false;
     } finally {
+      placeholderRequestKeysRef.current.delete(requestKey);
       if (expandAfterResult) {
         setIsLoading(false);
       }
@@ -1422,7 +1737,7 @@ export function LinguaTypeApp() {
     } catch (caught) {
       const payload = caught as { error?: string; rawResponse?: string };
       setError({
-        message: payload.error ?? "增强失败。请检查 API Settings 后重试。",
+        message: payload.error ?? "增强失败。请检查 API 设置后重试。",
         rawResponse: payload.rawResponse,
       });
       setStatusMessage("");
@@ -1527,7 +1842,6 @@ export function LinguaTypeApp() {
     setStatusMessage("");
     requestAnimationFrame(() => editorRef.current?.focus());
 
-    persistPlaceholderLearningAsset(completed);
     void runLearningExtraction(completed, nextText, paragraphRange.paragraph);
     void maybeRunParagraphHealthAfterApply(nextText, paragraphRange);
   }
@@ -1694,7 +2008,7 @@ export function LinguaTypeApp() {
     setInlineMenu((current) => ({ ...current, open: false }));
 
     if (!range.paragraph.trim()) {
-      setParagraphMessage("请先写一段内容，再检查段落流畅度 Paragraph Flow。");
+      setParagraphMessage("请先写一段内容，再检查段落流畅度。");
       requestWorkspaceView("editor");
       return;
     }
@@ -1731,7 +2045,7 @@ export function LinguaTypeApp() {
       });
     } catch (caught) {
       const payload = caught as { error?: string };
-      setParagraphMessage(payload.error ?? "段落流畅度 Paragraph Flow 检查失败。");
+      setParagraphMessage(payload.error ?? "段落流畅度检查失败。");
     } finally {
       setIsParagraphLoading(false);
     }
@@ -1798,46 +2112,6 @@ export function LinguaTypeApp() {
       saveWritingArchives(localStorage, next);
       return next;
     });
-  }
-
-  async function maybeClassifyArchiveDomain(archive: WritingArchiveItem) {
-    if (archive.topicAreaSource === "manual" || !archive.setup) {
-      return;
-    }
-    if (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model) {
-      return;
-    }
-    const wordCount = countEnglishWords(archive.text);
-    if (wordCount < 120) {
-      return;
-    }
-    if (archive.topicAreaClassifiedAt && Date.now() - Date.parse(archive.topicAreaClassifiedAt) < 12 * 60 * 60 * 1000) {
-      return;
-    }
-    if (contentChangeRatio(archive.topicAreaClassifiedText ?? "", archive.text) < 0.4) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/classify-writing-domain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: archive.setup.essayTopic || archive.title,
-          fullText: archive.text,
-          outlinePoints: archive.setup.outlinePoints,
-          allowedDomains: DOMAIN_OPTIONS.map((option) => option.value),
-          apiConfig: apiSettings,
-        }),
-      });
-      const payload = (await response.json()) as { topicArea?: WritingTopicArea; error?: string };
-      if (!response.ok || payload.error || !payload.topicArea) {
-        return;
-      }
-      assignArchiveDomain(archive.id, payload.topicArea, "auto");
-    } catch {
-      // Domain classification is intentionally low-priority and must never interrupt writing.
-    }
   }
 
   function openInlineMenu(selection: { start: number; end: number }) {
@@ -1990,6 +2264,14 @@ export function LinguaTypeApp() {
   const workspaceMotionState = pendingWorkspaceView && activeWorkspaceView !== "editor" ? "exiting" : "entering";
   const pendingIsAppliedReview = Boolean(pending?.placeholderRequestKey && pending.applied);
   const suggestionMarkers = [
+    ...(pending && isLoading && !pending.result
+      ? [{
+          id: `${pending.requestId}-loading`,
+          range: pending.latestSentenceRange,
+          state: "loading" as const,
+          onOpen: () => undefined,
+        }]
+      : []),
     ...placeholderSuggestions.flatMap((suggestion) => {
       if (suggestion.archiveId !== writingArchives.activeId) {
         return [];
@@ -2080,17 +2362,19 @@ export function LinguaTypeApp() {
               ref={writingSurfaceRef}
               aria-label="沉浸式写作区"
               data-document-motion-reason={documentMotionReason}
+              data-page-turn-motion="soft-page-turn"
               className="flex min-h-[calc(100vh-88px)] w-full flex-col gap-8 px-8 pb-0"
             >
               <section
                 data-writing-column="true"
-                className={`mx-auto w-full max-w-[920px] px-4 transition-[max-width] sm:px-8 ${
-                  archiveSidebarCollapsed ? "xl:max-w-[1020px]" : ""
+                className={`mx-auto flex w-full px-4 transition-[max-width] sm:px-8 md:px-10 ${
+                  archiveSidebarCollapsed ? "max-w-[1120px]" : "max-w-[980px]"
                 }`}
               >
                 <InlineSetupControls
                   activeArchive={activeArchive}
                   setup={writingSetup}
+                  text={text}
                   onTitleCommit={persistDocumentTitle}
                 />
                 {isOutlineChecking ? (
@@ -2136,6 +2420,14 @@ export function LinguaTypeApp() {
                   }
                   focusedSuggestionSourceText={pending?.placeholderHint?.sourceText ?? ""}
                   activeSuggestionSource={activePlaceholderInsight}
+                  focusedSuggestionDiffParts={
+                    pending?.result &&
+                    suggestionDisplayMode === "expanded"
+                      ? diffParts
+                      : []
+                  }
+                  activeSuggestionDiffId={activeSuggestionDiffId}
+                  onFocusedSuggestionDiffHover={setActiveSuggestionDiffId}
                   onFocusedSuggestionSourceClick={() => setActivePlaceholderInsight(true)}
                   onChange={handleEditorTextChange}
                   onWritingModeChange={setWritingMode}
@@ -2174,6 +2466,8 @@ export function LinguaTypeApp() {
                         isPlaceholderSuggestion={pending.source === "placeholder"}
                         isReviewOnly={pendingIsAppliedReview}
                         activePlaceholderFocus={activePlaceholderInsight}
+                        activeDiffId={activeSuggestionDiffId}
+                        onDiffHover={setActiveSuggestionDiffId}
                         diffParts={diffParts}
                         conflictMessage={conflictMessage}
                         copyMessage={copyMessage}
@@ -3241,13 +3535,21 @@ function ArchiveSidebar({
 function InlineSetupControls({
   activeArchive,
   setup,
+  text,
   onTitleCommit,
 }: {
   activeArchive: WritingArchiveItem | null;
   setup: WritingSetup | null;
+  text: string;
   onTitleCommit: (title: string) => void;
 }) {
   const title = setup?.essayTopic || activeArchive?.title || "未命名写作";
+
+  const domainLabel = topicAreaDisplayLabel(setup);
+  const wordCount = countMetadataWords(text);
+  const sentenceCount = countSentences(text);
+  const paragraphCount = countParagraphs(text);
+  const lastModified = formatArchiveTime(activeArchive?.updatedAt ?? setup?.updatedAt ?? new Date().toISOString());
 
   function commitTitle(event: FocusEvent<HTMLHeadingElement>) {
     const nextTitle = event.currentTarget.textContent?.trim() ?? "";
@@ -3271,7 +3573,7 @@ function InlineSetupControls({
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid w-full gap-2">
       <h1
         contentEditable
         suppressContentEditableWarning
@@ -3284,6 +3586,16 @@ function InlineSetupControls({
       >
         {title}
       </h1>
+      <p
+        data-document-metadata="true"
+        className="text-[11px] leading-6 text-[var(--lt-faint)]"
+      >
+        <span>最后修改：{lastModified}</span>
+        <span> / {wordCount} 词</span>
+        <span> / {sentenceCount} 句</span>
+        <span> / {paragraphCount} 段</span>
+        <span> / {domainLabel}</span>
+      </p>
     </div>
   );
 }
@@ -3330,26 +3642,6 @@ function normalizeClassificationText(text: string): string {
   return text.trim().replace(/\s+/gu, " ").slice(0, 6000);
 }
 
-function contentChangeRatio(previous: string, current: string): number {
-  const previousTokens = tokenSet(previous);
-  const currentTokens = tokenSet(current);
-  if (previousTokens.size === 0) {
-    return currentTokens.size > 0 ? 1 : 0;
-  }
-  const union = new Set([...previousTokens, ...currentTokens]);
-  let intersection = 0;
-  for (const token of previousTokens) {
-    if (currentTokens.has(token)) {
-      intersection += 1;
-    }
-  }
-  return union.size === 0 ? 0 : 1 - intersection / union.size;
-}
-
-function tokenSet(text: string): Set<string> {
-  return new Set(normalizeClassificationText(text).toLowerCase().match(/[a-z]+(?:'[a-z]+)?|[\u3400-\u9fff]/gu) ?? []);
-}
-
 function formatArchiveTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -3389,21 +3681,37 @@ function countEnglishWords(paragraph: string): number {
   return paragraph.match(/[A-Za-z]+(?:'[A-Za-z]+)?/gu)?.length ?? 0;
 }
 
+function countMetadataWords(paragraph: string): number {
+  const latinWords = countEnglishWords(paragraph);
+  const cjkWords = paragraph.match(/[\u4e00-\u9fff]/gu)?.length ?? 0;
+  return latinWords + cjkWords;
+}
+
+function countParagraphs(paragraph: string): number {
+  return paragraph
+    .trim()
+    .split(/\n{2,}/u)
+    .filter((part) => part.trim().length > 0)
+    .length;
+}
+
 function isEnglishSelection(text: string): boolean {
   return /[A-Za-z]/u.test(text) && !/[\u3400-\u9fff]/u.test(text);
 }
 
-function calculateSelectionPopoverPosition(anchorRect: DOMRect, containerRect: DOMRect): { left: number; top: number } {
-  const width = 40;
-  const gap = 12;
-  const preferredTop = anchorRect.top - containerRect.top - 44 - gap;
-  const fallbackTop = anchorRect.bottom - containerRect.top + gap;
-  const top = preferredTop >= 0 ? preferredTop : fallbackTop;
-  const centeredLeft = anchorRect.left - containerRect.left + anchorRect.width / 2 - width / 2;
-  const maxLeft = Math.max(0, containerRect.width - width - 16);
+export function calculateSelectionPopoverPosition(
+  anchorRect: DOMRect,
+  _containerRect: DOMRect,
+): { left: number; top: number } {
+  const toolbarWidth = 380;
+  const viewportWidth =
+    typeof window === "undefined" ? 1200 : window.innerWidth;
+  const focusLeft = anchorRect.left + Math.max(1, anchorRect.width) + 6;
+  const minLeft = 12;
+  const maxLeft = Math.max(minLeft, viewportWidth - toolbarWidth - 12);
   return {
-    left: Math.max(8, Math.min(centeredLeft, maxLeft)),
-    top: Math.max(8, top),
+    left: Math.max(minLeft, Math.min(focusLeft, maxLeft)),
+    top: anchorRect.top,
   };
 }
 

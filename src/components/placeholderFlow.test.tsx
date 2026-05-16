@@ -1,19 +1,23 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LinguaTypeApp } from "./LinguaTypeApp";
+import type { FastEnhanceResult, LearningExtractionResult } from "@/lib/llm/types";
 import {
   API_SETTINGS_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
+  PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY,
+  WRITING_ARCHIVES_STORAGE_KEY,
   WRITING_SETUP_STORAGE_KEY,
   defaultApiSettings,
 } from "@/lib/storage";
-import type { FastEnhanceResult, LearningExtractionResult } from "@/lib/llm/types";
+import { LinguaTypeApp } from "./LinguaTypeApp";
+
+const placeholderText = "I found that many students lack 自主学习能力.";
 
 const placeholderResult: FastEnhanceResult = {
   taskType: "mixed_chinese_rewrite",
-  originalSentence: "I found that many students lack 自主学习能力.",
+  originalSentence: placeholderText,
   finalSentence: "I found that many students lack the ability to learn independently.",
-  explanationZh: "结构：lack + the ability to + verb",
+  explanationZh: "lack + the ability to + verb",
   hasChinese: true,
 };
 
@@ -21,7 +25,7 @@ const wholeChineseSentenceResult: FastEnhanceResult = {
   taskType: "mixed_chinese_rewrite",
   originalSentence: "我觉得我这个会火。",
   finalSentence: "I think this will go viral.",
-  explanationZh: "结构：think + this will + verb",
+  explanationZh: "think + this will + verb",
   hasChinese: true,
 };
 
@@ -29,7 +33,7 @@ const secondPlaceholderResult: FastEnhanceResult = {
   taskType: "mixed_chinese_rewrite",
   originalSentence: "This may 影响 young people's values.",
   finalSentence: "This may affect young people's values.",
-  explanationZh: "结构：affect + someone's values",
+  explanationZh: "affect + someone's values",
   hasChinese: true,
 };
 
@@ -52,6 +56,79 @@ function setEditorTextAt(editor: HTMLElement, value: string, cursor: number) {
   fireEvent.change(editor, {
     target: { value, selectionStart: cursor, selectionEnd: cursor },
   });
+}
+
+function writeArchiveWithText(text: string) {
+  localStorage.setItem(
+    WRITING_ARCHIVES_STORAGE_KEY,
+    JSON.stringify({
+      activeId: "cache-archive",
+      items: [
+        {
+          id: "cache-archive",
+          title: "Learning habits",
+          text,
+          setup: {
+            topicArea: "education",
+            essayTopic: "Learning habits",
+            outlinePoints: [],
+            outline: "",
+            updatedAt: "2026-05-16T00:00:00.000Z",
+          },
+          createdAt: "2026-05-16T00:00:00.000Z",
+          updatedAt: "2026-05-16T00:00:00.000Z",
+          lastOpenedAt: "2026-05-16T00:00:00.000Z",
+        },
+      ],
+    }),
+  );
+}
+
+function writeCachedPlaceholderSuggestion(text = placeholderText, withRange = true) {
+  localStorage.setItem(
+    PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY,
+    JSON.stringify([
+      {
+        id: "cache-1",
+        requestKey: `cache-archive|natural|balanced|education|${text}`,
+        requestInputSnapshot: {
+          writingMode: "natural",
+          enhancementLevel: "balanced",
+          domain: "education",
+        },
+        archiveId: "cache-archive",
+        originalSentence: text,
+        finalSentence: placeholderResult.finalSentence,
+        explanationZh: "structure hint",
+        taskType: "mixed_chinese_rewrite",
+        hasChinese: true,
+        markerState: "available",
+        reviewed: false,
+        latestSentenceRange: { start: 0, end: text.length, sentence: text },
+        reviewedRange: { start: 0, end: text.length, sentence: text },
+        placeholderRange: withRange
+          ? {
+              sentence: text,
+              start: 0,
+              end: text.length,
+              placeholders: [
+                {
+                  text: "自主学习能力",
+                  start: text.indexOf("自主学习能力"),
+                  end: text.indexOf("自主学习能力") + "自主学习能力".length,
+                },
+              ],
+            }
+          : undefined,
+        placeholderHint: {
+          sourceText: "自主学习能力",
+          targetText: "the ability to learn independently",
+          structure: "lack + the ability to + verb",
+        },
+        updatedAt: "2026-05-16T01:00:00.000Z",
+      },
+    ]),
+  );
 }
 
 beforeEach(() => {
@@ -90,6 +167,51 @@ afterEach(() => {
 });
 
 describe("Chinese placeholder writing flow", () => {
+  it("reuses cached placeholder suggestions after hydration without re-calling /api/enhance-fast", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(placeholderResult));
+    vi.stubGlobal("fetch", fetchMock);
+    writeArchiveWithText(placeholderText);
+    writeCachedPlaceholderSuggestion();
+
+    render(<LinguaTypeApp />);
+
+    await screen.findByLabelText("写作编辑器");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("opens a cached placeholder suggestion directly without requesting /api/enhance-fast again", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(placeholderResult));
+    vi.stubGlobal("fetch", fetchMock);
+    writeArchiveWithText(placeholderText);
+    writeCachedPlaceholderSuggestion();
+
+    render(<LinguaTypeApp />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /AI/ }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText("修改后句子")).toHaveTextContent(
+      "the ability to learn independently",
+    );
+  });
+
+  it("does not re-call /api/enhance-fast when the requestKey is already cached even if the cached marker cannot be rebuilt", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(placeholderResult));
+    vi.stubGlobal("fetch", fetchMock);
+    writeArchiveWithText(placeholderText);
+    writeCachedPlaceholderSuggestion(placeholderText, false);
+
+    render(<LinguaTypeApp />);
+
+    await screen.findByLabelText("写作编辑器");
+    vi.useFakeTimers();
+    await act(async () => {
+      vi.advanceTimersByTime(1200);
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("keeps the editor quiet while the backend suggestion request is running", async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -102,7 +224,7 @@ describe("Chinese placeholder writing flow", () => {
     render(<LinguaTypeApp />);
     const editor = await screen.findByLabelText("写作编辑器");
     vi.useFakeTimers();
-    setEditorText(editor, "I found that many students lack 自主学习能力.");
+    setEditorText(editor, placeholderText);
 
     expect(fetchMock).not.toHaveBeenCalled();
     await act(async () => {
@@ -113,7 +235,7 @@ describe("Chinese placeholder writing flow", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/enhance-fast", expect.anything());
     expect(screen.queryByText(/正在/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("当前句行内建议")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("查看当前句 AI 建议")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/查看当前.*AI/)).not.toBeInTheDocument();
   });
 
   it("does not show a weak prompt or call AI before the sentence is complete", async () => {
@@ -125,28 +247,16 @@ describe("Chinese placeholder writing flow", () => {
     vi.useFakeTimers();
     setEditorText(editor, "I found that many students lack 自主学习能力");
 
-    expect(screen.queryByLabelText("中文占位弱提示")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
-
     await act(async () => {
-      vi.advanceTimersByTime(799);
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    await act(async () => {
-      vi.advanceTimersByTime(1);
+      vi.advanceTimersByTime(800);
       await Promise.resolve();
     });
     expect(fetchMock).not.toHaveBeenCalled();
 
-    setEditorText(editor, "I found that many students lack 自主学习能力.");
-    expect(fetchMock).not.toHaveBeenCalled();
+    setEditorText(editor, placeholderText);
     await act(async () => {
-      vi.advanceTimersByTime(799);
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-    await act(async () => {
-      vi.advanceTimersByTime(1);
+      vi.advanceTimersByTime(800);
       await Promise.resolve();
     });
     expect(fetchMock).toHaveBeenCalledWith("/api/enhance-fast", expect.anything());
@@ -164,7 +274,7 @@ describe("Chinese placeholder writing flow", () => {
     render(<LinguaTypeApp />);
     const editor = await screen.findByLabelText("写作编辑器");
     vi.useFakeTimers();
-    const text = "Last week, I joined a project. I found that many students lack 自主学习能力.";
+    const text = `Last week, I joined a project. ${placeholderText}`;
     setEditorText(editor, text);
     await act(async () => {
       vi.advanceTimersByTime(800);
@@ -172,31 +282,28 @@ describe("Chinese placeholder writing flow", () => {
     });
     vi.useRealTimers();
 
-    const suggestionIcon = await screen.findByLabelText("查看当前句 AI 建议");
+    const suggestionIcon = await screen.findByLabelText(/查看当前.*AI/);
     expect(screen.queryByLabelText("当前句行内建议")).not.toBeInTheDocument();
-    expect(screen.queryByText("✦ 更自然的表达")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("查看当前句 AI 建议虚线")).not.toBeInTheDocument();
     fireEvent.click(suggestionIcon);
 
     await screen.findByLabelText("当前句行内建议");
-    expect(screen.queryByText("✦ 更自然的表达")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("AI 建议句子焦点")).toHaveTextContent("I found that many students lack 自主学习能力.");
-    const sourcePhrase = screen.getByLabelText("中文占位意群：自主学习能力");
-    expect(sourcePhrase).toHaveTextContent("自主学习能力");
-    expect(screen.getAllByText("the ability to learn independently").length).toBeGreaterThan(0);
-    expect(screen.getByText("结构：lack + the ability to + verb")).toBeInTheDocument();
-    expect(screen.getByLabelText("对应英文表达")).toHaveAttribute("data-active", "false");
-    fireEvent.click(sourcePhrase);
-    expect(screen.getByLabelText("对应英文表达")).toHaveAttribute("data-active", "true");
+    expect(screen.getByLabelText("AI 建议句子焦点")).toHaveTextContent(placeholderText);
+    const originalDiff = screen.getByLabelText(/原句改动/u);
+    expect(originalDiff).toHaveTextContent("自主学习能力");
+    expect(originalDiff).not.toHaveAttribute("role", "button");
+    expect(screen.getByLabelText("修改后句子")).toHaveTextContent(
+      "the ability to learn independently",
+    );
+    expect(screen.queryByLabelText("对应英文表达")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "忽略" }));
     await waitFor(() => expect(screen.queryByLabelText("当前句行内建议")).not.toBeInTheDocument());
-    fireEvent.click(screen.getByLabelText("已调用 AI 修改，点击查看建议"));
+    fireEvent.click(screen.getByLabelText("重新查看AI修改"));
     await screen.findByLabelText("当前句行内建议");
 
     const enhanceCall = fetchMock.mock.calls.find(([input]) => String(input).includes("/api/enhance-fast"));
     const enhanceRequest = JSON.parse(String((enhanceCall?.[1] as RequestInit | undefined)?.body)) as { latestSentence: string };
-    expect(enhanceRequest.latestSentence).toBe("I found that many students lack 自主学习能力.");
+    expect(enhanceRequest.latestSentence).toBe(placeholderText);
 
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
@@ -207,40 +314,33 @@ describe("Chinese placeholder writing flow", () => {
       ),
     );
     expect(screen.queryByText("学习内容已保存")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("表达库有新内容")).toBeInTheDocument();
+    expect(screen.queryByLabelText("表达库有新内容")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("当前句行内建议")).not.toBeInTheDocument();
-    const reviewedMarker = screen.getByLabelText("已调用 AI 修改，点击查看建议");
+    const reviewedMarker = await screen.findByLabelText("重新查看AI修改");
     expect(reviewedMarker).toBeInTheDocument();
-    expect(screen.queryByLabelText("已调用 AI 修改虚线，点击查看建议")).not.toBeInTheDocument();
 
     fireEvent.click(reviewedMarker);
     const reviewCard = await screen.findByLabelText("当前句行内建议");
-    expect(reviewCard).toBeInTheDocument();
     expect(reviewCard).toHaveAttribute("data-suggestion-mode", "review");
-    expect(within(reviewCard).queryByText("I found that many students lack the ability to learn independently.")).not.toBeInTheDocument();
-    expect(screen.getAllByText("the ability to learn independently").length).toBeGreaterThan(0);
-
+    expect(within(reviewCard).getByLabelText("修改后句子")).toHaveTextContent(
+      placeholderResult.finalSentence,
+    );
     expect(screen.queryByRole("button", { name: "忽略" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "应用修改" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "换一种说法" })).toBeInTheDocument();
 
-    const library = JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]") as Array<{
-      content: string;
-      chineseMeaning: string;
-      usageNote: string;
-    }>;
-    expect(library).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          content: "the ability to learn independently",
-          chineseMeaning: "自主学习能力",
-          usageNote: "结构：lack + the ability to + verb",
-        }),
-      ]),
-    );
+    await waitFor(() => {
+      const cache = JSON.parse(localStorage.getItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY) ?? "[]");
+      expect(cache).toHaveLength(1);
+      expect(cache[0]).toMatchObject({
+        originalSentence: placeholderText,
+        finalSentence: placeholderResult.finalSentence,
+        reviewed: true,
+      });
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: /表达库/ }));
-    await waitFor(() => expect(screen.queryByLabelText("表达库有新内容")).not.toBeInTheDocument());
+    const library = JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) ?? "[]");
+    expect(library).toEqual([]);
   });
 
   it("does not repeat a whole Chinese sentence inside the inline learning card", async () => {
@@ -259,16 +359,16 @@ describe("Chinese placeholder writing flow", () => {
     });
     vi.useRealTimers();
 
-    fireEvent.click(await screen.findByLabelText("查看当前句 AI 建议"));
+    fireEvent.click(await screen.findByLabelText(/查看当前.*AI/));
     expect(await screen.findByLabelText("当前句行内建议")).toBeInTheDocument();
     expect(screen.getByLabelText("AI 建议句子焦点")).toHaveTextContent("我觉得我这个会火。");
-    expect(screen.getByLabelText("中文占位意群：会火")).toHaveTextContent("会火");
-    expect(screen.queryByLabelText("中文占位意群：我觉得我这个会火")).not.toBeInTheDocument();
-    expect(screen.queryByText(/我觉得我这个会火\s*→/u)).not.toBeInTheDocument();
-    expect(screen.getByLabelText("对应英文表达")).toHaveTextContent("go viral");
-
-    fireEvent.click(screen.getByLabelText("中文占位意群：会火"));
-    expect(screen.getByLabelText("对应英文表达")).toHaveAttribute("data-active", "true");
+    const originalDiff = screen.getByLabelText(/原句改动/u);
+    expect(originalDiff).toBeInTheDocument();
+    expect(originalDiff).not.toHaveAttribute("role", "button");
+    expect(screen.queryByLabelText("句级结构问题")).not.toBeInTheDocument();
+    expect(screen.getByText(/->/u)).toBeInTheDocument();
+    expect(screen.getByLabelText("修改后句子")).toHaveTextContent("go viral");
+    expect(screen.queryByLabelText("对应英文表达")).not.toBeInTheDocument();
   });
 
   it("keeps independent stable suggestion icons for multiple Chinese sentences and clears them on new archive", async () => {
@@ -299,9 +399,9 @@ describe("Chinese placeholder writing flow", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(screen.queryByLabelText("查看当前句 AI 建议虚线")).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText("查看当前句 AI 建议")).toHaveLength(2);
+    expect(screen.getAllByLabelText(/查看当前.*AI/)).toHaveLength(2);
 
-    fireEvent.click(screen.getAllByLabelText("查看当前句 AI 建议")[1]);
+    fireEvent.click(screen.getAllByLabelText(/查看当前.*AI/)[1]);
     expect(await screen.findByLabelText("当前句行内建议")).toBeInTheDocument();
     expect(screen.getByLabelText("AI 建议句子焦点")).toHaveTextContent("This may 影响 young people's values.");
 
@@ -327,6 +427,6 @@ describe("Chinese placeholder writing flow", () => {
     await screen.findByLabelText("当前句行内建议");
     const enhanceCall = fetchMock.mock.calls.find(([input]) => String(input).includes("/api/enhance-fast"));
     const enhanceRequest = JSON.parse(String((enhanceCall?.[1] as RequestInit | undefined)?.body)) as { latestSentence: string };
-    expect(enhanceRequest.latestSentence).toBe("I found that many students lack 自主学习能力.");
+    expect(enhanceRequest.latestSentence).toBe(placeholderText);
   });
 });

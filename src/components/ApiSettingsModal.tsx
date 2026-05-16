@@ -44,7 +44,7 @@ export function ApiSettingsModal({
       <button
         type="button"
         onClick={onClose}
-        aria-label="关闭 API Settings 设置"
+        aria-label="关闭 API 设置"
         className="absolute right-6 top-6 rounded-md bg-white/70 px-3 py-2 text-sm text-[#1c1c1c]/60 shadow-sm transition hover:bg-white"
       >
         关闭
@@ -55,17 +55,39 @@ export function ApiSettingsModal({
 
 export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: ApiSettingsPanelProps) {
   const [draft, setDraft] = useState<ApiConfig>(() => ({ ...settings, mockMode: false }));
+  const [feedbackType, setFeedbackType] = useState<"idle" | "success" | "error" | "info">("idle");
+  const [feedbackText, setFeedbackText] = useState("");
   const [testing, setTesting] = useState(false);
-  const [testMessage, setTestMessage] = useState("");
 
   useEffect(() => {
     setDraft({ ...settings, mockMode: false });
-    setTestMessage("");
+    setFeedbackType("idle");
+    setFeedbackText("");
   }, [settings]);
+
+  const feedbackBaseClass = "mt-3 rounded-md px-3 py-2 text-sm";
+  const feedbackClassByType: Record<typeof feedbackType, string> = {
+    idle: "hidden",
+    success: "bg-emerald-500/[0.10] text-emerald-900",
+    error: "bg-red-500/[0.10] text-red-900 dark:text-red-200",
+    info: "bg-[var(--lt-surface-soft)] text-[var(--lt-muted)]",
+  };
+
+  function setFeedback(type: typeof feedbackType, text: string) {
+    setFeedbackType(type);
+    setFeedbackText(text);
+  }
+
+  function sanitizeMessage(message: string): string {
+    if (!draft.apiKey) {
+      return message;
+    }
+    return message.split(draft.apiKey).join("[REDACTED_API_KEY]");
+  }
 
   async function testConnection() {
     setTesting(true);
-    setTestMessage("");
+    setFeedback("info", "正在测试连接...");
     try {
       const response = await fetch("/api/test-connection", {
         method: "POST",
@@ -76,9 +98,10 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? "连接测试失败。");
       }
-      setTestMessage("连接测试通过。");
+      setFeedback("success", "连接测试通过。");
     } catch (error) {
-      setTestMessage(error instanceof Error ? error.message : "连接测试失败。");
+      const message = sanitizeMessage(error instanceof Error ? error.message : "连接测试失败。");
+      setFeedback("error", message);
     } finally {
       setTesting(false);
     }
@@ -86,12 +109,14 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
 
   function update<K extends keyof ApiConfig>(key: K, value: ApiConfig[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    setFeedbackType("idle");
+    setFeedbackText("");
   }
 
   return (
     <section className={`rounded-md bg-[var(--lt-surface)] p-5 text-[var(--lt-text)] ring-1 ring-[var(--lt-border)] ${className}`}>
       <div>
-        <h2 className="text-lg font-semibold">API Settings 设置</h2>
+        <h2 className="text-lg font-semibold">API 设置</h2>
         <p className="mt-1 text-sm leading-6 text-[var(--lt-muted)]">
           设置只保存在当前浏览器。API Key 会随请求发送到本地 API route，但不会保存到服务器。
         </p>
@@ -167,9 +192,14 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
         </div>
       </details>
 
-      {testMessage ? (
-        <div className="mt-3 rounded-md bg-[var(--lt-surface-soft)] px-3 py-2 text-sm text-[var(--lt-muted)]">
-          {testMessage}
+      {feedbackType !== "idle" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={`${feedbackBaseClass} ${feedbackClassByType[feedbackType]}`}
+        >
+          {feedbackText}
         </div>
       ) : null}
 
@@ -178,7 +208,7 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
           type="button"
           onClick={() => {
             onClear();
-            setTestMessage("API 设置已重置。");
+            setFeedback("success", "API 设置已重置。");
           }}
           className="rounded-md px-3 py-2 text-sm text-red-700/80 transition hover:bg-red-500/[0.08] hover:text-red-800 dark:text-red-300"
         >
@@ -195,7 +225,10 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
           </button>
           <button
             type="button"
-            onClick={() => onSave({ ...draft, mockMode: false })}
+            onClick={() => {
+              onSave({ ...draft, mockMode: false });
+              setFeedback("success", "API 设置已保存。");
+            }}
             className="rounded-md bg-[var(--lt-text)] px-4 py-2 text-sm font-medium text-[var(--lt-bg)] transition opacity-95 hover:opacity-85"
           >
             保存设置
