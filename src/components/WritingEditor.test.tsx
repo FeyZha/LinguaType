@@ -326,6 +326,37 @@ describe("WritingEditor native long-text input", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it("renders expression reappearance cues as independent text-level reinforcement", () => {
+    const value = "Social media can shape young people's values.";
+    const start = value.indexOf("shape");
+    const { container } = renderEditor({
+      value,
+      expressionReappearanceCues: [
+        {
+          id: "cue-1",
+          itemId: "library-1",
+          expression: "shape one's values",
+          matchedText: "shape young people's values",
+          start,
+          end: start + "shape young people's values".length,
+          meaning: "塑造 / 影响某人的价值观",
+          state: "fresh",
+        },
+      ],
+    });
+
+    const cue = screen.getByLabelText("表达库命中：shape one's values");
+    expect(cue).toHaveAttribute("data-expression-reappearance-cue", "fresh");
+    expect(cue).toHaveClass("lt-expression-cue--fresh");
+    expect(container.querySelector("[data-suggestion-entry]")).toBeNull();
+    expect(container.querySelector("[data-proofreading-item]")).toBeNull();
+
+    fireEvent.mouseEnter(cue);
+    expect(screen.getByText("表达库命中")).toBeInTheDocument();
+    expect(screen.getByText("shape one's values")).toBeInTheDocument();
+    expect(screen.getByText("塑造 / 影响某人的价值观")).toBeInTheDocument();
+  });
+
   it("keeps AI marker closer than proofreading marker", () => {
     const value = "This is a proofing marker placement sentence.";
     const markerStart = 10;

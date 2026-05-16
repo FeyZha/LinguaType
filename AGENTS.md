@@ -41,6 +41,8 @@ Theme Preference supports `light`, `dark`, and `system`. It belongs in the main 
 
 Current Sentence suggestions should appear near the editor as an inline suggestion card when possible. Chinese placeholders should first surface as low-distraction sentence-side markers after a complete stable sentence, then expand only after the user opens the marker. Suggestions must remain suggestions, not applied text, until the user explicitly clicks Apply.
 
+Expression Reappearance Cues are passive learning reinforcement. When the user naturally writes a high-value phrase or collocation already stored in the local expression library, the matching text may show one very light inline cue and a small hover/focus explanation. This cue must not become a recommendation, candidate list, proofreading warning, AI suggestion marker, or text rewrite action.
+
 v0.2.2 preserves the core flow:
 latest sentence -> `/api/enhance-fast` -> code-generated diff -> Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply.
 
@@ -196,6 +198,20 @@ Save rules:
 6. Do not save empty content.
 7. Do not save items with empty meaning and empty usage note.
 
+## Expression Reappearance Cues
+
+Expression Reappearance Cues help users notice that they have naturally reused an expression from their own 表达库.
+
+Rules:
+1. Match only local `phrase` and `collocation` Learning Library items.
+2. Do not match ordinary single words, short fragments, personal dictionary entries, or whole paragraphs.
+3. Use local deterministic matching only; do not call the LLM or any API route.
+4. Do not modify editor text, auto-insert expressions, or save new learning data.
+5. In one sentence, show at most one expression reappearance cue.
+6. In one document session, animate the same expression only once; later matches may remain as a quiet static cue.
+7. Visual language must stay independent from AI suggestion markers and Local Proofreading Signals.
+8. Hover/focus may show a small Chinese-first explanation with the stored expression and meaning.
+
 ## Correction Events 与 写作习惯
 
 Correction Events are the data layer for correction signals.
@@ -316,6 +332,7 @@ Acceptance coverage must include:
 - Apply / Cancel / Regenerate / Copy behavior
 - background learning extraction only after Apply
 - Learning Library deduplication
+- Expression Reappearance Cues behavior
 - Correction Events and Writing Habits aggregation
 - trigger modes and cache/throttle behavior
 - Local Proofreading Signals behavior

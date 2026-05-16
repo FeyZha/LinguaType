@@ -13,6 +13,7 @@
 | 主题偏好 | `src/components/ThemePreferenceControl.tsx`, `src/app/globals.css`, `src/lib/storage.ts` | 管理 light/dark/system，只在主写作界面展示为轻量弹出菜单。 |
 | 大纲检查 API | `src/app/api/check-outline/route.ts`, `src/lib/llm/service.ts`, `src/lib/llm/prompts.ts`, `src/lib/llm/types.ts` | 检查大纲是否贴合主题；只提示，不修改。 |
 | 表达库 | `src/components/LearningLibraryPanel.tsx`, `src/lib/storage.ts`, `src/lib/proofreading.ts` | 管理本地表达资产，支持搜索、收藏、复制、插入、删除和导出；个人词典作为类型选项在此管理。 |
+| 表达复现提示 | `src/lib/expressionReappearance.ts`, `src/components/LinguaTypeApp.tsx`, `src/components/WritingEditor.tsx` | 本地匹配正文中已自然复现的表达库 phrase/collocation，并在写作区原位显示低打扰学习强化提示；不调用模型、不改正文。 |
 | 写作习惯 | `src/components/WritingHabitsPanel.tsx`, `src/lib/storage.ts` | 基于 Correction Events 聚合写作习惯。 |
 | 本地校对信号 | `src/lib/proofreading.ts`, `src/components/WritingEditor.tsx`, `src/components/ProofreadingSignalsPanel.tsx` | 在本地计算词数、句数、段落数、重复词、标点、长句和风格提示；写作页以底部统计和右侧轻量 tag 呈现，不弹出独立校对面板。 |
 | 段落流畅度 | `src/components/ParagraphFlowPanel.tsx`, `src/app/api/check-paragraph-flow/route.ts` | 手动检查当前段落，可返回 revisedParagraph，但不自动 Apply。 |
@@ -34,6 +35,7 @@
 - 最新句增强只处理最新非空句，不改写整段。
 - 文档编辑器只是 UI 组织方式；即使临时展开内联建议，也不改变 Apply/Cancel、原生输入、空行和 range replacement 规则。
 - 中文占位句建议必须先查本地缓存；页面加载或切换存档不能因为已有缓存建议而重复调用模型。
+- 表达复现提示只读表达库和正文，只做本地规则匹配；不得复用 AI 修改入口或本地校对 tag 的视觉语言。
 - 主题 H1 和 setup 元数据不并入正文 `text`；latest-sentence extraction 只基于正文草稿文本。
 - 大纲检查只在用户确认内联 setup 修改后触发，只提示问题，不生成正文、不改写大纲、不保存学习数据。
 - 本地校对信号只做轻量提示和 hover/focus 定位，不自动改写文本，不恢复独立校对详情弹窗。

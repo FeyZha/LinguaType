@@ -13,6 +13,7 @@ import {
 import { waapi } from "animejs/waapi";
 import type { Change } from "diff";
 
+import type { ExpressionReappearanceMatch } from "@/lib/expressionReappearance";
 import type { EnhancementLevel, WritingMode } from "@/lib/llm/types";
 import type { ProofreadingResult } from "@/lib/proofreading";
 import type { ProofreadingSignal } from "@/lib/proofreading";
@@ -40,6 +41,12 @@ type SuggestionMarker = {
 };
 
 const EMPTY_SUGGESTION_MARKERS: SuggestionMarker[] = [];
+
+export type ExpressionReappearanceCue = ExpressionReappearanceMatch & {
+  state?: "fresh" | "seen";
+};
+
+const EMPTY_EXPRESSION_REAPPEARANCE_CUES: ExpressionReappearanceCue[] = [];
 
 export type WritingEditorHandle = {
   focus: () => void;
@@ -86,6 +93,7 @@ type WritingEditorProps = {
   onFocusedSuggestionSourceClick?: () => void;
   suggestionMarker?: SuggestionMarker | null;
   suggestionMarkers?: SuggestionMarker[];
+  expressionReappearanceCues?: ExpressionReappearanceCue[];
   inlineSuggestionParagraphIndex?: number;
   placeholderNotice?: string;
   onApplySuggestionShortcut?: () => void;
@@ -546,6 +554,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       onFocusedSuggestionSourceClick,
       suggestionMarker = null,
       suggestionMarkers = EMPTY_SUGGESTION_MARKERS,
+      expressionReappearanceCues = EMPTY_EXPRESSION_REAPPEARANCE_CUES,
       onApplySuggestionShortcut,
       onRegenerateSuggestionShortcut,
       wideLayout = false,
@@ -573,6 +582,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       Record<string, { expandedHeight: number }>
     >({});
     const [activeProofreadingSignalId, setActiveProofreadingSignalId] = useState<string | null>(null);
+    const [activeExpressionCueId, setActiveExpressionCueId] = useState<string | null>(null);
 
     const proofreadingIssueCount = proofreadingResult.signals.length;
     const proofreadingHints = useMemo<ProofreadingSignal[]>(
@@ -627,6 +637,10 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       () =>
         activeSuggestionMarkers.find((marker) => marker.id === activeSuggestionMarkerId),
       [activeSuggestionMarkerId, activeSuggestionMarkers],
+    );
+    const activeExpressionCue = useMemo(
+      () => expressionReappearanceCues.find((cue) => cue.id === activeExpressionCueId),
+      [activeExpressionCueId, expressionReappearanceCues],
     );
 
     useDismissableLayer(statusControlsRef, () => setOpenStatusMenu(null), Boolean(openStatusMenu));
@@ -973,6 +987,89 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       );
     }
 
+    function renderExpressionReappearanceLayer(cues: ExpressionReappearanceCue[]) {
+      if (cues.length === 0) {
+        return null;
+      }
+
+      const nodes: ReactNode[] = [];
+      let cursor = 0;
+      const sortedCues = [...cues]
+        .map((cue) => ({
+          ...cue,
+          start: clampOffset(cue.start, value.length),
+          end: clampOffset(cue.end, value.length),
+        }))
+        .filter((cue) => cue.end > cue.start)
+        .sort((first, second) => first.start - second.start);
+
+      for (const cue of sortedCues) {
+        const start = Math.max(cursor, cue.start);
+        const end = Math.max(start, cue.end);
+        if (end <= start) {
+          continue;
+        }
+        if (start > cursor) {
+          nodes.push(
+            <span key={`${cue.id}-before-${cursor}`} aria-hidden="true">
+              {value.slice(cursor, start)}
+            </span>,
+          );
+        }
+
+        const isActive = activeExpressionCue?.id === cue.id;
+        nodes.push(
+          <span
+            key={cue.id}
+            tabIndex={0}
+            aria-label={`表达库命中：${cue.expression}`}
+            data-expression-reappearance-cue={cue.state === "fresh" ? "fresh" : "seen"}
+            className={`lt-expression-cue pointer-events-auto relative inline cursor-text whitespace-pre-wrap text-transparent outline-none ${
+              cue.state === "fresh" ? "lt-expression-cue--fresh" : ""
+            } ${isActive ? "lt-expression-cue--active" : ""}`}
+            onMouseEnter={() => setActiveExpressionCueId(cue.id)}
+            onMouseLeave={() =>
+              setActiveExpressionCueId((current) => (current === cue.id ? null : current))
+            }
+            onFocus={() => setActiveExpressionCueId(cue.id)}
+            onBlur={() =>
+              setActiveExpressionCueId((current) => (current === cue.id ? null : current))
+            }
+            onMouseDown={(event) => {
+              event.preventDefault();
+              editorRef.current?.focus();
+            }}
+          >
+            {value.slice(start, end)}
+            {isActive ? (
+              <span
+                role="status"
+                data-expression-reappearance-detail="open"
+                className="absolute left-0 top-[1.75em] z-30 min-w-[220px] max-w-[320px] border-l border-[color:color-mix(in_srgb,var(--lt-memory)_55%,transparent)] bg-[var(--lt-bg)]/90 py-1.5 pl-3 pr-2 font-sans text-[11px] leading-4 text-[var(--lt-muted)] backdrop-blur-sm"
+              >
+                <span className="block font-medium text-[var(--lt-text)]">表达库命中</span>
+                <span className="block text-[var(--lt-muted)]">{cue.expression}</span>
+                {cue.meaning ? (
+                  <span className="block text-[var(--lt-faint)]">{cue.meaning}</span>
+                ) : null}
+              </span>
+            ) : null}
+          </span>,
+        );
+        cursor = end;
+      }
+
+      if (cursor < value.length) {
+        nodes.push(
+          <span key="expression-cue-after" aria-hidden="true">
+            {value.slice(cursor)}
+          </span>,
+        );
+      }
+
+      return nodes;
+    }
+
     const writingTextClass =
       "font-serif text-[21px] leading-[2.22] tracking-[0] md:text-[22px] md:leading-[2.25] whitespace-pre-wrap break-words";
     const writingPaperClass = `${writingTextClass} text-transparent`;
@@ -1052,6 +1149,14 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
                     className={`pointer-events-none absolute inset-x-0 top-0 min-h-[520px] ${writingPaperClass}`}
                   >
                     {renderSuggestionHighlightLayer(activeSuggestionMarker)}
+                  </div>
+                ) : null}
+
+                {expressionReappearanceCues.length > 0 ? (
+                  <div
+                    className={`pointer-events-none absolute inset-x-0 top-0 z-10 min-h-[520px] ${writingPaperClass}`}
+                  >
+                    {renderExpressionReappearanceLayer(expressionReappearanceCues)}
                   </div>
                 ) : null}
 

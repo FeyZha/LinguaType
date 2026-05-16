@@ -11,6 +11,7 @@ src/app/page.tsx
       -> src/lib/sentence.ts
       -> src/lib/storage.ts
       -> src/lib/proofreading.ts
+      -> src/lib/expressionReappearance.ts
       -> src/app/api/* via fetch
 
 src/app/api/*/route.ts
@@ -34,6 +35,7 @@ src/app/api/*/route.ts
 - Selection Actions。
 - 编辑器内联 Writing Setup 修改和显式 outline check。
 - 原生长文本写作面、句旁建议入口、行内当前句建议展示和中间主舞台页面切换。
+- 用本地表达库和正文计算表达复现提示；该计算不调用 API，不写学习数据。
 - 左侧固定导航中的 Writing Archives、表达库、写作习惯、数据管理、触发设置和快捷键入口，以及顶部 API 设置入口。
 
 ## 写作准备数据流
@@ -82,6 +84,7 @@ App load
 - 在无内联卡片时保持原生输入面；打开建议后临时把目标句拆出为焦点段落并把卡片放在句子下方。
 - 固定底部状态栏，展示词数、句数、段落数、模式、强度、触发、领域和本地校对数量。
 - 将本地校对问题渲染为写作区右侧轻量 tag，并在 tag hover/focus 时用覆盖层高亮对应正文范围。
+- 将表达库命中的 phrase/collocation 渲染为正文原位的极轻表达复现提示，并在 hover/focus 时显示小说明。
 
 这样可以保留既有能力：
 
@@ -127,6 +130,18 @@ Selection Actions 和 Inline Expression Menu 仍接收全文 offset，不直接�
 ```
 
 模型不生成 diff。Diff 由本地代码生成。
+
+## 表达复现提示数据流
+
+```text
+用户编辑正文
+  -> findExpressionReappearanceCues(text, learningLibrary)
+  -> 只匹配本地 phrase / collocation
+  -> WritingEditor 在命中文本上显示极轻微动效
+  -> hover/focus 显示表达库命中说明
+```
+
+表达复现提示不调用模型，不触发 `/api/extract-learning`，不写入表达库或 Correction Events，也不修改正文。它与 AI 修改入口和本地校对 tag 是三套不同的交互。
 
 ## 大纲检查数据流
 

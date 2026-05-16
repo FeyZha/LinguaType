@@ -48,6 +48,7 @@ import {
   type SentenceRange,
   type ChinesePlaceholderSentenceRange,
 } from "@/lib/sentence";
+import { findExpressionReappearanceCues } from "@/lib/expressionReappearance";
 import { createParagraphFingerprint } from "@/lib/llm/normalize";
 import { TOPIC_OPTIONS } from "@/lib/topicOptions";
 import {
@@ -219,8 +220,11 @@ export function LinguaTypeApp() {
   const placeholderTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paragraphHealthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const documentMotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expressionCueAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoredPlaceholderRequestKeyRef = useRef("");
   const placeholderRequestKeysRef = useRef<Set<string>>(new Set());
+  const seenExpressionCueKeysRef = useRef<Set<string>>(new Set());
+  const hasUserEditedForExpressionCuesRef = useRef(false);
   const [text, setText] = useState("");
   const [editorSelection, setEditorSelection] = useState({ start: 0, end: 0 });
   const [writingMode, setWritingMode] = useState<WritingMode>("natural");
@@ -262,6 +266,7 @@ export function LinguaTypeApp() {
   const [placeholderSuggestionCache, setPlaceholderSuggestionCache] = useState<PlaceholderSuggestionCacheRecord[]>([]);
   const [activePlaceholderInsight, setActivePlaceholderInsight] = useState(false);
   const [activeSuggestionDiffId, setActiveSuggestionDiffId] = useState<string | null>(null);
+  const [freshExpressionCueIds, setFreshExpressionCueIds] = useState<Set<string>>(() => new Set());
   const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("editor");
@@ -316,6 +321,10 @@ export function LinguaTypeApp() {
       if (documentMotionTimerRef.current) {
         clearTimeout(documentMotionTimerRef.current);
         documentMotionTimerRef.current = null;
+      }
+      if (expressionCueAnimationTimerRef.current) {
+        clearTimeout(expressionCueAnimationTimerRef.current);
+        expressionCueAnimationTimerRef.current = null;
       }
       if (workspaceExitTimerRef.current) {
         clearTimeout(workspaceExitTimerRef.current);
@@ -481,6 +490,56 @@ export function LinguaTypeApp() {
     () => analyzeProofreading(text, personalDictionary),
     [text, personalDictionary],
   );
+
+  const expressionReappearanceMatches = useMemo(
+    () => findExpressionReappearanceCues(text, learningLibrary),
+    [learningLibrary, text],
+  );
+
+  useEffect(() => {
+    hasUserEditedForExpressionCuesRef.current = false;
+    setFreshExpressionCueIds(new Set());
+  }, [writingArchives.activeId]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    const archiveKey = writingArchives.activeId ?? "draft";
+    if (!hasUserEditedForExpressionCuesRef.current) {
+      for (const match of expressionReappearanceMatches) {
+        seenExpressionCueKeysRef.current.add(`${archiveKey}:${match.itemId}`);
+      }
+      setFreshExpressionCueIds((current) => (current.size === 0 ? current : new Set()));
+      return;
+    }
+
+    const freshIds: string[] = [];
+    const animatedItems = new Set<string>();
+    for (const match of expressionReappearanceMatches) {
+      const cueKey = `${archiveKey}:${match.itemId}`;
+      if (seenExpressionCueKeysRef.current.has(cueKey) || animatedItems.has(match.itemId)) {
+        continue;
+      }
+      seenExpressionCueKeysRef.current.add(cueKey);
+      animatedItems.add(match.itemId);
+      freshIds.push(match.id);
+    }
+
+    if (freshIds.length === 0) {
+      return;
+    }
+
+    if (expressionCueAnimationTimerRef.current) {
+      clearTimeout(expressionCueAnimationTimerRef.current);
+    }
+    setFreshExpressionCueIds(new Set(freshIds));
+    expressionCueAnimationTimerRef.current = setTimeout(() => {
+      setFreshExpressionCueIds(new Set());
+      expressionCueAnimationTimerRef.current = null;
+    }, 900);
+  }, [expressionReappearanceMatches, isHydrated, writingArchives.activeId]);
 
   useEffect(() => {
     if (placeholderTriggerTimerRef.current) {
@@ -1483,6 +1542,7 @@ export function LinguaTypeApp() {
   }
 
   function handleEditorTextChange(value: string) {
+    hasUserEditedForExpressionCuesRef.current = true;
     setText(value);
     const cursorPosition = editorRef.current?.getSelectionRange().end ?? value.length;
     setEditorSelection((current) => (
@@ -2408,6 +2468,10 @@ export function LinguaTypeApp() {
                   topicAreaLabel={topicAreaDisplayLabel(writingSetup)}
                   wideLayout={archiveSidebarCollapsed}
                   suggestionMarkers={suggestionMarkers}
+                  expressionReappearanceCues={expressionReappearanceMatches.map((match) => ({
+                    ...match,
+                    state: freshExpressionCueIds.has(match.id) ? "fresh" : "seen",
+                  }))}
                   focusedSuggestionSentence={
                     pending?.result && suggestionDisplayMode === "expanded"
                       ? pending.originalSentence
