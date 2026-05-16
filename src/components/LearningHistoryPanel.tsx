@@ -3,9 +3,9 @@
 import type { LearningHistoryItem } from "@/lib/llm/types";
 
 const TYPE_LABELS: Record<LearningHistoryItem["type"], string> = {
-  phrase: "短语 Phrase",
-  collocation: "搭配 Collocation",
-  sentence_pattern: "句型 Sentence pattern",
+  phrase: "短语",
+  collocation: "搭配",
+  sentence_pattern: "句型",
 };
 
 type LearningHistoryPanelProps = {
@@ -17,7 +17,7 @@ type LearningHistoryPanelProps = {
 export function LearningHistoryPanel({ items, onDelete, onInsert }: LearningHistoryPanelProps) {
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">学习记录 Learning History</h2>
+      <h2 className="text-sm font-semibold text-slate-900">学习记录</h2>
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           应用修改后，有用表达会保存到这里。
@@ -40,7 +40,7 @@ export function LearningHistoryPanel({ items, onDelete, onInsert }: LearningHist
                       <div className="font-medium text-slate-900">{item.content}</div>
                       <div className="mt-1 text-slate-600">{item.chineseMeaning}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        已保存，复用 {item.useCount} 次
+                        已保存，使用 {item.useCount} 次
                       </div>
                       <div className="mt-2 flex gap-2">
                         <button

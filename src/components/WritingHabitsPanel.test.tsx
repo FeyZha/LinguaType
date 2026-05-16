@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WritingHabitsPanel } from "./WritingHabitsPanel";
 import type { CorrectionEvent } from "@/lib/llm/types";
@@ -47,7 +47,61 @@ describe("WritingHabitsPanel", () => {
     expect(trendChart).toHaveAttribute("data-habit-chart-state", "empty");
     expect(screen.getByText("还没有近 7 天修正记录。")).toBeInTheDocument();
   });
+
+  it("shows a temporary delete notice with corrected Chinese copy", () => {
+    vi.useFakeTimers();
+    try {
+      render(<WritingHabitsPanel events={writingHabitEvents()} onDeleteType={vi.fn()} />);
+
+      const deleteButton = getDeleteTypeButtons()[0];
+      fireEvent.click(deleteButton);
+
+      const notice = screen.getByRole("status");
+      expect(notice).toHaveTextContent("已清理 chinese_transfer 本地修改记录。");
+      expect(notice).toHaveTextContent("表达库不受影响。");
+
+      act(() => {
+        vi.advanceTimersByTime(2500);
+      });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("replaces the previous delete notice and resets the auto-dismiss timer", () => {
+    vi.useFakeTimers();
+    try {
+      render(<WritingHabitsPanel events={writingHabitEvents()} onDeleteType={vi.fn()} />);
+      const deleteButtons = getDeleteTypeButtons();
+
+      fireEvent.click(deleteButtons[0]);
+      expect(screen.getByRole("status")).toHaveTextContent("已清理 chinese_transfer 本地修改记录。");
+
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      fireEvent.click(deleteButtons[1]);
+      expect(screen.getByRole("status")).toHaveTextContent("已清理 word_order 本地修改记录。");
+
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(screen.getByRole("status")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+
+function getDeleteTypeButtons(): HTMLElement[] {
+  return screen.getAllByRole("button", { name: "删除此类写作习惯" });
+}
 
 function writingHabitEvents(): CorrectionEvent[] {
   return [

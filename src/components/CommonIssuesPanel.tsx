@@ -4,11 +4,11 @@ import type { CorrectionMemory, WritingMode } from "@/lib/llm/types";
 import { sortCorrectionMemory } from "@/lib/storage";
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
-  natural: "Natural",
-  ielts: "IELTS",
-  academic: "Academic",
-  business: "Business",
-  concise: "Concise",
+  natural: "自然",
+  ielts: "雅思",
+  academic: "学术",
+  business: "商务",
+  concise: "简洁",
 };
 
 type CommonIssuesPanelProps = {
@@ -21,7 +21,7 @@ export function CommonIssuesPanel({ items, onDelete }: CommonIssuesPanelProps) {
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">常见问题 Common Issues</h2>
+      <h2 className="text-sm font-semibold text-slate-900">常见问题</h2>
       {sorted.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           应用句子建议后，反复出现的修改模式会显示在这里。

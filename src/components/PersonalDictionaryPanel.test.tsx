@@ -7,10 +7,10 @@ describe("PersonalDictionaryPanel", () => {
     const onChange = vi.fn();
     render(<PersonalDictionaryPanel terms={["LinguaType"]} onChange={onChange} />);
 
-    fireEvent.change(screen.getByLabelText("添加 Personal Dictionary 词条"), {
+    fireEvent.change(screen.getByLabelText("添加个人词典项"), {
       target: { value: " DeepSeek " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "加入词典" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加词典项" }));
 
     expect(onChange).toHaveBeenCalledWith(["LinguaType", "DeepSeek"]);
 

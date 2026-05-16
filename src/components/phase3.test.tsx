@@ -217,12 +217,17 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByRole("button", { name: "应用修改" });
     fireEvent.click(screen.getByRole("button", { name: "换一种说法" }));
-    expect(await screen.findByText(regenerated.finalSentence)).toBeInTheDocument();
+    const suggestion = await screen.findByLabelText("当前句行内建议");
+    const addedText = Array.from(suggestion.querySelectorAll("[data-diff-part='added']")).map(
+      (part) => part.textContent,
+    );
+    expect(addedText.join(" ")).toContain("learners");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
     });
 
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(regenerated.finalSentence);
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual(["/api/enhance-fast", "/api/enhance-fast"]);
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY)).toBeNull();
@@ -252,7 +257,7 @@ describe("LinguaType v0.2.1", () => {
     expect(await screen.findByText("段落健康：可能有 1 个问题")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/check-paragraph-flow");
     fireEvent.click(screen.getByRole("button", { name: "查看建议" }));
-    expect(await screen.findByText("段落流畅度检查 Paragraph Flow")).toBeInTheDocument();
+    expect(await screen.findByText("段落流畅度检查")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/check-paragraph-flow");
   });
 
@@ -286,7 +291,7 @@ describe("LinguaType v0.2.1", () => {
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
     expect(screen.getByText("表达菜单")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "解释原因 Explain reason" }));
+    fireEvent.click(screen.getByRole("button", { name: "解释原因" }));
     fireEvent.click(screen.getByRole("button", { name: "This may be because..." }));
 
     expectEditorText(editor, "Hello This may be because...world");
@@ -323,15 +328,15 @@ describe("LinguaType v0.2.1", () => {
     setEditorText(editor, paragraphResult.originalParagraph);
     setEditorSelection(editor, 0);
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "从 Learning Library 插入" }));
+    fireEvent.click(screen.getByRole("button", { name: "从表达库插入" }));
     fireEvent.click(screen.getByRole("button", { name: "as a result" }));
 
     expectEditorText(editor, `as a result${paragraphResult.originalParagraph}`);
 
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "检查当前段落" }));
+    fireEvent.click(screen.getByRole("button", { name: "检查本段" }));
 
-    expect(await screen.findByText("段落流畅度检查 Paragraph Flow")).toBeInTheDocument();
+    expect(await screen.findByText("段落流畅度检查")).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/check-paragraph-flow");
     expect(localStorage.getItem(CORRECTION_MEMORY_STORAGE_KEY)).toBeNull();
   });

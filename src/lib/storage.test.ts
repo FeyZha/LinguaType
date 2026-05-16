@@ -7,6 +7,7 @@ import {
   THEME_SETTINGS_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
   PARAGRAPH_HEALTH_CACHE_STORAGE_KEY,
+  PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY,
   PERSONAL_DICTIONARY_STORAGE_KEY,
   WRITING_SETUP_STORAGE_KEY,
   WRITING_ARCHIVES_STORAGE_KEY,
@@ -22,19 +23,23 @@ import {
   filterLearningLibrary,
   loadCorrectionEventsFromStorage,
   loadLearningLibraryFromStorage,
+  loadPlaceholderSuggestionCache,
   loadPersonalDictionaryFromStorage,
   loadThemeSettingsFromStorage,
   loadTriggerSettingsFromStorage,
   loadWritingArchivesFromStorage,
   loadWritingSetupFromStorage,
+  savePlaceholderSuggestionCache,
   savePersonalDictionary,
   saveParagraphHealthCache,
   saveThemeSettings,
   saveTriggerSettings,
   saveWritingArchives,
   saveWritingSetup,
+  upsertPlaceholderSuggestionCache,
   upsertCorrectionEvents,
   upsertLearningItems,
+  type PlaceholderSuggestionCacheRecord,
 } from "./storage";
 import type {
   CorrectionEvent,
@@ -73,6 +78,7 @@ describe("storage constants", () => {
     expect(WRITING_SETUP_STORAGE_KEY).toBe("linguatype.writingSetup.v1");
     expect(WRITING_ARCHIVES_STORAGE_KEY).toBe("linguatype.writingArchives.v1");
     expect(THEME_SETTINGS_STORAGE_KEY).toBe("linguatype.themeSettings.v1");
+    expect(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY).toBe("linguatype.placeholderSuggestionCache.v1");
   });
 
   it("defaults to JSON mode off and enough tokens for structured responses", () => {
@@ -595,5 +601,88 @@ describe("paragraph health cache", () => {
     const saved = JSON.parse(storage.getItem(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY) ?? "[]") as ParagraphHealthCacheItem[];
     expect(saved).toHaveLength(20);
     expect(saved.filter((item) => item.paragraphFingerprint === "same")).toHaveLength(1);
+  });
+});
+
+describe("placeholder suggestion cache", () => {
+  const now = "2026-05-16T00:00:00.000Z";
+
+  const sampleCacheItem: PlaceholderSuggestionCacheRecord = {
+    id: "record-1",
+    requestKey: "archive-1|natural|balanced|education|I miss Chinese phrases.",
+    requestInputSnapshot: {
+      writingMode: "natural" as const,
+      enhancementLevel: "balanced" as const,
+      domain: "education",
+    },
+    archiveId: "archive-1",
+    originalSentence: "I miss Chinese phrases.",
+    finalSentence: "I still miss Chinese phrases.",
+    explanationZh: "Use concise wording.",
+    taskType: "mixed_chinese_rewrite",
+    hasChinese: true,
+    markerState: "available" as const,
+    reviewed: false,
+    latestSentenceRange: { start: 0, end: 25, sentence: "I miss Chinese phrases." },
+    reviewedRange: { start: 0, end: 25, sentence: "I miss Chinese phrases." },
+    placeholderRange: {
+      sentence: "I miss Chinese phrases.",
+      start: 0,
+      end: 25,
+      placeholders: [{ text: "Chinese", start: 7, end: 13 }],
+    },
+    placeholderHint: {
+      sourceText: "Chinese",
+      targetText: "Chinese",
+      structure: "noun phrase",
+    },
+    updatedAt: now,
+  };
+
+  it("stores and caps placeholder suggestion cache entries", () => {
+    const storage = createMemoryStorage();
+    const items = Array.from({ length: 121 }, (_, index) => ({
+      ...sampleCacheItem,
+      id: `record-${index + 1}`,
+      requestKey: `archive-1|natural|balanced|education|sentence ${index + 1}`,
+      updatedAt: `2026-05-16T00:${String(index).padStart(2, "0")}:00.000Z`,
+      latestSentenceRange: {
+        ...sampleCacheItem.latestSentenceRange,
+        start: index,
+        end: index + 10,
+        sentence: `sentence ${index + 1}`,
+      },
+      reviewedRange: {
+        ...sampleCacheItem.reviewedRange,
+        start: index,
+        end: index + 10,
+        sentence: `sentence ${index + 1}`,
+      },
+      originalSentence: `sentence ${index + 1}`,
+      finalSentence: `improved sentence ${index + 1}`,
+    }));
+
+    const saved = savePlaceholderSuggestionCache(storage, items);
+    expect(saved).toHaveLength(120);
+    expect(JSON.parse(storage.getItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY) ?? "[]")).toHaveLength(120);
+  });
+
+  it("dedupes placeholder cache records by request key and keeps the newest", () => {
+    const storage = createMemoryStorage();
+    const first = { ...sampleCacheItem };
+    const second = {
+      ...sampleCacheItem,
+      id: "record-2",
+      finalSentence: "I miss Chinese vocabulary.",
+      updatedAt: "2026-05-16T00:05:00.000Z",
+    };
+
+    let cache = upsertPlaceholderSuggestionCache(storage, [], first);
+    cache = upsertPlaceholderSuggestionCache(storage, cache, second);
+
+    expect(cache).toHaveLength(1);
+    expect(cache[0].finalSentence).toBe("I miss Chinese vocabulary.");
+    expect(cache[0].updatedAt).toBe("2026-05-16T00:05:00.000Z");
+    expect(loadPlaceholderSuggestionCache(storage)[0].finalSentence).toBe("I miss Chinese vocabulary.");
   });
 });

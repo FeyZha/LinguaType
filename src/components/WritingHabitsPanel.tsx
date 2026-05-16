@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { waapi } from "animejs/waapi";
 import { stagger } from "animejs/utils";
 import { TrashIcon } from "./HeroIcons";
@@ -27,6 +27,20 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
   const maxInsightCount = Math.max(1, ...insights.map((insight) => insight.count));
   const topInsight = insights[0] ?? null;
   const hasTrendData = trendPoints.some((point) => point.value > 0);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+  const deleteNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const DELETE_NOTICE_VISIBLE_MS = 2500;
+
+  const showDeleteNotice = (message: string) => {
+    if (deleteNoticeTimerRef.current) {
+      clearTimeout(deleteNoticeTimerRef.current);
+    }
+    setDeleteNotice(message);
+    deleteNoticeTimerRef.current = setTimeout(() => {
+      setDeleteNotice(null);
+      deleteNoticeTimerRef.current = null;
+    }, DELETE_NOTICE_VISIBLE_MS);
+  };
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -59,15 +73,31 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
     }
   }, [events.length, insights.length]);
 
+  useEffect(() => {
+    return () => {
+      if (deleteNoticeTimerRef.current) {
+        clearTimeout(deleteNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <section ref={panelRef} className="text-[var(--lt-text)]">
       <header data-habit-motion>
-        <p className="text-xs font-medium tracking-[0.14em] text-[var(--lt-muted)]">WRITING HABITS</p>
+        <p className="text-xs font-medium tracking-[0.14em] text-[var(--lt-muted)]">写作观察</p>
         <h1 className="mt-2 font-serif text-[42px] font-normal leading-tight">写作习惯</h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--lt-muted)]">
           基于你已经确认应用的修改，提炼出长期表达模式和下一步练习重点。
         </p>
       </header>
+      {deleteNotice ? (
+        <p
+          role="status"
+          className="mt-6 rounded-md border border-emerald-400/60 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+        >
+          {deleteNotice}
+        </p>
+      ) : null}
 
       <section
         aria-label="写作习惯简约摘要"
@@ -236,7 +266,12 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
                           aria-label="删除此类写作习惯"
                           title="删除此类"
                           data-icon-only="true"
-                          onClick={() => onDeleteType(insight.type)}
+                          onClick={() => {
+                            onDeleteType(insight.type);
+                            showDeleteNotice(
+                              `已清理 ${insight.type} 本地修改记录。表达库不受影响。`,
+                            );
+                          }}
                           className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-red-700/75 transition hover:bg-red-500/[0.08] hover:text-red-700 dark:text-red-300"
                         >
                           <TrashIcon className="h-4 w-4" />

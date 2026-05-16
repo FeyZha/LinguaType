@@ -10,10 +10,13 @@ import type {
   LearningItemType,
   ParagraphHealthCacheItem,
   ParagraphIssueType,
-  WritingHabitInsight,
   WritingMode,
+  EnhancementLevel,
+  FastEnhanceResult,
+  WritingHabitInsight,
 } from "./llm/types";
 import { normalizePersonalDictionary } from "./proofreading";
+import type { SentenceRange } from "./sentence";
 
 export const API_SETTINGS_STORAGE_KEY = "linguatype.apiSettings.v1";
 export const LEARNING_HISTORY_STORAGE_KEY = "linguatype.learningHistory.v1";
@@ -27,6 +30,46 @@ export const DRAFT_STORAGE_KEY = "linguatype.writingDraft.v1";
 export const WRITING_SETUP_STORAGE_KEY = "linguatype.writingSetup.v1";
 export const WRITING_ARCHIVES_STORAGE_KEY = "linguatype.writingArchives.v1";
 export const THEME_SETTINGS_STORAGE_KEY = "linguatype.themeSettings.v1";
+export const PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY = "linguatype.placeholderSuggestionCache.v1";
+
+const MAX_PLACEHOLDER_SUGGESTION_CACHE_ENTRIES = 120;
+
+export type PlaceholderSuggestionCacheRange = SentenceRange & {
+  placeholders: Array<{
+    text: string;
+    start: number;
+    end: number;
+  }>;
+};
+
+export type PlaceholderLearningHintCache = {
+  sourceText: string;
+  targetText: string;
+  structure?: string;
+};
+
+export type PlaceholderSuggestionCacheRecord = {
+  id: string;
+  requestKey: string;
+  requestInputSnapshot: {
+    writingMode: WritingMode;
+    enhancementLevel: EnhancementLevel;
+    domain: string;
+  };
+  archiveId: string | null;
+  originalSentence: string;
+  finalSentence: string;
+  explanationZh: string;
+  taskType: FastEnhanceResult["taskType"];
+  hasChinese: boolean;
+  markerState: "available" | "reviewed";
+  reviewed: boolean;
+  latestSentenceRange: SentenceRange;
+  reviewedRange: SentenceRange;
+  placeholderRange?: PlaceholderSuggestionCacheRange;
+  placeholderHint?: PlaceholderLearningHintCache;
+  updatedAt: string;
+};
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -532,6 +575,71 @@ export function saveParagraphHealthCache(
   return normalized;
 }
 
+export function loadPlaceholderSuggestionCache(storage: StorageLike): PlaceholderSuggestionCacheRecord[] {
+  return normalizePlaceholderSuggestionCache(parseArray(storage.getItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY)));
+}
+
+export function savePlaceholderSuggestionCache(
+  storage: StorageLike,
+  items: PlaceholderSuggestionCacheRecord[],
+): PlaceholderSuggestionCacheRecord[] {
+  const normalized = normalizePlaceholderSuggestionCache(items);
+  storage.setItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function upsertPlaceholderSuggestionCache(
+  storage: StorageLike,
+  current: PlaceholderSuggestionCacheRecord[],
+  incoming: PlaceholderSuggestionCacheRecord,
+): PlaceholderSuggestionCacheRecord[] {
+  const normalizedIncoming = normalizePlaceholderSuggestionCacheItem({
+    ...incoming,
+    updatedAt: incoming.updatedAt || new Date().toISOString(),
+  });
+  if (!normalizedIncoming) {
+    return savePlaceholderSuggestionCache(storage, current);
+  }
+  const next = new Map(current.map((item) => [item.requestKey, item]));
+  const existing = next.get(normalizedIncoming.requestKey);
+  if (existing) {
+    const base =
+      existing.updatedAt <= normalizedIncoming.updatedAt
+        ? { ...existing, ...normalizedIncoming }
+        : { ...normalizedIncoming, ...existing };
+    next.set(
+      normalizedIncoming.requestKey,
+      {
+        ...base,
+        markerState:
+          existing.markerState === "reviewed" || normalizedIncoming.markerState === "reviewed"
+            ? "reviewed"
+            : "available",
+        reviewed: existing.reviewed || normalizedIncoming.reviewed,
+      },
+    );
+  } else {
+    next.set(normalizedIncoming.requestKey, normalizedIncoming);
+  }
+  return savePlaceholderSuggestionCache(storage, Array.from(next.values()));
+}
+
+export function lookupPlaceholderSuggestionCache(
+  storageItems: PlaceholderSuggestionCacheRecord[],
+  requestKey: string,
+): PlaceholderSuggestionCacheRecord | undefined {
+  return storageItems.find((item) => item.requestKey === requestKey);
+}
+
+export function removePlaceholderSuggestionCacheForArchive(
+  storage: StorageLike,
+  current: PlaceholderSuggestionCacheRecord[],
+  archiveId: string,
+): PlaceholderSuggestionCacheRecord[] {
+  const filtered = current.filter((item) => item.archiveId !== archiveId);
+  return savePlaceholderSuggestionCache(storage, filtered);
+}
+
 export function exportLearningLibraryJson(items: LearningItem[]): string {
   return JSON.stringify(items, null, 2);
 }
@@ -803,6 +911,141 @@ function normalizeParagraphHealthCache(
     .slice(0, 20);
 }
 
+function normalizePlaceholderSuggestionCache(
+  items: Array<Record<string, unknown> | PlaceholderSuggestionCacheRecord>,
+): PlaceholderSuggestionCacheRecord[] {
+  const byRequestKey = new Map<string, PlaceholderSuggestionCacheRecord>();
+  const now = new Date().toISOString();
+
+  for (const rawItem of items) {
+    const item = isRecord(rawItem) ? normalizePlaceholderSuggestionCacheItem(rawItem) : null;
+    if (!item) {
+      continue;
+    }
+    const match = byRequestKey.get(item.requestKey);
+    if (!match || item.updatedAt >= match.updatedAt) {
+      byRequestKey.set(item.requestKey, { ...item, updatedAt: item.updatedAt || now });
+    }
+  }
+
+  return Array.from(byRequestKey.values())
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, MAX_PLACEHOLDER_SUGGESTION_CACHE_ENTRIES);
+}
+
+function normalizePlaceholderSuggestionCacheItem(
+  item: Record<string, unknown>,
+): PlaceholderSuggestionCacheRecord | null {
+  const requestInputSnapshot: PlaceholderSuggestionCacheRecord["requestInputSnapshot"] = isRecord(item.requestInputSnapshot)
+    ? {
+        writingMode: isWritingMode(item.requestInputSnapshot.writingMode)
+          ? item.requestInputSnapshot.writingMode
+          : "natural",
+        enhancementLevel: isEnhancementLevel(item.requestInputSnapshot.enhancementLevel)
+          ? item.requestInputSnapshot.enhancementLevel
+          : "balanced",
+        domain: isString(item.requestInputSnapshot.domain) ? item.requestInputSnapshot.domain : "custom",
+      }
+    : {
+        writingMode: "natural",
+        enhancementLevel: "balanced",
+        domain: "custom",
+      };
+
+  const latestSentenceRange = normalizeSentenceRange(item.latestSentenceRange);
+  const reviewedRange = normalizeSentenceRange(item.reviewedRange);
+  const placeholderRange = normalizePlaceholderSuggestionCacheRange(item.placeholderRange);
+  const placeholderHint = normalizePlaceholderLearningHint(item.placeholderHint);
+
+  if (!latestSentenceRange || !reviewedRange) {
+    return null;
+  }
+  const markerState = item.markerState === "reviewed" ? "reviewed" : "available";
+
+  return {
+    id: stringOr(item.id, crypto.randomUUID()),
+    requestKey: stringOr(item.requestKey, ""),
+    requestInputSnapshot,
+    archiveId: typeof item.archiveId === "string" ? item.archiveId : null,
+    originalSentence: stringOr(item.originalSentence, ""),
+    finalSentence: stringOr(item.finalSentence, ""),
+    explanationZh: stringOr(item.explanationZh, ""),
+    taskType: isFastEnhanceTaskType(item.taskType) ? item.taskType : "english_polish",
+    hasChinese: typeof item.hasChinese === "boolean" ? item.hasChinese : false,
+    markerState,
+    reviewed: typeof item.reviewed === "boolean" ? item.reviewed : false,
+    latestSentenceRange,
+    reviewedRange,
+    placeholderRange,
+    placeholderHint,
+    updatedAt: stringOr(item.updatedAt, new Date().toISOString()),
+  };
+}
+
+function normalizeSentenceRange(value: unknown): SentenceRange | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const sentence = stringOr(value.sentence, "");
+  const start = numberOr(value.start);
+  const end = numberOr(value.end);
+  if (!sentence || !Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return null;
+  }
+  return { sentence, start, end };
+}
+
+function normalizePlaceholderSuggestionCacheRange(
+  value: unknown,
+): PlaceholderSuggestionCacheRange | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const sentence = stringOr(value.sentence, "");
+  const placeholders = Array.isArray(value.placeholders)
+    ? value.placeholders
+        .filter(isRecord)
+        .map((placeholder) => ({
+          text: stringOr(placeholder.text, ""),
+          start: numberOr(placeholder.start),
+          end: numberOr(placeholder.end),
+        }))
+        .filter((placeholder) => placeholder.text)
+    : [];
+  const start = numberOr(value.start);
+  const end = numberOr(value.end);
+  if (!sentence || !Number.isFinite(start) || !Number.isFinite(end)) {
+    return undefined;
+  }
+  return {
+    sentence,
+    start,
+    end,
+    placeholders,
+  };
+}
+
+function normalizePlaceholderLearningHint(value: unknown): PlaceholderLearningHintCache | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const sourceText = stringOr(value.sourceText, "");
+  const targetText = stringOr(value.targetText, "");
+  if (!sourceText || !targetText) {
+    return undefined;
+  }
+  const structure = stringOr(value.structure, "");
+  return {
+    sourceText,
+    targetText,
+    ...(structure ? { structure } : {}),
+  };
+}
+
+function isFastEnhanceTaskType(value: unknown): value is FastEnhanceResult["taskType"] {
+  return value === "english_polish" || value === "mixed_chinese_rewrite" || value === "unchanged";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -811,12 +1054,24 @@ function stringOr(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
 }
 
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function numberOr(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : NaN;
+}
+
 function isLearningItemType(value: unknown): value is LearningItemType {
   return value === "phrase" || value === "collocation" || value === "sentence_pattern";
 }
 
 function isWritingMode(value: unknown): value is WritingMode {
   return value === "natural" || value === "ielts" || value === "academic" || value === "business" || value === "concise";
+}
+
+function isEnhancementLevel(value: unknown): value is EnhancementLevel {
+  return value === "minimal" || value === "balanced" || value === "polished";
 }
 
 function isWritingTopicArea(value: unknown): value is WritingTopicArea {
