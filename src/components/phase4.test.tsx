@@ -78,6 +78,10 @@ function expectEditorText(editor: HTMLElement, value: string) {
   expect(editor).toHaveValue(value);
 }
 
+async function findCurrentSentenceSuggestion() {
+  return screen.findByLabelText("当前句行内建议");
+}
+
 function longParagraph(sentence = fastResult.originalSentence) {
   return [
     "AI tools are useful because they make daily writing practice easier for students who need steady language support.",
@@ -146,7 +150,8 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     expect(screen.queryByText("检查中...")).not.toBeInTheDocument();
 
     resolveEnhancement(response(fastResult));
-    expect(await screen.findByText(fastResult.explanationZh)).toBeInTheDocument();
+    const suggestion = await findCurrentSentenceSuggestion();
+    expect(suggestion).toHaveTextContent(fastResult.finalSentence);
   });
 
   it("shows the current sentence suggestion near the editor and closes with Escape without saving data", async () => {
@@ -164,7 +169,7 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
     expect(await screen.findByText("当前句建议")).toBeInTheDocument();
-    expect(screen.getByText(fastResult.explanationZh)).toBeInTheDocument();
+    expect(await findCurrentSentenceSuggestion()).toHaveTextContent(fastResult.finalSentence);
     fireEvent.keyDown(editor, { key: "Escape" });
 
     await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
@@ -193,15 +198,16 @@ describe("LinguaType v0.2.2 current sentence popover", () => {
     setEditorText(editor, fastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
 
-    const suggestion = await screen.findByLabelText("当前句行内建议");
-    const removedPieces = screen.getAllByText((content, node) => {
-      return Boolean(node?.getAttribute("data-diff-part") === "removed" && content.includes("bring"));
-    });
-    expect(removedPieces.length).toBeGreaterThan(0);
-    const addedPieces = screen.getAllByText((content, node) => {
-      return Boolean(node?.getAttribute("data-diff-part") === "added" && /have/.test(content));
-    });
-    expect(addedPieces.length).toBeGreaterThan(0);
+    const suggestion = await findCurrentSentenceSuggestion();
+    const originalChanges = Array.from(document.querySelectorAll("[data-original-diff='changed']")).map(
+      (node) => node.textContent ?? "",
+    );
+    expect(originalChanges.join(" ")).toContain("bring bad");
+    const revisedChanges = Array.from(suggestion.querySelectorAll("[data-revised-diff='changed']")).map(
+      (node) => node.textContent ?? "",
+    );
+    expect(revisedChanges.join(" ")).toContain("have a negative");
+    expect(suggestion).toHaveTextContent(fastResult.finalSentence);
     expectEditorText(editor, fastResult.originalSentence);
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
   });
@@ -299,9 +305,9 @@ describe("LinguaType v0.2.2 ", () => {
 
     expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-workspace-motion", "api");
     expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-intensity", "noticeable");
-    expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-duration", "820");
+    expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-duration", "620");
     expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-state", "entering");
-    expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-exit-duration", "420");
+    expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-exit-duration", "520");
     expect(screen.getByLabelText("API 设置页面")).toHaveAttribute("data-motion-exit-pattern", "soft-rise-fade");
     expect(screen.queryByText(/Mock Mode|演示模式/u)).not.toBeInTheDocument();
     expect(screen.getByLabelText("最大 Tokens")).toHaveValue(20000);
@@ -400,7 +406,7 @@ describe("LinguaType v0.2.2 settings and data control", () => {
       setEditorText(editor, longParagraph(fastResult.originalSentence));
       fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
       await screen.findByRole("button", { name: "应用修改" });
-      await screen.findByText(fastResult.explanationZh);
+      expect(await findCurrentSentenceSuggestion()).toHaveTextContent(fastResult.finalSentence);
       fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
       await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
     }

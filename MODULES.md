@@ -4,15 +4,15 @@
 
 | 模块 | 主要文件 | 职责 |
 | --- | --- | --- |
-| App shell | `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css` | 挂载应用、定义 metadata、提供全局样式和主题样式。 |
-| 主流程编排 | `src/components/LinguaTypeApp.tsx` | 管理 editor state、setup gating、writing archives、fixed left navigation、workspace view、inline setup edit、API calls、Apply 冲突检测、学习提取、outline check 和 localStorage hydration。 |
+| App shell | `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css`, `public/brand/*` | 挂载应用、定义 metadata、提供全局样式、主题样式和主题对应的品牌图片资产。 |
+| 主流程编排 | `src/components/LinguaTypeApp.tsx` | 管理 editor state、setup gating、writing archives、fixed left navigation、workspace view、theme-resolved brand display、inline setup edit、API calls、Apply 冲突检测、学习提取、outline check 和 localStorage hydration。 |
 | 写作存档 | `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 保存本地写作稿的标题、正文和 setup；支持新建、切换、重命名、删除和可折叠侧栏；不保存学习数据。 |
 | 写作准备 | `src/components/WritingSetupPanel.tsx`, `src/components/LinguaTypeApp.tsx`, `src/lib/storage.ts` | 首次进入时收集领域、主题和大纲点；进入主界面后通过编辑器内联交互修改 setup；不调用 LLM，不生成正文。 |
 | 文档编辑器 | `src/components/WritingEditor.tsx` | 以原生 `textarea` 承载单块长文本正文，负责光标/选区上报、状态栏、句旁建议入口定位、本地校对 tag、hover 高亮和内联建议展开时的临时句子焦点视图。 |
 | 当前句建议 | `src/components/EnhancementPopover.tsx`, `src/components/DiffViewer.tsx`, `src/lib/sentence.ts`, `src/lib/storage.ts` | 展示当前句建议、本地 diff、中文占位表达映射、Apply/Cancel/Regenerate/Copy；已生成的中文占位句建议写入本地缓存，重新打开页面时优先恢复。 |
 | 主题偏好 | `src/components/ThemePreferenceControl.tsx`, `src/app/globals.css`, `src/lib/storage.ts` | 管理 light/dark/system，只在主写作界面展示为轻量弹出菜单。 |
 | 大纲检查 API | `src/app/api/check-outline/route.ts`, `src/lib/llm/service.ts`, `src/lib/llm/prompts.ts`, `src/lib/llm/types.ts` | 检查大纲是否贴合主题；只提示，不修改。 |
-| 表达库 | `src/components/LearningLibraryPanel.tsx`, `src/lib/storage.ts`, `src/lib/proofreading.ts` | 管理本地表达资产，支持搜索、收藏、复制、插入、删除和导出；个人词典作为类型选项在此管理。 |
+| 表达库 | `src/components/LearningLibraryPanel.tsx`, `src/lib/storage.ts`, `src/lib/proofreading.ts` | 管理本地表达资产，支持搜索、收藏、复制、插入、删除和导出；以统一小卡片网格展示长期积累内容，个人词典作为类型选项在此管理。 |
 | 表达复现提示 | `src/lib/expressionReappearance.ts`, `src/components/LinguaTypeApp.tsx`, `src/components/WritingEditor.tsx` | 本地匹配正文中已自然复现的表达库 phrase/collocation，并在写作区原位显示低打扰学习强化提示；不调用模型、不改正文。 |
 | 写作习惯 | `src/components/WritingHabitsPanel.tsx`, `src/lib/storage.ts` | 基于 Correction Events 聚合写作习惯。 |
 | 本地校对信号 | `src/lib/proofreading.ts`, `src/components/WritingEditor.tsx`, `src/components/ProofreadingSignalsPanel.tsx` | 在本地计算词数、句数、段落数、重复词、标点、长句和风格提示；写作页以底部统计和右侧轻量 tag 呈现，不弹出独立校对面板。 |

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { waapi } from "animejs/waapi";
@@ -17,6 +18,7 @@ import type { ExpressionReappearanceMatch } from "@/lib/expressionReappearance";
 import type { EnhancementLevel, WritingMode } from "@/lib/llm/types";
 import type { ProofreadingResult } from "@/lib/proofreading";
 import type { ProofreadingSignal } from "@/lib/proofreading";
+import { extractCurrentSentence } from "@/lib/sentence";
 import type { TriggerSettings } from "@/lib/storage";
 import { buildMappedDiffRows, renderOriginalDiffTokens } from "./EnhancementPopover";
 import { useDismissableLayer } from "./useDismissableLayer";
@@ -372,6 +374,21 @@ function estimateOffsetTop(
   const { visualLineIndex } = getVisualCaretPosition(text, safeOffset, metrics);
 
   return 8 + metrics.paddingTop + visualLineIndex * metrics.lineHeight;
+}
+
+function estimateInlineCueCursorOffset(
+  event: ReactMouseEvent<HTMLElement>,
+  start: number,
+  end: number,
+) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const cueLength = Math.max(0, end - start);
+  if (cueLength === 0 || rect.width <= 0) {
+    return start;
+  }
+
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  return start + Math.round(ratio * cueLength);
 }
 
 function getSentenceStartForOffset(text: string, offset: number) {
@@ -942,8 +959,9 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       if (!activeSignal) {
         return null;
       }
-      const start = clampOffset(activeSignal.start, value.length);
-      const end = clampOffset(activeSignal.end, value.length);
+      const sentenceRange = extractCurrentSentence(value, activeSignal.start + 1);
+      const start = clampOffset(sentenceRange.start, value.length);
+      const end = clampOffset(sentenceRange.end, value.length);
       if (end <= start) {
         return null;
       }
@@ -967,8 +985,9 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         return null;
       }
 
-      const start = clampOffset(activeMarker.range.start, value.length);
-      const end = clampOffset(activeMarker.range.end, value.length);
+      const sentenceRange = extractCurrentSentence(value, activeMarker.range.start + 1);
+      const start = clampOffset(sentenceRange.start, value.length);
+      const end = clampOffset(sentenceRange.end, value.length);
       if (end <= start) {
         return null;
       }
@@ -1037,7 +1056,14 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
             }
             onMouseDown={(event) => {
               event.preventDefault();
-              editorRef.current?.focus();
+              const element = editorRef.current;
+              if (!element) {
+                return;
+              }
+              const cursorOffset = estimateInlineCueCursorOffset(event, start, end);
+              element.focus();
+              element.setSelectionRange(cursorOffset, cursorOffset);
+              reportSelection(element);
             }}
           >
             {value.slice(start, end)}
@@ -1045,12 +1071,13 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
               <span
                 role="status"
                 data-expression-reappearance-detail="open"
-                className="absolute left-0 top-[1.75em] z-30 min-w-[220px] max-w-[320px] border-l border-[color:color-mix(in_srgb,var(--lt-memory)_55%,transparent)] bg-[var(--lt-bg)]/90 py-1.5 pl-3 pr-2 font-sans text-[11px] leading-4 text-[var(--lt-muted)] backdrop-blur-sm"
+                data-expression-reappearance-detail-style="light-card"
+                className="pointer-events-none absolute left-0 top-[1.95em] z-30 min-w-[300px] max-w-[380px] rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] px-4 py-3 font-serif text-[13px] leading-6 text-[var(--lt-text)]"
               >
-                <span className="block font-medium text-[var(--lt-text)]">表达库命中</span>
-                <span className="block text-[var(--lt-muted)]">{cue.expression}</span>
+                <span className="block text-xs text-[var(--lt-muted)]">表达库命中</span>
+                <span className="mt-0.5 block text-[16px] font-medium leading-6 text-[var(--lt-text)]">{cue.expression}</span>
                 {cue.meaning ? (
-                  <span className="block text-[var(--lt-faint)]">{cue.meaning}</span>
+                  <span className="mt-1 block text-[13px] leading-5 text-[var(--lt-muted)]">{cue.meaning}</span>
                 ) : null}
               </span>
             ) : null}

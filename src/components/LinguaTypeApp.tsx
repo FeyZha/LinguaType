@@ -187,6 +187,7 @@ type InlineSetupEditState =
   | { kind: "outline-point"; index: number; draft: string };
 
 type WorkspaceView = "editor" | "library" | "habits" | "data" | "triggers" | "shortcuts" | "api";
+type ResolvedTheme = "light" | "dark";
 
 const WORKSPACE_NAV_ITEMS: Array<{ id: "library" | "habits" | "data"; label: string; icon: typeof BookOpenIcon }> = [
   { id: "library", label: "表达库", icon: BookOpenIcon },
@@ -206,7 +207,7 @@ const DOMAIN_OPTIONS: Array<{ value: WritingTopicArea; label: string }> = [
   { value: "custom", label: "自定义" },
 ];
 
-const WORKSPACE_EXIT_MOTION_DURATION = 420;
+const WORKSPACE_EXIT_MOTION_DURATION = 520;
 
 export function LinguaTypeApp() {
   const editorRef = useRef<WritingEditorHandle>(null);
@@ -232,6 +233,7 @@ export function LinguaTypeApp() {
   const [apiSettings, setApiSettings] = useState<ApiConfig>(() => defaultApiSettings());
   const [triggerSettings, setTriggerSettings] = useState<TriggerSettings>(() => defaultTriggerSettings());
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(() => defaultThemeSettings());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("light");
   const [writingArchives, setWritingArchives] = useState<WritingArchivesState>({ activeId: null, items: [] });
   const [writingSetup, setWritingSetup] = useState<WritingSetup | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -457,6 +459,7 @@ export function LinguaTypeApp() {
         ? typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
         : themeSettings.preference;
       root.dataset.theme = resolved;
+      setResolvedTheme(resolved);
     }
 
     applyResolvedTheme();
@@ -2370,6 +2373,7 @@ export function LinguaTypeApp() {
           archives={writingArchives}
           collapsed={archiveSidebarCollapsed}
           activeView={activeWorkspaceView}
+          resolvedTheme={resolvedTheme}
           hasLearningUpdate={hasUnseenLearningUpdates}
           openMenuArchiveId={openArchiveMenuId}
           deleteCandidateId={deleteCandidateId}
@@ -2729,10 +2733,10 @@ function AnimatedWorkspacePage({
 }) {
   const pageRef = useRef<HTMLElement | null>(null);
   const isLibraryPage = view === "library";
-  const motionDuration = isLibraryPage ? 560 : 820;
+  const motionDuration = isLibraryPage ? 560 : 620;
   const exitMotionDuration = WORKSPACE_EXIT_MOTION_DURATION;
-  const motionDistance = isLibraryPage ? 24 : 72;
-  const motionProfile = isLibraryPage ? "library-unified-rise" : "workspace-soft-rise";
+  const motionDistance = isLibraryPage ? 16 : 20;
+  const motionProfile = isLibraryPage ? "library-unified-rise" : "workspace-settled-rise";
 
   useEffect(() => {
     const page = pageRef.current;
@@ -2742,9 +2746,8 @@ function AnimatedWorkspacePage({
 
     if (motionState === "exiting") {
       waapi.animate(page, {
-        opacity: [1, 0.08],
-        transform: ["translateY(0px) scale(1)", "translateY(-32px) scale(0.985)"],
-        filter: ["blur(0px)", "blur(9px)"],
+        opacity: [1, 0],
+        transform: ["translateY(0px) scale(1)", "translateY(-14px) scale(0.995)"],
         duration: exitMotionDuration,
         ease: "cubic-bezier(0.4, 0, 0.2, 1)",
       });
@@ -2755,9 +2758,9 @@ function AnimatedWorkspacePage({
       if (exitingItems.length > 0 && typeof exitingItems[0].animate === "function") {
         waapi.animate(exitingItems, {
           opacity: [1, 0],
-          transform: ["translateY(0px)", "translateY(-14px)"],
-          duration: exitMotionDuration - 60,
-          delay: stagger(14),
+          transform: ["translateY(0px)", "translateY(-8px)"],
+          duration: exitMotionDuration - 80,
+          delay: stagger(10),
           ease: "cubic-bezier(0.4, 0, 0.2, 1)",
         });
       }
@@ -2765,12 +2768,11 @@ function AnimatedWorkspacePage({
     }
 
     waapi.animate(page, {
-      opacity: [0.06, 1],
+      opacity: [0.86, 1],
       transform: [
-        `translateY(${motionDistance}px) scale(${isLibraryPage ? 0.99 : 0.96})`,
+        `translateY(${motionDistance}px) scale(0.995)`,
         "translateY(0px) scale(1)",
       ],
-      filter: [isLibraryPage ? "blur(5px)" : "blur(16px)", "blur(0px)"],
       duration: motionDuration,
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
@@ -2778,9 +2780,9 @@ function AnimatedWorkspacePage({
     const sweep = page.querySelector<HTMLElement>("[data-motion-sweep]");
     if (sweep && !isLibraryPage && typeof sweep.animate === "function") {
       waapi.animate(sweep, {
-        opacity: [0, 0.58, 0],
+        opacity: [0, 0.16, 0],
         transform: ["scaleX(0)", "scaleX(1)", "scaleX(1)"],
-        duration: 920,
+        duration: 680,
         ease: "cubic-bezier(0.22, 1, 0.36, 1)",
       });
     }
@@ -2793,10 +2795,10 @@ function AnimatedWorkspacePage({
     }
 
     waapi.animate(motionItems, {
-      opacity: [0, 1],
-      transform: [isLibraryPage ? "translateY(16px)" : "translateY(34px)", "translateY(0px)"],
-      duration: isLibraryPage ? 420 : 720,
-      delay: stagger(isLibraryPage ? 32 : 70),
+      opacity: [0.82, 1],
+      transform: [isLibraryPage ? "translateY(10px)" : "translateY(12px)", "translateY(0px)"],
+      duration: isLibraryPage ? 420 : 480,
+      delay: stagger(isLibraryPage ? 22 : 26),
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
   }, [exitMotionDuration, isLibraryPage, motionDistance, motionDuration, motionState, view]);
@@ -2818,7 +2820,7 @@ function AnimatedWorkspacePage({
       <span
         aria-hidden
         data-motion-sweep
-        className="pointer-events-none absolute left-8 right-8 top-0 h-px origin-left bg-[var(--lt-text)]/35"
+        className="pointer-events-none absolute left-8 right-8 top-0 h-px origin-left bg-[var(--lt-text)]/20 opacity-0"
       />
       {children}
     </section>
@@ -2920,10 +2922,39 @@ function ShortcutRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function LinguaTypeWordmark({ className = "", theme }: { className?: string; theme: ResolvedTheme }) {
+  return (
+    <img
+      src={`/brand/linguatype-wordmark-${theme}.png`}
+      alt=""
+      aria-hidden="true"
+      data-brand-logo="wordmark"
+      data-brand-theme={theme}
+      draggable={false}
+      className={`select-none object-contain ${className}`}
+    />
+  );
+}
+
+function LinguaTypeBrandMark({ className = "", theme }: { className?: string; theme: ResolvedTheme }) {
+  return (
+    <img
+      src={`/brand/linguatype-mark-${theme}.png`}
+      alt=""
+      aria-hidden="true"
+      data-brand-logo="mark"
+      data-brand-theme={theme}
+      draggable={false}
+      className={`select-none object-contain ${className}`}
+    />
+  );
+}
+
 function ArchiveSidebar({
   archives,
   collapsed,
   activeView,
+  resolvedTheme,
   hasLearningUpdate,
   openMenuArchiveId,
   deleteCandidateId,
@@ -2944,6 +2975,7 @@ function ArchiveSidebar({
   archives: WritingArchivesState;
   collapsed: boolean;
   activeView: WorkspaceView;
+  resolvedTheme: ResolvedTheme;
   hasLearningUpdate: boolean;
   openMenuArchiveId: string | null;
   deleteCandidateId: string | null;
@@ -3212,11 +3244,9 @@ function ArchiveSidebar({
           <div
             aria-label="LinguaType 标识"
             data-sidebar-motion-item
-            className="lt-brand-wordmark-serif grid h-10 w-9 place-items-center text-[var(--lt-text)]"
+            className="grid h-12 w-12 place-items-center text-[var(--lt-text)]"
           >
-            <span className="lt-brand-wordmark-serif text-2xl leading-none" data-brand-font="system-serif-italic">
-              L
-            </span>
+            <LinguaTypeBrandMark theme={resolvedTheme} className="block h-11 w-11" />
           </div>
           <button
             type="button"
@@ -3284,13 +3314,13 @@ function ArchiveSidebar({
       className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--lt-border)] bg-[var(--lt-bg)] px-7 py-8 text-[var(--lt-muted)] will-change-transform"
     >
       <div className="flex shrink-0 items-center justify-between gap-3">
-        <button type="button" onClick={() => onViewChange("editor")} className="text-left">
-          <h1
-            className="lt-brand-wordmark-serif text-[36px] leading-none text-[var(--lt-text)]"
-            data-brand-font="system-serif-italic"
-          >
-            LinguaType
-          </h1>
+        <button
+          type="button"
+          onClick={() => onViewChange("editor")}
+          aria-label="LinguaType"
+          className="text-left"
+        >
+          <LinguaTypeWordmark theme={resolvedTheme} className="block h-[84px] w-[252px] text-[var(--lt-text)]" />
           <p className="sr-only">输入法式英文表达助手</p>
         </button>
         <button
@@ -3644,7 +3674,7 @@ function InlineSetupControls({
         spellCheck={false}
         onBlur={commitTitle}
         onKeyDown={handleTitleKeyDown}
-        className="max-w-[860px] whitespace-pre-wrap break-words font-serif text-[38px] font-normal leading-[1.18] text-[var(--lt-text)] outline-none empty:before:text-[var(--lt-faint)] empty:before:content-[attr(data-placeholder)]"
+        className="max-w-[860px] whitespace-pre-wrap break-words font-serif text-[38px] font-semibold leading-[1.18] text-[var(--lt-text)] outline-none empty:before:text-[var(--lt-faint)] empty:before:content-[attr(data-placeholder)]"
         data-writing-title="true"
         data-placeholder="未命名写作"
       >
@@ -3770,9 +3800,9 @@ export function calculateSelectionPopoverPosition(
   const toolbarWidth = 380;
   const viewportWidth =
     typeof window === "undefined" ? 1200 : window.innerWidth;
-  const focusLeft = anchorRect.left + Math.max(1, anchorRect.width) + 6;
-  const minLeft = 12;
-  const maxLeft = Math.max(minLeft, viewportWidth - toolbarWidth - 12);
+  const focusLeft = anchorRect.left + Math.max(1, anchorRect.width);
+  const minLeft = toolbarWidth;
+  const maxLeft = Math.max(minLeft, viewportWidth - 12);
   return {
     left: Math.max(minLeft, Math.min(focusLeft, maxLeft)),
     top: anchorRect.top,

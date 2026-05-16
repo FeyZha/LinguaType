@@ -55,7 +55,9 @@ describe("LinguaType deprecated writing setup", () => {
     expect(await screen.findByLabelText("写作编辑器")).toBeInTheDocument();
     expect(screen.queryByText("写作准备")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "进入写作" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "未命名写作" })).toBeInTheDocument();
+    const title = screen.getByRole("heading", { level: 1, name: "未命名写作" });
+    expect(title).toBeInTheDocument();
+    expect(title).toHaveClass("font-semibold");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -95,6 +97,10 @@ describe("LinguaType v0.2.5 theme preference", () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
     expect(document.documentElement.dataset.themePreference).toBe("dark");
     expect(JSON.parse(localStorage.getItem(THEME_SETTINGS_STORAGE_KEY) ?? "{}").preference).toBe("dark");
+    expect(screen.getByRole("button", { name: "LinguaType" }).querySelector('[data-brand-logo="wordmark"]')).toHaveAttribute(
+      "src",
+      "/brand/linguatype-wordmark-dark.png",
+    );
   });
 
   it("shows theme settings immediately because the setup page is removed", async () => {
@@ -456,8 +462,12 @@ describe("LinguaType v0.2.7 editor shell", () => {
     expectEditorText(await screen.findByLabelText("写作编辑器"), "Existing draft sentence.");
     expect(screen.getByLabelText("LinguaType 工作区布局")).toHaveClass("transition-[grid-template-columns]");
     expect(screen.getByLabelText("写作存档侧边栏")).toHaveAttribute("data-sidebar-motion-state", "expanded");
-    expect(screen.getByText("LinguaType")).toHaveClass("lt-brand-wordmark-serif");
-    expect(screen.getByText("LinguaType")).toHaveAttribute("data-brand-font", "system-serif-italic");
+    const brandButton = screen.getByRole("button", { name: "LinguaType" });
+    expect(brandButton.querySelector('[data-brand-logo="wordmark"]')).toHaveClass("h-[84px]", "w-[252px]");
+    expect(brandButton.querySelector('[data-brand-logo="wordmark"]')).toHaveAttribute(
+      "src",
+      "/brand/linguatype-wordmark-light.png",
+    );
     const expandedNav = screen.getByLabelText("左侧功能导航");
     expect(expandedNav).toHaveAttribute("data-sidebar-nav-density", "compact");
     expect(expandedNav).toHaveClass("mt-4", "gap-1", "pt-4");
@@ -485,7 +495,14 @@ describe("LinguaType v0.2.7 editor shell", () => {
       "新建写作",
     ]);
     expect(screen.getByLabelText("LinguaType 标识").tagName).not.toBe("BUTTON");
-    expect(screen.getByLabelText("LinguaType 标识")).toHaveClass("lt-brand-wordmark-serif");
+    expect(screen.getByLabelText("LinguaType 标识").querySelector('[data-brand-logo="mark"]')).toHaveClass(
+      "h-11",
+      "w-11",
+    );
+    expect(screen.getByLabelText("LinguaType 标识").querySelector('[data-brand-logo="mark"]')).toHaveAttribute(
+      "src",
+      "/brand/linguatype-mark-light.png",
+    );
     expect(screen.getByLabelText("LinguaType 标识")).not.toHaveClass("bg-[var(--lt-surface-soft)]");
     expectEditorText(screen.getByLabelText("写作编辑器"), "Existing draft sentence.");
 

@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --lt-serif-font: Georgia, "Times New Roman", "Noto Serif SC", "Songti SC", "STSong", serif;
   --lt-bg: #faf9f5;
   --lt-surface: #fcfbf8;
   --lt-surface-soft: rgba(20, 20, 19, 0.04);
@@ -57,8 +58,7 @@ body {
   margin: 0;
   color: var(--lt-text);
   background: var(--lt-bg);
-  font-family:
-    "Aptos", "Inter", "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+  font-family: var(--lt-serif-font);
   letter-spacing: 0;
 }
 
@@ -188,26 +188,39 @@ select {
 }
 
 .lt-brand-wordmark-serif {
-  font-family: Georgia, "Times New Roman", "Noto Serif SC", "Songti SC", serif;
+  font-family: var(--lt-serif-font);
   font-style: italic;
   font-weight: 700;
   letter-spacing: 0;
 }
 
 .lt-expression-cue {
-  background-image: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--lt-memory) 46%, transparent),
-    transparent
-  );
-  background-position: 0 88%;
+  border-radius: 3px;
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--lt-memory) 22%, transparent) 18%,
+      color-mix(in srgb, var(--lt-memory) 42%, transparent) 52%,
+      transparent 88%
+    ),
+    linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--lt-memory) 50%, transparent),
+      transparent
+    );
+  background-position:
+    0 52%,
+    0 92%;
   background-repeat: no-repeat;
-  background-size: 100% 1px;
+  background-size:
+    0 1.15em,
+    100% 1px;
 }
 
 .lt-expression-cue--fresh {
-  animation: lt-expression-cue-sweep 720ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+  animation: lt-expression-cue-sweep 1320ms cubic-bezier(0.22, 1, 0.36, 1) 1;
 }
 
 .lt-expression-cue--active {
@@ -221,15 +234,31 @@ select {
 
 @keyframes lt-expression-cue-sweep {
   0% {
-    background-size: 0 1px;
+    background-size:
+      0 1.15em,
+      0 3px;
     background-color: transparent;
+    box-shadow: 0 0 0 color-mix(in srgb, var(--lt-memory) 0%, transparent);
   }
-  42% {
-    background-size: 100% 1px;
-    background-color: var(--lt-memory-soft);
+  34% {
+    background-size:
+      100% 1.15em,
+      100% 3px;
+    background-color: transparent;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--lt-memory) 18%, transparent);
+  }
+  62% {
+    background-size:
+      100% 1.15em,
+      100% 2px;
+    background-color: transparent;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--lt-memory) 10%, transparent);
   }
   100% {
-    background-size: 100% 1px;
+    background-size:
+      0 1.15em,
+      100% 1px;
     background-color: transparent;
+    box-shadow: 0 0 0 color-mix(in srgb, var(--lt-memory) 0%, transparent);
   }
 }

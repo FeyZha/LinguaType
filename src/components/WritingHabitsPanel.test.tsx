@@ -9,6 +9,7 @@ describe("WritingHabitsPanel", () => {
 
     render(<WritingHabitsPanel events={writingHabitEvents()} onDeleteType={onDeleteType} />);
 
+    expect(screen.queryByText("写作观察")).not.toBeInTheDocument();
     const visual = screen.getByLabelText("写作习惯简约摘要");
     expect(visual).toHaveAttribute("data-visual-tone", "minimal-editorial");
     expect(visual).toHaveAttribute("data-motion-library", "animejs");
@@ -29,6 +30,8 @@ describe("WritingHabitsPanel", () => {
     expect(within(firstInsight).getByText("高频")).toHaveAttribute("data-severity-tone", "heavy");
     expect(screen.getByText("按出现次数分档：1-10 低频，11-30 中频，31 次及以上高频。")).toBeInTheDocument();
     expect(screen.getByText("have a positive influence")).toBeInTheDocument();
+    expect(screen.getAllByText("修改前")[0]).toHaveClass("text-[var(--lt-muted)]");
+    expect(screen.getAllByText("修改后")[0]).toHaveClass("text-[var(--lt-muted)]");
     expect(screen.queryByText("We not only face challenge")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /展开/u })).not.toBeInTheDocument();
 

@@ -27,7 +27,7 @@ src/app/api/*/route.ts
 - localStorage hydration。
 - 写作准备 gating。
 - 写作存档的新建、切换、重命名、删除、侧栏折叠和 active archive 保存。
-- 主题偏好应用到 document root。
+- 主题偏好应用到 document root，并把解析后的 light/dark 主题传给侧栏品牌图片。
 - 草稿文本保存和恢复。
 - 最新句增强请求、快照、冲突检测和 Apply。
 - Apply 后后台学习提取。
@@ -37,6 +37,8 @@ src/app/api/*/route.ts
 - 原生长文本写作面、句旁建议入口、行内当前句建议展示和中间主舞台页面切换。
 - 用本地表达库和正文计算表达复现提示；该计算不调用 API，不写学习数据。
 - 左侧固定导航中的 Writing Archives、表达库、写作习惯、数据管理、触发设置和快捷键入口，以及顶部 API 设置入口。
+
+主题品牌图片位于 `public/brand/`。`LinguaTypeApp` 只根据 resolved theme 选择 `linguatype-wordmark-light.png`、`linguatype-wordmark-dark.png`、`linguatype-mark-light.png` 或 `linguatype-mark-dark.png`，不写入 localStorage，也不影响 API 设置或 provider 行为。
 
 ## 写作准备数据流
 

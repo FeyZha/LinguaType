@@ -24,7 +24,7 @@ describe("SelectionActionsPopover", () => {
     expect(toolbar).toHaveStyle({
       left: "120px",
       top: "80px",
-      transform: "translate(0, calc(-100% - 8px))",
+      transform: "translate(calc(-100% + 12px), calc(-100% - 8px))",
     });
     expect(screen.getAllByRole("button")).toHaveLength(4);
     expect(screen.queryByText("make a difference")).not.toBeInTheDocument();
@@ -60,7 +60,7 @@ describe("SelectionActionsPopover", () => {
     expect(document.querySelector('[data-selection-toolbar="true"]')).toHaveStyle({
       left: "120px",
       top: "80px",
-      transform: "translate(0, calc(-100% - 8px))",
+      transform: "translate(calc(-100% + 12px), calc(-100% - 8px))",
     });
   });
 
@@ -69,7 +69,7 @@ describe("SelectionActionsPopover", () => {
     const anchorRect = new DOMRect(360, 180, 120, 24);
     const position = calculateSelectionPopoverPosition(anchorRect, containerRect);
 
-    expect(position.left).toBe(486);
+    expect(position.left).toBe(480);
     expect(position.top).toBe(180);
   });
 
@@ -79,7 +79,7 @@ describe("SelectionActionsPopover", () => {
     const anchorRect = new DOMRect(580, 180, 24, 24);
     const position = calculateSelectionPopoverPosition(anchorRect, containerRect);
 
-    expect(position.left).toBe(248);
+    expect(position.left).toBe(604);
     expect(position.top).toBe(180);
     vi.unstubAllGlobals();
   });
