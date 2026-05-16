@@ -269,7 +269,7 @@ describe("WritingEditor native long-text input", () => {
     const onOpen = vi.fn();
     const value = "I found that many students lack 自主学习能力.";
     const start = value.indexOf("自主学习能力");
-    renderEditor({
+    const { container } = renderEditor({
       value,
       suggestionMarkers: [
         {
@@ -298,6 +298,8 @@ describe("WritingEditor native long-text input", () => {
     const aiButton = screen.getByRole("button", { name: /查看当前句 AI 建议|Current Sentence AI|AI 建议/ });
     expect(aiButton).toHaveClass("h-6", "w-6", "rounded-full");
     expect(aiButton.querySelector("svg")).toBeNull();
+    fireEvent.mouseEnter(aiButton);
+    expect(container.querySelector("[data-suggestion-highlight='active']")).toHaveTextContent(value);
     fireEvent.click(aiButton);
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
@@ -324,6 +326,53 @@ describe("WritingEditor native long-text input", () => {
 
     fireEvent.click(loadingButton);
     expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("renders expression reappearance cues as independent text-level reinforcement", () => {
+    const value = "Social media can shape young people's values.";
+    const start = value.indexOf("shape");
+    const end = start + "shape young people's values".length;
+    const { container } = renderEditor({
+      value,
+      expressionReappearanceCues: [
+        {
+          id: "cue-1",
+          itemId: "library-1",
+          expression: "shape one's values",
+          matchedText: "shape young people's values",
+          start,
+          end,
+          meaning: "塑造 / 影响某人的价值观",
+          state: "fresh",
+        },
+      ],
+    });
+
+    const cue = screen.getByLabelText("表达库命中：shape one's values");
+    expect(cue).toHaveAttribute("data-expression-reappearance-cue", "fresh");
+    expect(cue).toHaveClass("lt-expression-cue--fresh");
+    expect(container.querySelector("[data-suggestion-entry]")).toBeNull();
+    expect(container.querySelector("[data-proofreading-item]")).toBeNull();
+
+    fireEvent.mouseEnter(cue);
+    expect(screen.getByText("表达库命中")).toBeInTheDocument();
+    expect(screen.getByText("shape one's values")).toBeInTheDocument();
+    expect(screen.getByText("塑造 / 影响某人的价值观")).toBeInTheDocument();
+    const detail = container.querySelector("[data-expression-reappearance-detail='open']");
+    expect(detail).toHaveAttribute("data-expression-reappearance-detail-style", "light-card");
+    expect(detail).toHaveClass("rounded-[8px]");
+    expect(detail).toHaveClass("min-w-[300px]");
+    expect(detail).toHaveClass("text-[13px]");
+    expect(detail).not.toHaveClass("backdrop-blur-sm");
+
+    Object.defineProperty(cue, "getBoundingClientRect", {
+      configurable: true,
+      value: () => new DOMRect(100, 100, 280, 24),
+    });
+    fireEvent.mouseDown(cue, { clientX: 240 });
+    const editor = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(editor.selectionStart).toBeGreaterThan(start);
+    expect(editor.selectionStart).toBeLessThan(end);
   });
 
   it("keeps AI marker closer than proofreading marker", () => {
@@ -435,7 +484,9 @@ describe("WritingEditor native long-text input", () => {
     await waitFor(() => {
       expect(groups[0]?.querySelector('[data-proofreading-detail="open"]')).not.toBeNull();
     });
-    expect(container.querySelector("[data-proofreading-highlight='active']")).toHaveTextContent("They");
+    expect(container.querySelector("[data-proofreading-highlight='active']")).toHaveTextContent(
+      "They they repeated, repeated words often.",
+    );
 
     const afterSecondTop = getTop(groups[1] as HTMLElement);
     expect(afterSecondTop).toBeGreaterThan(closedSecondTop);

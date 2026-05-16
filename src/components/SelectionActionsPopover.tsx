@@ -61,7 +61,11 @@ export function SelectionActionsPopover({
           ? "w-[min(380px,calc(100%-2rem))] rounded-lg bg-[var(--lt-menu-bg)] p-4"
           : "inline-flex rounded-[7px] bg-[var(--lt-menu-bg)] p-1"
       }`}
-      style={{ left: position?.left ?? 16, top: position?.top ?? 16, transform: "translate(0, calc(-100% - 8px))" }}
+      style={{
+        left: position?.left ?? 16,
+        top: position?.top ?? 16,
+        transform: "translate(calc(-100% + 12px), calc(-100% - 8px))",
+      }}
     >
       <div className={showPanel ? "flex items-start justify-between gap-3" : "flex items-center gap-1"}>
         {showPanel ? (

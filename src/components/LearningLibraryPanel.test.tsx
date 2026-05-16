@@ -63,6 +63,40 @@ afterEach(() => {
 });
 
 describe("LearningLibraryPanel", () => {
+  it("lays accumulated expressions out as compact cards", () => {
+    const { container } = renderPanel();
+
+    const grid = container.querySelector("[data-library-layout='compact-card-grid']");
+    expect(grid).toBeInTheDocument();
+    expect(grid).toHaveClass("grid-cols-[repeat(auto-fill,minmax(260px,1fr))]");
+    expect(grid).toHaveClass("auto-rows-[420px]");
+    expect(container.querySelector("[data-library-card='compact']")).toHaveClass("h-full");
+  });
+
+  it("opens the full source inside the card without changing the card footprint", () => {
+    const { container } = renderPanel();
+
+    const card = container.querySelector("[data-library-card='compact']");
+    const sourcePreview = container.querySelector("[data-library-source-preview='item-1']");
+    expect(card).toHaveClass("h-full");
+    expect(sourcePreview).toBeInTheDocument();
+
+    fireEvent.click(sourcePreview as Element);
+
+    expect(container.querySelector("[data-library-source-detail='open']")).toBeInTheDocument();
+    expect(card).toHaveClass("h-full");
+  });
+
+  it("keeps item actions in the same lightweight footer as metadata", () => {
+    const { container } = renderPanel();
+
+    const footer = container.querySelector("[data-library-actions-layout='inline-footer']");
+    expect(footer).toBeInTheDocument();
+    expect(footer).toHaveClass("border-t");
+    expect(footer).not.toHaveClass("justify-between");
+    expect(footer?.querySelectorAll("button")).toHaveLength(3);
+  });
+
   it("shows action feedback when copying a learning item", async () => {
     renderPanel();
 

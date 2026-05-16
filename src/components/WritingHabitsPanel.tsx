@@ -51,11 +51,10 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
     const motionItems = Array.from(panel.querySelectorAll<HTMLElement>("[data-habit-motion]"));
     if (motionItems.length > 0 && canAnimate(motionItems[0])) {
       waapi.animate(motionItems, {
-        opacity: [0, 1],
-        transform: ["translateY(12px)", "translateY(0px)"],
-        filter: ["blur(8px)", "blur(0px)"],
-        duration: 460,
-        delay: stagger(38),
+        opacity: [0.86, 1],
+        transform: ["translateY(8px)", "translateY(0px)"],
+        duration: 300,
+        delay: stagger(14),
         ease: "cubic-bezier(0.16, 1, 0.3, 1)",
       });
     }
@@ -84,8 +83,7 @@ export function WritingHabitsPanel({ events, onDeleteType }: WritingHabitsPanelP
   return (
     <section ref={panelRef} className="text-[var(--lt-text)]">
       <header data-habit-motion>
-        <p className="text-xs font-medium tracking-[0.14em] text-[var(--lt-muted)]">写作观察</p>
-        <h1 className="mt-2 font-serif text-[42px] font-normal leading-tight">写作习惯</h1>
+        <h1 className="font-serif text-[42px] font-normal leading-tight">写作习惯</h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--lt-muted)]">
           基于你已经确认应用的修改，提炼出长期表达模式和下一步练习重点。
         </p>
@@ -304,11 +302,11 @@ function BeforeAfterExample({ before, after, reason }: { before: string; after: 
   return (
     <div className="space-y-2">
       <div className="grid gap-2 sm:grid-cols-[64px_minmax(0,1fr)]">
-        <span className="text-xs font-medium text-red-700 dark:text-red-300">修改前</span>
+        <span className="text-xs font-medium text-[var(--lt-muted)]">修改前</span>
         <p className="break-words leading-6 text-[var(--lt-muted)]">{before}</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-[64px_minmax(0,1fr)]">
-        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">修改后</span>
+        <span className="text-xs font-medium text-[var(--lt-muted)]">修改后</span>
         <p className="break-words leading-6 text-[var(--lt-text)]">{after}</p>
       </div>
       {reason ? <p className="pl-0 text-xs leading-5 text-[var(--lt-muted)] sm:pl-16">{reason}</p> : null}

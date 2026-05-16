@@ -179,6 +179,40 @@ describe("Chinese placeholder writing flow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("surfaces expression reappearance cues from the local library without calling the model", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(placeholderResult));
+    vi.stubGlobal("fetch", fetchMock);
+    const text = "Social media can shape young people's values.";
+    writeArchiveWithText(text);
+    localStorage.setItem(
+      LEARNING_LIBRARY_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: "library-shape-values",
+          type: "phrase",
+          content: "shape one's values",
+          chineseMeaning: "塑造 / 影响某人的价值观",
+          usageNote: "用于说明环境或媒介对价值观的影响。",
+          sourceSentence: "This phenomenon may shape young people's values.",
+          writingMode: "natural",
+          createdAt: "2026-05-16T00:00:00.000Z",
+          updatedAt: "2026-05-16T00:00:00.000Z",
+          useCount: 1,
+          favorite: false,
+          tags: [],
+        },
+      ]),
+    );
+
+    render(<LinguaTypeApp />);
+
+    await screen.findByLabelText("写作编辑器");
+    const cue = await screen.findByLabelText("表达库命中：shape one's values");
+    expect(cue).toHaveAttribute("data-expression-reappearance-cue", "seen");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) || "[]")[0].useCount).toBe(1);
+  });
+
   it("opens a cached placeholder suggestion directly without requesting /api/enhance-fast again", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(placeholderResult));
     vi.stubGlobal("fetch", fetchMock);

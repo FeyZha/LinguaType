@@ -58,6 +58,7 @@ export function LearningLibraryPanel({
   const [sortBy, setSortBy] = useState<"updatedAt" | "useCount">("updatedAt");
   const [actionMessage, setActionMessage] = useState("");
   const [dictionaryDraft, setDictionaryDraft] = useState("");
+  const [expandedSourceItemId, setExpandedSourceItemId] = useState<string | null>(null);
   const actionMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function setMessage(message: string) {
@@ -140,10 +141,10 @@ export function LearningLibraryPanel({
       return;
     }
     waapi.animate(items, {
-      opacity: [0, 1],
-      transform: ["translateY(16px)", "translateY(0px)"],
-      duration: 420,
-      delay: stagger(32),
+      opacity: [0.86, 1],
+      transform: ["translateY(8px)", "translateY(0px)"],
+      duration: 300,
+      delay: stagger(14),
       ease: "cubic-bezier(0.22, 1, 0.36, 1)",
     });
   }, [showDictionary, visibleItems.length]);
@@ -301,13 +302,19 @@ export function LearningLibraryPanel({
           </p>
         </div>
       ) : (
-        <ul aria-label="表达库条目列表" {...LIBRARY_MOTION_ATTRS} className="mt-8 grid gap-3">
+        <ul
+          aria-label="表达库条目列表"
+          data-library-layout="compact-card-grid"
+          {...LIBRARY_MOTION_ATTRS}
+          className="mt-8 grid auto-rows-[420px] grid-cols-[repeat(auto-fill,minmax(260px,1fr))] items-stretch gap-3"
+        >
           {visibleItems.map((item) => (
             <li
               key={item.id}
               data-library-motion-item
+              data-library-card="compact"
               {...LIBRARY_MOTION_ATTRS}
-              className="group rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] px-5 py-4 transition hover:border-[var(--lt-ring)]"
+              className="group relative flex h-full flex-col overflow-hidden rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] px-4 py-4 transition hover:border-[var(--lt-ring)]"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -322,7 +329,7 @@ export function LearningLibraryPanel({
                       </span>
                     ) : null}
                   </div>
-                  <h2 className="mt-2 break-words text-[21px] font-semibold leading-snug">{item.content}</h2>
+                  <h2 className="mt-2 break-words text-[20px] font-semibold leading-snug">{item.content}</h2>
                   <p className="mt-1 break-words text-sm leading-6 text-[var(--lt-muted)]">{item.chineseMeaning}</p>
                 </div>
                 <button
@@ -342,30 +349,42 @@ export function LearningLibraryPanel({
                 </button>
               </div>
 
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--lt-text)]">{item.usageNote}</p>
+              <p className="mt-3 max-h-[4.75rem] overflow-hidden text-sm leading-6 text-[var(--lt-text)]">{item.usageNote}</p>
               {item.sourceSentence ? (
-                <div className="mt-3 max-w-4xl rounded-[6px] bg-[var(--lt-surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--lt-muted)]">
+                <button
+                  type="button"
+                  aria-expanded={expandedSourceItemId === item.id}
+                  aria-label={`查看完整来源 ${item.content}`}
+                  data-library-source-preview={item.id}
+                  onClick={() =>
+                    setExpandedSourceItemId((current) => (current === item.id ? null : item.id))
+                  }
+                  className="mt-3 max-h-[5rem] overflow-hidden rounded-[6px] bg-[var(--lt-surface-soft)] px-3 py-2 text-left text-[12px] leading-5 text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-ring)]"
+                >
                   <span className="font-medium text-[var(--lt-text)]">来源</span>
                   <p className="mt-1 break-words">{item.sourceSentence}</p>
-                </div>
+                </button>
               ) : null}
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--lt-muted)]">
+              <div
+                data-library-actions-layout="inline-footer"
+                className="mt-auto border-t border-[var(--lt-border)] pt-3 text-xs text-[var(--lt-muted)]"
+              >
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
                   <span>使用 {item.useCount} 次</span>
                   <span>上次 {formatOptionalDate(item.lastUsedAt)}</span>
                   <span>更新 {formatDate(item.updatedAt)}</span>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs">
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-xs">
                   <button
                     type="button"
                     onClick={() => {
                       onInsert(item.content);
                       setMessage(`已插入当前稿件：${item.content}`);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-[var(--lt-accent-soft)] px-3 py-1.5 text-[var(--lt-accent)] transition hover:bg-[var(--lt-accent-soft-strong)]"
+                    className="inline-flex items-center gap-1.5 rounded-[4px] px-1.5 py-1 text-[var(--lt-accent)] transition hover:bg-[var(--lt-accent-soft)]"
                   >
-                    <PencilSquareIcon className="h-4 w-4" />
+                    <PencilSquareIcon className="h-3.5 w-3.5" />
                     插入当前稿件
                   </button>
                   <button
@@ -384,9 +403,9 @@ export function LearningLibraryPanel({
                         }
                       })()
                     }
-                    className="inline-flex items-center gap-1.5 rounded-md bg-[var(--lt-surface-soft)] px-3 py-1.5 text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
+                    className="inline-flex items-center gap-1.5 rounded-[4px] px-1.5 py-1 text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-soft)]"
                   >
-                    <ClipboardDocumentIcon className="h-4 w-4" />
+                    <ClipboardDocumentIcon className="h-3.5 w-3.5" />
                     复制
                   </button>
                   <button
@@ -395,13 +414,36 @@ export function LearningLibraryPanel({
                       onDelete(item.id);
                       setMessage(`表达已删除：${item.content}`);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-red-700/80 transition hover:bg-red-500/[0.08] dark:text-red-300"
+                    className="inline-flex items-center gap-1.5 rounded-[4px] px-1.5 py-1 text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-soft)] hover:text-[var(--lt-text)]"
                   >
-                    <TrashIcon className="h-4 w-4" />
+                    <TrashIcon className="h-3.5 w-3.5" />
                     删除
                   </button>
                 </div>
               </div>
+              {expandedSourceItemId === item.id && item.sourceSentence ? (
+                <section
+                  role="region"
+                  aria-label={`完整来源 ${item.content}`}
+                  data-library-source-detail="open"
+                  className="absolute inset-3 z-20 flex flex-col rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] p-4 text-left"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-[var(--lt-border)] pb-2">
+                    <span className="text-sm font-medium text-[var(--lt-text)]">完整来源</span>
+                    <button
+                      type="button"
+                      aria-label={`收起来源 ${item.content}`}
+                      onClick={() => setExpandedSourceItemId(null)}
+                      className="rounded-[4px] px-2 py-1 text-xs text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-soft)] hover:text-[var(--lt-text)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-ring)]"
+                    >
+                      收起
+                    </button>
+                  </div>
+                  <p className="mt-3 min-h-0 overflow-auto pr-1 text-[13px] leading-6 text-[var(--lt-text)]">
+                    {item.sourceSentence}
+                  </p>
+                </section>
+              ) : null}
             </li>
           ))}
         </ul>
