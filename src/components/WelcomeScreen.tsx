@@ -6,6 +6,7 @@ import { stagger } from "animejs/utils";
 
 type WelcomeScreenProps = {
   onStart: () => void;
+  theme?: "light" | "dark";
 };
 
 const CORE_FEATURES = [
@@ -24,7 +25,7 @@ const HOW_TO_USE = [
   "写到多段后点“检查文章地图”，再按需要检查本段。",
 ];
 
-export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
+export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) {
   const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -82,21 +83,28 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
           <div>
             <div data-welcome-brand className="flex items-center gap-3 opacity-0">
               <img
-                src="/brand/linguatype-mark-dark.png"
+                src={`/brand/linguatype-mark-${theme}.png`}
                 alt=""
-                className="h-10 w-10 rounded-md ring-1 ring-[var(--lt-border)]"
+                data-welcome-brand-mark
+                draggable={false}
+                className="h-11 w-11 select-none rounded-md object-contain ring-1 ring-[var(--lt-border)]"
               />
-              <img src="/brand/linguatype-wordmark-dark.png" alt="LinguaType" className="h-9 w-auto" />
+              <img
+                src={`/brand/linguatype-wordmark-${theme}.png`}
+                alt="LinguaType"
+                draggable={false}
+                className="h-10 w-[220px] select-none object-contain object-left"
+              />
             </div>
             <div data-welcome-rule className="mt-5 h-px w-full bg-[var(--lt-border)]" />
 
             <div data-welcome-motion className="mt-12 opacity-0">
-              <p className="text-sm font-medium text-[var(--lt-accent)]">一句话定位</p>
+              <p className="text-sm font-medium text-[var(--lt-accent)]">产品定位</p>
               <h1 className="mt-4 max-w-[860px] font-serif text-[44px] font-semibold leading-[1.08] tracking-[0] text-[var(--lt-text)] sm:text-[58px]">
                 面向中文母语者的英文写作辅助工具
               </h1>
               <p className="mt-6 max-w-[760px] text-[18px] leading-8 text-[var(--lt-muted)]">
-                在英文写作卡壳时，提供低打扰、原位式的表达建议、句子润色和修改解释。
+                围绕中文母语者的英文写作过程，提供中英文混合改写、英文句子润色、修改差异解释、表达沉淀、写作存档与文章地图检查；模型输出始终先作为建议呈现，由用户确认后再应用。
               </p>
             </div>
           </div>

@@ -2817,7 +2817,7 @@ export function LinguaTypeApp() {
   }
 
   if (showWelcome) {
-    return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+    return <WelcomeScreen theme={resolvedTheme} onStart={() => setShowWelcome(false)} />;
   }
 
   const workspaceMotionState = pendingWorkspaceView && activeWorkspaceView !== "editor" ? "exiting" : "entering";
