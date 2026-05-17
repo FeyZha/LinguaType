@@ -131,7 +131,6 @@ export type TriggerSettings = {
   popoverBehavior: {
     autoCloseAfterApply: boolean;
     escapeCloses: boolean;
-    suppressLargePanelAutoOpen: boolean;
   };
 };
 
@@ -179,7 +178,6 @@ export function defaultTriggerSettings(): TriggerSettings {
     popoverBehavior: {
       autoCloseAfterApply: true,
       escapeCloses: true,
-      suppressLargePanelAutoOpen: true,
     },
   };
 }
@@ -771,9 +769,6 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
         ? popoverBehavior.autoCloseAfterApply
         : defaults.popoverBehavior.autoCloseAfterApply,
       escapeCloses: true,
-      suppressLargePanelAutoOpen: typeof popoverBehavior.suppressLargePanelAutoOpen === "boolean"
-        ? popoverBehavior.suppressLargePanelAutoOpen
-        : defaults.popoverBehavior.suppressLargePanelAutoOpen,
     },
   };
 }

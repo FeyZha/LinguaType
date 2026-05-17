@@ -57,4 +57,13 @@ describe("TriggerSettingsPanel", () => {
     expect(screen.queryByRole("option", { name: "徽标" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "仅手动查看" })).not.toBeInTheDocument();
   });
+
+  it("does not expose the removed large-panel auto-open setting", () => {
+    const onChange = vi.fn();
+
+    render(<TriggerSettingsPanel settings={defaultTriggerSettings()} onChange={onChange} />);
+
+    expect(screen.queryByText("关闭大面板自动弹出")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "关闭大面板自动弹出" })).not.toBeInTheDocument();
+  });
 });

@@ -124,17 +124,6 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
           >
             应用后自动关闭弹窗
           </SoftCheckbox>
-          <SoftCheckbox
-            checked={settings.popoverBehavior.suppressLargePanelAutoOpen}
-            onChange={(checked) =>
-              updatePopoverBehavior(
-                { suppressLargePanelAutoOpen: checked },
-                "关闭大面板自动弹出",
-              )
-            }
-          >
-            关闭大面板自动弹出
-          </SoftCheckbox>
         </div>
       </div>
 

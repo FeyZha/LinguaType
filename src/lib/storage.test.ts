@@ -277,7 +277,6 @@ describe("v0.2.2  storage", () => {
       popoverBehavior: {
         autoCloseAfterApply: true,
         escapeCloses: true,
-        suppressLargePanelAutoOpen: true,
       },
     });
   });
@@ -288,7 +287,7 @@ describe("v0.2.2  storage", () => {
         sentenceEnhancementShortcut: "disable_shortcut",
         writingHabitsFeedback: "manual_only",
         statusFeedbackStyle: "toast",
-        popoverBehavior: { escapeCloses: false },
+        popoverBehavior: { escapeCloses: false, suppressLargePanelAutoOpen: false },
       }),
     });
 
@@ -301,8 +300,8 @@ describe("v0.2.2  storage", () => {
     expect(loaded.popoverBehavior).toEqual({
       autoCloseAfterApply: true,
       escapeCloses: true,
-      suppressLargePanelAutoOpen: true,
     });
+    expect("suppressLargePanelAutoOpen" in loaded.popoverBehavior).toBe(false);
 
     const saved = saveTriggerSettings(storage, {
       ...loaded,
@@ -314,6 +313,7 @@ describe("v0.2.2  storage", () => {
     expect(storedSettings.paragraphHealthTrigger).toBe("after_paragraph_complete");
     expect("writingHabitsFeedback" in storedSettings).toBe(false);
     expect("statusFeedbackStyle" in storedSettings).toBe(false);
+    expect("suppressLargePanelAutoOpen" in storedSettings.popoverBehavior).toBe(false);
   });
 
   it("normalizes document map auto check modes", () => {
