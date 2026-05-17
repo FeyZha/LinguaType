@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { waapi } from "animejs/waapi";
 import { stagger } from "animejs/utils";
 import type { Change } from "diff";
@@ -387,12 +387,20 @@ export function LinguaTypeApp() {
     setActiveWorkspaceView(nextView);
   }
 
+  const clearWritingSurfaceMotionStyles = useCallback((surface = writingSurfaceRef.current) => {
+    surface?.style.removeProperty("transform");
+    surface?.style.removeProperty("transform-origin");
+    surface?.style.removeProperty("filter");
+    surface?.style.removeProperty("opacity");
+  }, []);
+
   useEffect(() => {
     return () => {
       if (documentMotionTimerRef.current) {
         clearTimeout(documentMotionTimerRef.current);
         documentMotionTimerRef.current = null;
       }
+      clearWritingSurfaceMotionStyles();
       if (expressionCueAnimationTimerRef.current) {
         clearTimeout(expressionCueAnimationTimerRef.current);
         expressionCueAnimationTimerRef.current = null;
@@ -411,12 +419,13 @@ export function LinguaTypeApp() {
         clearTimeout(documentMapHighlightTimerRef.current);
       }
     };
-  }, []);
+  }, [clearWritingSurfaceMotionStyles]);
 
   useEffect(() => {
     if (documentMotionTimerRef.current) {
       clearTimeout(documentMotionTimerRef.current);
       documentMotionTimerRef.current = null;
+      clearWritingSurfaceMotionStyles();
     }
 
     if (documentMotionReason === "idle") {
@@ -437,10 +446,11 @@ export function LinguaTypeApp() {
     });
 
     documentMotionTimerRef.current = setTimeout(() => {
+      clearWritingSurfaceMotionStyles(surface);
       setDocumentMotionReason("idle");
       documentMotionTimerRef.current = null;
     }, 560);
-  }, [documentMotionReason, writingArchives.activeId]);
+  }, [clearWritingSurfaceMotionStyles, documentMotionReason, writingArchives.activeId]);
 
   useEffect(() => {
     const storedSetup = loadWritingSetupFromStorage(localStorage);
