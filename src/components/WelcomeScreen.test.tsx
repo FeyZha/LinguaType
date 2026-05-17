@@ -42,6 +42,12 @@ describe("WelcomeScreen", () => {
 
       expect(positioningLabel).toBeInTheDocument();
       expect(heading).toBeInTheDocument();
+      expect(heading).toHaveAttribute("aria-label", "用中文思路，写出自然英文");
+      expect(heading.querySelectorAll("span")).toHaveLength(2);
+      expect(Array.from(heading.querySelectorAll("span")).map((item) => item.textContent)).toEqual([
+        "用中文思路，",
+        "写出自然英文",
+      ]);
       expect(positioningBody).toBeInTheDocument();
       expect(preview).toHaveAttribute("data-welcome-live-motion", "staggered-preview");
       expect(screen.getByText("文章地图 · 可检查")).toHaveClass("lt-welcome-map-status");

@@ -259,8 +259,16 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
             <div data-welcome-rule className="mt-5 h-px w-full bg-[var(--lt-border)]" />
 
             <div data-welcome-motion data-welcome-copy className="mt-12 opacity-0">
-              <h1 className="max-w-[860px] font-serif text-[44px] font-semibold leading-[1.08] tracking-[0] text-[var(--lt-text)] sm:text-[58px]">
-                用中文思路，写出自然英文
+              <h1
+                aria-label="用中文思路，写出自然英文"
+                className="max-w-[860px] font-serif text-[44px] font-semibold leading-[1.08] tracking-[0] text-[var(--lt-text)] sm:text-[58px]"
+              >
+                <span aria-hidden="true" className="block">
+                  用中文思路，
+                </span>
+                <span aria-hidden="true" className="block">
+                  写出自然英文
+                </span>
               </h1>
               <p className="mt-7 text-sm font-medium text-[var(--lt-accent)]">产品定位</p>
               <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[var(--lt-muted)]">
