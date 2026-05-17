@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { waapi } from "animejs/waapi";
 import { stagger } from "animejs/utils";
 import type { Change } from "diff";
 import { ApiSettingsPanel } from "./ApiSettingsModal";
 import { DataControlPanel } from "./DataControlPanel";
 import { DesignSelect } from "./DesignSelect";
+import {
+  DocumentMapPanel,
+  type DocumentMapParagraphCheckView,
+  type DocumentMapParagraphHealthViewState,
+} from "./DocumentMapPanel";
 import { EnhancementPopover } from "./EnhancementPopover";
-import { InlineExpressionMenu } from "./InlineExpressionMenu";
 import { LearningLibraryPanel } from "./LearningLibraryPanel";
-import { ParagraphFlowPanel } from "./ParagraphFlowPanel";
 import { SelectionActionsPopover } from "./SelectionActionsPopover";
 import { EmptyState, ErrorState } from "./StateViews";
 import { ThemePreferenceControl } from "./ThemePreferenceControl";
 import { TriggerSettingsPanel } from "./TriggerSettingsPanel";
 import { useDismissableLayer } from "./useDismissableLayer";
+import { WelcomeScreen } from "./WelcomeScreen";
 import { WritingEditor, type WritingEditorHandle } from "./WritingEditor";
 import { WritingHabitsPanel } from "./WritingHabitsPanel";
 import {
@@ -27,10 +31,12 @@ import {
   CircleStackIcon,
   Cog6ToothIcon,
   CommandLineIcon,
+  DocumentCheckIcon,
   EllipsisHorizontalIcon,
   MagnifyingGlassIcon,
   PlusIcon,
   QuestionMarkCircleIcon,
+  SparklesIcon,
   TrashIcon,
 } from "./HeroIcons";
 import {
@@ -49,11 +55,23 @@ import {
   type ChinesePlaceholderSentenceRange,
 } from "@/lib/sentence";
 import { findExpressionReappearanceCues } from "@/lib/expressionReappearance";
+import {
+  createDocumentMapCacheKey,
+  createDocumentMapOutlineHash,
+  createDocumentMapTextHash,
+  createDocumentMapParagraphFingerprints,
+  DOCUMENT_MAP_AUTO_CHECK_RULES,
+  documentMapModelKey,
+  evaluateDocumentMapFreshness,
+  splitDocumentIntoParagraphs,
+  shouldQueueDocumentMapAutoCheck,
+} from "@/lib/documentMap";
 import { createParagraphFingerprint } from "@/lib/llm/normalize";
 import { TOPIC_OPTIONS } from "@/lib/topicOptions";
 import {
   API_SETTINGS_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
+  DOCUMENT_MAP_CACHE_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   LEARNING_HISTORY_STORAGE_KEY,
   LEARNING_LIBRARY_STORAGE_KEY,
@@ -66,6 +84,7 @@ import {
   defaultThemeSettings,
   defaultTriggerSettings,
   loadCorrectionEventsFromStorage,
+  loadDocumentMapCache,
   loadLearningLibraryFromStorage,
   loadParagraphHealthCache,
   loadPersonalDictionaryFromStorage,
@@ -74,6 +93,7 @@ import {
   loadWritingArchivesFromStorage,
   loadWritingSetupFromStorage,
   savePersonalDictionary,
+  upsertDocumentMapCache,
   saveWritingArchives,
   saveParagraphHealthCache,
   saveThemeSettings,
@@ -94,6 +114,11 @@ import type {
   ApiConfig,
   CorrectionEvent,
   CorrectionEventType,
+  DocumentMapCacheRecord,
+  DocumentMapParagraph,
+  DocumentMapParagraphInput,
+  DocumentMapFreshness,
+  DocumentMapResult,
   EnhancementLevel,
   FastEnhanceInput,
   FastEnhanceResult,
@@ -107,7 +132,6 @@ import type {
   SelectionExplainResult,
   WritingMode,
 } from "@/lib/llm/types";
-import { analyzeProofreading } from "@/lib/proofreading";
 
 type PendingEnhancement = {
   requestId: string;
@@ -159,11 +183,26 @@ type PendingParagraphCheck = {
   result: ParagraphCheckResult;
 };
 
-type ParagraphHealthNotice = {
-  snapshotFullText: string;
-  paragraphRange: ParagraphRange;
-  result: ParagraphHealthResult;
+type ParagraphCheckContext = {
+  title: string;
+  subtitle: string;
 };
+
+type DocumentMapTrigger = "manual" | "auto_idle" | "after_apply" | "after_outline_change";
+
+type DocumentMapState =
+  | { status: "idle"; message?: string }
+  | { status: "loading"; message?: string }
+  | { status: "empty" | "error"; message: string }
+  | {
+      status: "ready";
+      result: DocumentMapResult;
+      snapshotFullText: string;
+      paragraphs: DocumentMapParagraphInput[];
+      cacheKey: string;
+      textHash: string;
+      message?: string;
+    };
 
 type ErrorMessage = {
   message: string;
@@ -213,13 +252,18 @@ export function LinguaTypeApp() {
   const editorRef = useRef<WritingEditorHandle>(null);
   const writingSurfaceRef = useRef<HTMLElement | null>(null);
   const healthCacheRef = useRef<ParagraphHealthCacheItem[]>([]);
-  const lastHealthCheckAtRef = useRef(0);
-  const isHealthCheckingRef = useRef(false);
+  const documentMapCacheRef = useRef<DocumentMapCacheRecord[]>([]);
   const skipNextArchiveAutoSaveRef = useRef(false);
-  const appliedEditsSinceHealthRef = useRef(0);
+  const paragraphHealthStateRef = useRef(new Map<string, { isChecking: boolean; lastCheckedAt: number }>());
+  const paragraphFlowCheckingFingerprintsRef = useRef(new Set<string>());
+  const completedParagraphHealthFingerprintsRef = useRef(new Set<string>());
+  const pendingCompletedParagraphHealthFingerprintsRef = useRef(new Set<string>());
+  const completedParagraphModeInitializedRef = useRef(false);
   const workspaceExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const placeholderTriggerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const paragraphHealthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const documentMapHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const documentMapAutoCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const documentMapLastInputAtRef = useRef(0);
   const documentMotionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expressionCueAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoredPlaceholderRequestKeyRef = useRef("");
@@ -237,17 +281,17 @@ export function LinguaTypeApp() {
   const [writingArchives, setWritingArchives] = useState<WritingArchivesState>({ activeId: null, items: [] });
   const [writingSetup, setWritingSetup] = useState<WritingSetup | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [learningLibrary, setLearningLibrary] = useState<LearningItem[]>([]);
   const [correctionEvents, setCorrectionEvents] = useState<CorrectionEvent[]>([]);
   const [personalDictionary, setPersonalDictionary] = useState<string[]>([]);
   const [pending, setPending] = useState<PendingEnhancement | null>(null);
   const [pendingParagraph, setPendingParagraph] = useState<PendingParagraphCheck | null>(null);
-  const [paragraphHealthNotice, setParagraphHealthNotice] = useState<ParagraphHealthNotice | null>(null);
-  const [inlineMenu, setInlineMenu] = useState<{ open: boolean; start: number; end: number }>({
-    open: false,
-    start: 0,
-    end: 0,
-  });
+  const [paragraphCheckContext, setParagraphCheckContext] = useState<ParagraphCheckContext | null>(null);
+  const [documentMapParagraphHealthById, setDocumentMapParagraphHealthById] = useState<
+    Record<string, DocumentMapParagraphHealthViewState>
+  >({});
+  const [documentMapState, setDocumentMapState] = useState<DocumentMapState>({ status: "idle" });
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isParagraphLoading, setIsParagraphLoading] = useState(false);
@@ -271,6 +315,8 @@ export function LinguaTypeApp() {
   const [freshExpressionCueIds, setFreshExpressionCueIds] = useState<Set<string>>(() => new Set());
   const [selectionAction, setSelectionAction] = useState<SelectionActionState | null>(null);
   const [isSelectionLoading, setIsSelectionLoading] = useState(false);
+  const [isDocumentMapPanelOpen, setIsDocumentMapPanelOpen] = useState(false);
+  const [isDocumentMapAutoChecking, setIsDocumentMapAutoChecking] = useState(false);
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("editor");
   const [pendingWorkspaceView, setPendingWorkspaceView] = useState<WorkspaceView | null>(null);
   const [documentMotionReason, setDocumentMotionReason] = useState<"idle" | "new" | "switch">("idle");
@@ -328,14 +374,18 @@ export function LinguaTypeApp() {
         clearTimeout(expressionCueAnimationTimerRef.current);
         expressionCueAnimationTimerRef.current = null;
       }
+      if (documentMapAutoCheckTimerRef.current) {
+        clearTimeout(documentMapAutoCheckTimerRef.current);
+        documentMapAutoCheckTimerRef.current = null;
+      }
       if (workspaceExitTimerRef.current) {
         clearTimeout(workspaceExitTimerRef.current);
       }
       if (placeholderTriggerTimerRef.current) {
         clearTimeout(placeholderTriggerTimerRef.current);
       }
-      if (paragraphHealthTimerRef.current) {
-        clearTimeout(paragraphHealthTimerRef.current);
+      if (documentMapHighlightTimerRef.current) {
+        clearTimeout(documentMapHighlightTimerRef.current);
       }
     };
   }, []);
@@ -372,6 +422,9 @@ export function LinguaTypeApp() {
   useEffect(() => {
     const storedSetup = loadWritingSetupFromStorage(localStorage);
     const rawArchiveStorage = localStorage.getItem(WRITING_ARCHIVES_STORAGE_KEY);
+    const legacyDraftText = localStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
+    const shouldShowWelcome =
+      process.env.NODE_ENV !== "test" && rawArchiveStorage === null && !legacyDraftText.trim() && !storedSetup;
     const storedArchives = loadWritingArchivesFromStorage(localStorage);
     const shouldPreserveExistingArchiveStorage = rawArchiveStorage !== null && storedArchives.items.length === 0;
     const ensuredArchives = shouldPreserveExistingArchiveStorage ? storedArchives : ensureWritableArchiveState(storedArchives);
@@ -379,7 +432,7 @@ export function LinguaTypeApp() {
     if (ensuredArchives !== storedArchives && !shouldPreserveExistingArchiveStorage) {
       saveWritingArchives(localStorage, ensuredArchives);
     }
-    const activeText = activeArchive?.text ?? localStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
+    const activeText = activeArchive?.text ?? legacyDraftText;
     const activeSetup = activeArchive?.setup ?? storedSetup;
     setWritingArchives(ensuredArchives);
     setText(activeText);
@@ -394,6 +447,7 @@ export function LinguaTypeApp() {
     setPersonalDictionary(loadPersonalDictionaryFromStorage(localStorage));
     setTriggerSettings(loadTriggerSettingsFromStorage(localStorage));
     healthCacheRef.current = loadParagraphHealthCache(localStorage);
+    documentMapCacheRef.current = loadDocumentMapCache(localStorage);
     const placeholderCache = loadPlaceholderSuggestionCache(localStorage);
     setPlaceholderSuggestionCache(placeholderCache);
     setPlaceholderSuggestions(
@@ -407,6 +461,7 @@ export function LinguaTypeApp() {
       ),
     );
     skipNextArchiveAutoSaveRef.current = true;
+    setShowWelcome(shouldShowWelcome);
     setIsHydrated(true);
   }, []);
 
@@ -485,14 +540,20 @@ export function LinguaTypeApp() {
     return createWordDiff(pendingParagraph.originalParagraph, pendingParagraph.result.revisedParagraph);
   }, [pendingParagraph]);
 
+  const paragraphCheckView: DocumentMapParagraphCheckView | null = paragraphCheckContext
+    ? {
+        ...paragraphCheckContext,
+        isLoading: isParagraphLoading,
+        result: pendingParagraph?.result,
+        diffParts: paragraphDiffParts,
+        message: paragraphMessage,
+        conflictMessage: paragraphConflictMessage,
+      }
+    : null;
+
   useEffect(() => {
     setActiveSuggestionDiffId(null);
   }, [pending?.requestId, pending?.originalSentence, suggestionDisplayMode]);
-
-  const proofreadingResult = useMemo(
-    () => analyzeProofreading(text, personalDictionary),
-    [text, personalDictionary],
-  );
 
   const expressionReappearanceMatches = useMemo(
     () => findExpressionReappearanceCues(text, learningLibrary),
@@ -552,8 +613,9 @@ export function LinguaTypeApp() {
 
     if (
       !isHydrated
+      || showWelcome
       || isRegenerating
-      || (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model))
+      || !hasApiCredentials()
     ) {
       return;
     }
@@ -593,8 +655,10 @@ export function LinguaTypeApp() {
     apiSettings.baseUrl,
     apiSettings.mockMode,
     apiSettings.model,
+    apiSettings.useServerApiKey,
     isHydrated,
     isRegenerating,
+    showWelcome,
     pending?.placeholderRequestKey,
     placeholderSuggestions,
     text,
@@ -613,24 +677,127 @@ export function LinguaTypeApp() {
   }, [activeWorkspaceView]);
 
   useEffect(() => {
-    if (paragraphHealthTimerRef.current) {
-      clearTimeout(paragraphHealthTimerRef.current);
-      paragraphHealthTimerRef.current = null;
-    }
-    if (!paragraphHealthNotice) {
+    completedParagraphModeInitializedRef.current = false;
+    completedParagraphHealthFingerprintsRef.current = new Set();
+    pendingCompletedParagraphHealthFingerprintsRef.current = new Set();
+  }, [writingArchives.activeId]);
+
+  useEffect(() => {
+    if (!isHydrated || triggerSettings.paragraphHealthTrigger !== "after_paragraph_complete") {
+      completedParagraphModeInitializedRef.current = false;
+      completedParagraphHealthFingerprintsRef.current = new Set();
+      pendingCompletedParagraphHealthFingerprintsRef.current = new Set();
       return;
     }
-    paragraphHealthTimerRef.current = setTimeout(() => {
-      setParagraphHealthNotice(null);
-      paragraphHealthTimerRef.current = null;
-    }, 6000);
+
+    const completedParagraphs = extractCompletedParagraphRanges(text);
+    const completedFingerprints = new Set(
+      completedParagraphs.map((range) => createParagraphFingerprint(range.paragraph)),
+    );
+
+    if (!completedParagraphModeInitializedRef.current) {
+      completedParagraphHealthFingerprintsRef.current = completedFingerprints;
+      completedParagraphModeInitializedRef.current = true;
+      return;
+    }
+
+    for (const paragraphRange of completedParagraphs) {
+      const fingerprint = createParagraphFingerprint(paragraphRange.paragraph);
+      if (
+        completedParagraphHealthFingerprintsRef.current.has(fingerprint) ||
+        pendingCompletedParagraphHealthFingerprintsRef.current.has(fingerprint)
+      ) {
+        continue;
+      }
+
+      pendingCompletedParagraphHealthFingerprintsRef.current.add(fingerprint);
+      void runParagraphHealthCheck(text, paragraphRange).then((result) => {
+        pendingCompletedParagraphHealthFingerprintsRef.current.delete(fingerprint);
+        if (result) {
+          completedParagraphHealthFingerprintsRef.current.add(fingerprint);
+        }
+      });
+    }
+  }, [isHydrated, text, triggerSettings.paragraphHealthTrigger, writingArchives.activeId, writingMode, apiSettings]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    const autoMode = getDocumentMapAutoCheckMode();
+    if (autoMode !== "auto_idle" || isDocumentMapPanelOpen || paragraphCheckContext || !documentMapLastInputAtRef.current) {
+      if (documentMapAutoCheckTimerRef.current) {
+        clearTimeout(documentMapAutoCheckTimerRef.current);
+        documentMapAutoCheckTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (!hasApiCredentials() || isAnyAiRequestActive()) {
+      return;
+    }
+
+    const autoCheckContext = getDocumentMapAutoCheckContext();
+    const { freshness } = autoCheckContext;
+
+    if (freshness !== "needs_check") {
+      if (documentMapAutoCheckTimerRef.current) {
+        clearTimeout(documentMapAutoCheckTimerRef.current);
+        documentMapAutoCheckTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (documentMapAutoCheckTimerRef.current) {
+      clearTimeout(documentMapAutoCheckTimerRef.current);
+      documentMapAutoCheckTimerRef.current = null;
+    }
+    documentMapAutoCheckTimerRef.current = setTimeout(() => {
+      if (isAnyAiRequestActive()) {
+        return;
+      }
+      const queuedContext = getDocumentMapAutoCheckContext();
+      if (
+        shouldQueueDocumentMapAutoCheck(queuedContext.freshness, queuedContext.latestCache, {
+          now: Date.now(),
+          lastInputAt: documentMapLastInputAtRef.current,
+        })
+      ) {
+        void checkDocumentMap(false, "auto_idle");
+      }
+    }, DOCUMENT_MAP_AUTO_CHECK_RULES.idleMs);
+
     return () => {
-      if (paragraphHealthTimerRef.current) {
-        clearTimeout(paragraphHealthTimerRef.current);
-        paragraphHealthTimerRef.current = null;
+      if (documentMapAutoCheckTimerRef.current) {
+        clearTimeout(documentMapAutoCheckTimerRef.current);
+        documentMapAutoCheckTimerRef.current = null;
       }
     };
-  }, [paragraphHealthNotice]);
+  }, [
+    isHydrated,
+    text,
+    triggerSettings,
+    writingArchives.activeId,
+    writingSetup?.topicArea,
+    writingSetup?.customTopicArea,
+    writingSetup?.outlinePoints,
+    writingSetup?.essayTopic,
+    apiSettings.apiKey,
+    apiSettings.baseUrl,
+    apiSettings.model,
+    apiSettings.mockMode,
+    apiSettings.provider,
+    apiSettings.useServerApiKey,
+    writingMode,
+    isLoading,
+    isRegenerating,
+    isParagraphLoading,
+    isSelectionLoading,
+    documentMapState.status,
+    isDocumentMapPanelOpen,
+    paragraphCheckContext,
+  ]);
 
   const activeArchive = useMemo(
     () => writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null,
@@ -936,6 +1103,8 @@ export function LinguaTypeApp() {
     setStatusMessage("");
     setError(null);
     setEmpty(false);
+    setDocumentMapState({ status: "idle" });
+    setIsDocumentMapPanelOpen(false);
     ignoredPlaceholderRequestKeyRef.current = "";
   }
 
@@ -1546,6 +1715,7 @@ export function LinguaTypeApp() {
 
   function handleEditorTextChange(value: string) {
     hasUserEditedForExpressionCuesRef.current = true;
+    documentMapLastInputAtRef.current = Date.now();
     setText(value);
     const cursorPosition = editorRef.current?.getSelectionRange().end ?? value.length;
     setEditorSelection((current) => (
@@ -1564,10 +1734,7 @@ export function LinguaTypeApp() {
   }
 
   function ensureApiSettings(): boolean {
-    if (apiSettings.mockMode) {
-      return true;
-    }
-    if (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model) {
+    if (!hasApiCredentials()) {
       requestWorkspaceView("api");
       setError({ message: "需要先填写 API 设置。" });
       return false;
@@ -1634,7 +1801,7 @@ export function LinguaTypeApp() {
       return true;
     }
 
-    if (!apiSettings.mockMode && (!apiSettings.baseUrl || !apiSettings.apiKey || !apiSettings.model)) {
+    if (!hasApiCredentials()) {
       if (trigger === "manual") {
         ensureApiSettings();
       }
@@ -1964,32 +2131,29 @@ export function LinguaTypeApp() {
   }
 
   async function maybeRunParagraphHealthAfterApply(nextText: string, paragraphRange: ParagraphRange) {
-    if (triggerSettings.paragraphHealthTrigger === "off" || triggerSettings.paragraphHealthTrigger === "manual_only") {
+    if (triggerSettings.paragraphHealthTrigger !== "after_every_apply") {
       return;
     }
-    appliedEditsSinceHealthRef.current += 1;
-    if (
-      triggerSettings.paragraphHealthTrigger === "after_3_applied_edits" &&
-      appliedEditsSinceHealthRef.current < 3
-    ) {
-      return;
-    }
-    if (!shouldRunParagraphHealth(paragraphRange.paragraph)) {
-      return;
-    }
+    await runParagraphHealthCheck(nextText, paragraphRange);
+  }
 
+  async function runParagraphHealthCheck(nextText: string, paragraphRange: ParagraphRange): Promise<ParagraphHealthResult | null> {
     const fingerprint = createParagraphFingerprint(paragraphRange.paragraph);
     const cached = healthCacheRef.current.find((item) => item.paragraphFingerprint === fingerprint);
     if (cached) {
-      if (cached.result.hasIssues) {
-        setParagraphHealthNotice({ snapshotFullText: nextText, paragraphRange, result: cached.result });
-      }
-      appliedEditsSinceHealthRef.current = 0;
-      return;
+      return cached.result;
     }
 
-    isHealthCheckingRef.current = true;
-    lastHealthCheckAtRef.current = Date.now();
+    if (!shouldRunParagraphHealth(paragraphRange.paragraph, fingerprint)) {
+      return null;
+    }
+
+    const healthState = paragraphHealthStateRef.current.get(fingerprint) ?? { isChecking: false, lastCheckedAt: 0 };
+    paragraphHealthStateRef.current.set(fingerprint, {
+      ...healthState,
+      isChecking: true,
+      lastCheckedAt: Date.now(),
+    });
     try {
       const response = await fetch("/api/check-paragraph-health", {
         method: "POST",
@@ -2003,7 +2167,7 @@ export function LinguaTypeApp() {
       });
       const payload = (await response.json()) as ParagraphHealthResult | { error?: string };
       if (!response.ok || "error" in payload) {
-        return;
+        return null;
       }
 
       const result = payload as ParagraphHealthResult;
@@ -2015,30 +2179,353 @@ export function LinguaTypeApp() {
           checkedAt: new Date().toISOString(),
         },
       ]);
-      if (result.hasIssues) {
-        setParagraphHealthNotice({ snapshotFullText: nextText, paragraphRange, result });
-      }
-      appliedEditsSinceHealthRef.current = 0;
       setStatusMessage("段落健康 已检查");
+      return result;
     } finally {
-      isHealthCheckingRef.current = false;
+      const current = paragraphHealthStateRef.current.get(fingerprint);
+      paragraphHealthStateRef.current.set(fingerprint, {
+        isChecking: false,
+        lastCheckedAt: current?.lastCheckedAt ?? Date.now(),
+      });
     }
   }
 
-  function shouldRunParagraphHealth(paragraph: string): boolean {
-    if (isHealthCheckingRef.current || isParagraphLoading) {
+  function shouldRunParagraphHealth(paragraph: string, fingerprint: string): boolean {
+    const healthState = paragraphHealthStateRef.current.get(fingerprint);
+    if (healthState?.isChecking) {
       return false;
     }
-    if (Date.now() - lastHealthCheckAtRef.current < 30_000) {
+    if (paragraphFlowCheckingFingerprintsRef.current.has(fingerprint)) {
+      return false;
+    }
+    if (Date.now() - (healthState?.lastCheckedAt ?? 0) < 30_000) {
       return false;
     }
     if (countSentences(paragraph) < 2) {
       return false;
     }
-    if (countEnglishWords(paragraph) < 40) {
-      return false;
-    }
     return true;
+  }
+
+  function hasApiCredentials(): boolean {
+    return Boolean(
+      apiSettings.mockMode ||
+      apiSettings.useServerApiKey ||
+      (apiSettings.baseUrl && apiSettings.apiKey && apiSettings.model),
+    );
+  }
+
+  function getDocumentMapAutoCheckMode(): TriggerSettings["documentMapAutoCheck"] {
+    return triggerSettings.documentMapAutoCheck;
+  }
+
+  function isAnyAiRequestActive(): boolean {
+    return (
+      isLoading ||
+      isRegenerating ||
+      isParagraphLoading ||
+      isSelectionLoading ||
+      isDocumentMapAutoChecking ||
+      documentMapState.status === "loading"
+    );
+  }
+
+  function getLatestDocumentMapCacheForContext(context: { cacheKey: string; model: string; domain: string; outlinePointsHash: string }) {
+    const outlinePointsHash = context.outlinePointsHash;
+    const archiveId = writingArchives.activeId;
+    const essayTopic = writingSetup?.essayTopic ?? "";
+    return documentMapCacheRef.current
+      .filter((item) =>
+        item.archiveId === archiveId &&
+        item.model === context.model &&
+        item.domain === context.domain &&
+        item.essayTopic === essayTopic &&
+        (item.outlinePointsHash === outlinePointsHash || item.outlineHash === outlinePointsHash || (!outlinePointsHash && item.outlinePointsHash === ""))
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  }
+
+  function getDocumentMapDomain(): string {
+    return getPlaceholderDomain(writingSetup);
+  }
+
+  function buildDocumentMapCacheContext(paragraphs: DocumentMapParagraphInput[]) {
+    const outlinePoints = writingSetup?.outlinePoints ?? [];
+    const textHash = createDocumentMapTextHash(text);
+    const outlinePointsHash = createDocumentMapOutlineHash(outlinePoints);
+    const domain = getDocumentMapDomain();
+    const model = documentMapModelKey(apiSettings);
+    const cacheKey = createDocumentMapCacheKey({
+      archiveId: writingArchives.activeId,
+      textHash,
+      essayTopic: writingSetup?.essayTopic ?? "",
+      outlinePoints,
+      domain,
+      model,
+    });
+    return { cacheKey, textHash, outlinePointsHash, domain, model, outlinePoints };
+  }
+
+  function getDocumentMapAutoCheckContext() {
+    const paragraphs = splitDocumentIntoParagraphs(text);
+    const context = buildDocumentMapCacheContext(paragraphs);
+    const latestCache = getLatestDocumentMapCacheForContext(context);
+    const freshness = evaluateDocumentMapFreshness({
+      text,
+      paragraphs,
+      essayTopic: writingSetup?.essayTopic ?? "",
+      outlinePoints: context.outlinePoints,
+      cache: latestCache
+        ? {
+          cacheKey: latestCache.cacheKey,
+          textHash: latestCache.textHash,
+          essayTopicHash: latestCache.essayTopicHash,
+          outlinePointsHash: latestCache.outlinePointsHash,
+          outlineHash: latestCache.outlineHash,
+          paragraphFingerprints: latestCache.paragraphFingerprints,
+          generatedAt: latestCache.generatedAt,
+          freshness: latestCache.freshness,
+          lastAutoCheckedAt: latestCache.lastAutoCheckedAt,
+          autoCheckCountInSession: latestCache.autoCheckCountInSession,
+        }
+        : null,
+    });
+    return { paragraphs, context, latestCache, freshness };
+  }
+
+  function documentMapIssueCount(result: DocumentMapResult | undefined): number {
+    return result?.globalIssues.length ?? 0;
+  }
+
+  function documentMapButtonLabel(): string {
+    if (documentMapState.status === "loading" || isDocumentMapAutoChecking) {
+      return "文章地图 · 整理中";
+    }
+    if (documentMapState.status === "error") {
+      return "文章地图 · 检查失败";
+    }
+    if (documentMapState.status === "ready") {
+      if (createDocumentMapTextHash(text) !== documentMapState.textHash) {
+        return "文章地图 · 可能已过期";
+      }
+      const issueCount = documentMapIssueCount(documentMapState.result);
+      return issueCount > 0 ? `文章地图 · ${issueCount} 个发现` : "文章地图 · 已更新";
+    }
+
+    if (getDocumentMapAutoCheckMode() === "off") {
+      return "检查文章地图";
+    }
+
+    const { latestCache, freshness } = getDocumentMapAutoCheckContext();
+    if (freshness === "needs_check") {
+      return "文章地图 · 可检查";
+    }
+    if (freshness === "stale") {
+      return "文章地图 · 可能已过期";
+    }
+    if (latestCache?.result && (freshness === "ready" || freshness === "fresh")) {
+      const issueCount = documentMapIssueCount(latestCache.result);
+      return issueCount > 0 ? `文章地图 · ${issueCount} 个发现` : "文章地图 · 已更新";
+    }
+    return "检查文章地图";
+  }
+
+  async function checkDocumentMap(force = false, trigger: DocumentMapTrigger = "manual") {
+    const isAutoTrigger = trigger === "auto_idle";
+    if (!isAutoTrigger) {
+      setIsDocumentMapPanelOpen(true);
+    }
+    const paragraphs = splitDocumentIntoParagraphs(text);
+    const requestText = text;
+    const requestSnapshotHash = createDocumentMapTextHash(requestText);
+    setParagraphCheckContext(null);
+    setPendingParagraph(null);
+    if (paragraphs.length < 2) {
+      setDocumentMapParagraphHealthById({});
+      setDocumentMapState({
+        status: "empty",
+        message: "文章内容较少，写到至少 2 个段落后可以生成文章地图。",
+      });
+      return;
+    }
+
+    const context = buildDocumentMapCacheContext(paragraphs);
+    const cached = documentMapCacheRef.current.find((item) => item.cacheKey === context.cacheKey);
+    const existingAutoCount = cached?.autoCheckCountInSession ?? 0;
+    if (cached && !force) {
+      setDocumentMapParagraphHealthById({});
+      setDocumentMapState({
+        status: "ready",
+        result: cached.result,
+        snapshotFullText: text,
+        paragraphs,
+        cacheKey: context.cacheKey,
+        textHash: context.textHash,
+      });
+      return;
+    }
+
+    if (isAutoTrigger ? !hasApiCredentials() : !ensureApiSettings()) {
+      return;
+    }
+
+    setIsDocumentMapAutoChecking(trigger === "auto_idle");
+    setDocumentMapState({ status: "loading", message: "正在整理文章结构……" });
+    setDocumentMapParagraphHealthById({});
+    try {
+      const requestBody = {
+        text: requestText,
+        essayTopic: writingSetup?.essayTopic ?? "",
+        outlinePoints: context.outlinePoints,
+        domain: context.domain,
+        writingMode,
+        paragraphs,
+        trigger,
+        apiConfig: apiSettings,
+      };
+      const response = await fetch("/api/check-document-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      const payload = (await response.json()) as DocumentMapResult | { error?: string; rawResponse?: string };
+      if (!response.ok || "error" in payload) {
+        throw payload;
+      }
+
+      const result = payload as DocumentMapResult;
+      const now = new Date().toISOString();
+      const freshContext = createDocumentMapParagraphFingerprints(paragraphs);
+      const autoCheckCountInSession = trigger === "auto_idle"
+        ? Math.min(DOCUMENT_MAP_AUTO_CHECK_RULES.maxAutoChecksPerSession, existingAutoCount + 1)
+        : existingAutoCount;
+      documentMapCacheRef.current = upsertDocumentMapCache(localStorage, documentMapCacheRef.current, {
+        cacheKey: context.cacheKey,
+        archiveId: writingArchives.activeId,
+        textHash: requestSnapshotHash,
+        essayTopic: writingSetup?.essayTopic ?? "",
+        outlinePointsHash: context.outlinePointsHash,
+        domain: context.domain,
+        model: context.model,
+        paragraphFingerprints: freshContext,
+        generatedAt: now,
+        freshness: "ready",
+        autoCheckCountInSession,
+        lastAutoCheckedAt: trigger === "auto_idle" ? now : cached?.lastAutoCheckedAt,
+        createdAt: now,
+        result,
+      });
+      const isCurrent = requestSnapshotHash === createDocumentMapTextHash(text);
+      setDocumentMapState({
+        status: "ready",
+        result,
+        snapshotFullText: requestText,
+        paragraphs,
+        cacheKey: context.cacheKey,
+        textHash: requestSnapshotHash,
+        message: isCurrent ? undefined : "正文已修改，当前文章地图结果可能已过期。",
+      });
+    } catch (caught) {
+      const payload = caught as { error?: string };
+      setDocumentMapState({
+        status: "error",
+        message: payload.error ?? "文章地图生成失败，请检查 API 设置后重试。",
+      });
+    } finally {
+      setIsDocumentMapAutoChecking(false);
+    }
+  }
+
+  function resolveDocumentMapParagraphRange(paragraph: DocumentMapParagraph): ParagraphRange | null {
+    if (documentMapState.status !== "ready") {
+      return null;
+    }
+    const source = documentMapState.paragraphs.find((item) => item.paragraphId === paragraph.paragraphId);
+    if (!source) {
+      return null;
+    }
+    const currentSlice = text.slice(source.range.start, source.range.end);
+    if (currentSlice === source.text) {
+      return { paragraph: source.text, start: source.range.start, end: source.range.end };
+    }
+    const currentParagraph = splitDocumentIntoParagraphs(text).find(
+      (item) => item.text.trim() === source.text.trim(),
+    );
+    return currentParagraph
+      ? { paragraph: currentParagraph.text, start: currentParagraph.range.start, end: currentParagraph.range.end }
+      : null;
+  }
+
+  function locateDocumentMapParagraph(paragraph: DocumentMapParagraph) {
+    const range = resolveDocumentMapParagraphRange(paragraph);
+    if (!range) {
+      setDocumentMapState((current) => ({
+        ...current,
+        message: "正文已修改，当前段落位置可能不是最新结果。请重新检查文章地图。",
+      }));
+      return;
+    }
+    editorRef.current?.selectRange(range.start, range.end);
+    if (documentMapHighlightTimerRef.current) {
+      clearTimeout(documentMapHighlightTimerRef.current);
+    }
+    documentMapHighlightTimerRef.current = setTimeout(() => {
+      editorRef.current?.setCursor(range.end);
+      documentMapHighlightTimerRef.current = null;
+    }, 1200);
+  }
+
+  async function viewDocumentMapParagraphHealth(paragraph: DocumentMapParagraph) {
+    const range = resolveDocumentMapParagraphRange(paragraph);
+    if (!range) {
+      setDocumentMapParagraphHealthById((current) => ({
+        ...current,
+        [paragraph.paragraphId]: {
+          status: "error",
+          message: "正文已修改，当前段落位置可能不是最新结果。请重新检查文章地图。",
+        },
+      }));
+      setDocumentMapState((current) => ({
+        ...current,
+        message: "正文已修改，当前段落位置可能不是最新结果。请重新检查文章地图。",
+      }));
+      return;
+    }
+
+    setDocumentMapParagraphHealthById((current) => ({
+      ...current,
+      [paragraph.paragraphId]: { status: "loading" },
+    }));
+    const result = await runParagraphHealthCheck(text, range);
+    setDocumentMapParagraphHealthById((current) => ({
+      ...current,
+      [paragraph.paragraphId]: result
+        ? result.hasIssues
+          ? { status: "ready", result }
+          : { status: "empty", message: "这一段暂未发现明显轻量健康问题。" }
+        : { status: "error", message: "当前段落暂不满足段落健康检查条件，或刚刚检查过。" },
+    }));
+    if (!result) {
+      setDocumentMapState((current) => ({
+        ...current,
+        message: "当前段落暂不满足段落健康检查条件，或刚刚检查过。",
+      }));
+    }
+  }
+
+  async function checkDocumentMapParagraph(paragraph: DocumentMapParagraph) {
+    const range = resolveDocumentMapParagraphRange(paragraph);
+    if (!range) {
+      setDocumentMapState((current) => ({
+        ...current,
+        message: "正文已修改，当前段落位置可能不是最新结果。请重新检查文章地图。",
+      }));
+      return;
+    }
+    await runParagraphFlowCheck(text, range, {
+      title: `第 ${paragraph.index} 段｜${paragraph.roleZh}`,
+      subtitle: paragraph.mainPointZh,
+    });
   }
 
   async function copyRevisedSentence() {
@@ -2052,27 +2539,25 @@ export function LinguaTypeApp() {
 
   async function checkCurrentParagraph(cursorPosition?: number) {
     const range = extractCurrentParagraph(text, cursorPosition ?? editorRef.current?.getSelectionRange().start);
-    await runParagraphFlowCheck(text, range);
+    await runParagraphFlowCheck(text, range, {
+      title: "当前段落",
+      subtitle: "来自当前光标位置的段落检查。",
+    });
   }
 
-  async function viewParagraphHealthSuggestions() {
-    if (!paragraphHealthNotice) {
-      return;
-    }
-    const notice = paragraphHealthNotice;
-    setParagraphHealthNotice(null);
-    await runParagraphFlowCheck(notice.snapshotFullText, notice.paragraphRange);
-  }
-
-  async function runParagraphFlowCheck(snapshotFullText: string, range: ParagraphRange) {
+  async function runParagraphFlowCheck(
+    snapshotFullText: string,
+    range: ParagraphRange,
+    context: ParagraphCheckContext,
+  ) {
     setParagraphMessage("");
     setParagraphConflictMessage("");
     setPendingParagraph(null);
-    setInlineMenu((current) => ({ ...current, open: false }));
+    setParagraphCheckContext(context);
+    requestWorkspaceView("editor");
 
     if (!range.paragraph.trim()) {
       setParagraphMessage("请先写一段内容，再检查段落流畅度。");
-      requestWorkspaceView("editor");
       return;
     }
 
@@ -2081,8 +2566,9 @@ export function LinguaTypeApp() {
     }
 
     const requestId = crypto.randomUUID();
+    const flowFingerprint = createParagraphFingerprint(range.paragraph);
+    paragraphFlowCheckingFingerprintsRef.current.add(flowFingerprint);
     setIsParagraphLoading(true);
-    requestWorkspaceView("editor");
 
     try {
       const response = await fetch("/api/check-paragraph-flow", {
@@ -2110,6 +2596,7 @@ export function LinguaTypeApp() {
       const payload = caught as { error?: string };
       setParagraphMessage(payload.error ?? "段落流畅度检查失败。");
     } finally {
+      paragraphFlowCheckingFingerprintsRef.current.delete(flowFingerprint);
       setIsParagraphLoading(false);
     }
   }
@@ -2125,6 +2612,7 @@ export function LinguaTypeApp() {
 
     setText(replaceRange(text, pendingParagraph.paragraphRange, pendingParagraph.result.revisedParagraph));
     setPendingParagraph(null);
+    setParagraphCheckContext(null);
     setParagraphConflictMessage("");
     requestAnimationFrame(() => editorRef.current?.focus());
   }
@@ -2136,7 +2624,6 @@ export function LinguaTypeApp() {
     const end = selection?.end ?? editorSelection?.end ?? text.length;
     const nextText = `${text.slice(0, start)}${content}${text.slice(end)}`;
     setText(nextText);
-    setInlineMenu((current) => ({ ...current, open: false }));
     requestAnimationFrame(() => {
       editor?.focus();
       editor?.setCursor(start + content.length);
@@ -2175,16 +2662,6 @@ export function LinguaTypeApp() {
       saveWritingArchives(localStorage, next);
       return next;
     });
-  }
-
-  function openInlineMenu(selection: { start: number; end: number }) {
-    setInlineMenu({ open: true, start: selection.start, end: selection.end });
-    requestAnimationFrame(() => editorRef.current?.focus());
-  }
-
-  function closeInlineMenu() {
-    setInlineMenu((current) => ({ ...current, open: false }));
-    requestAnimationFrame(() => editorRef.current?.focus());
   }
 
   function handleSelectionChange(selection: {
@@ -2324,6 +2801,10 @@ export function LinguaTypeApp() {
     );
   }
 
+  if (showWelcome) {
+    return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+  }
+
   const workspaceMotionState = pendingWorkspaceView && activeWorkspaceView !== "editor" ? "exiting" : "entering";
   const pendingIsAppliedReview = Boolean(pending?.placeholderRequestKey && pending.applied);
   const suggestionMarkers = [
@@ -2360,9 +2841,17 @@ export function LinguaTypeApp() {
         }]
       : []),
   ];
+  const documentMapIsStale =
+    documentMapState.status === "ready" &&
+    createDocumentMapTextHash(text) !== documentMapState.textHash;
+  const documentMapOpen = (isDocumentMapPanelOpen && documentMapState.status !== "idle") || paragraphCheckView !== null;
+  const documentMapButtonText = documentMapButtonLabel();
 
   return (
-    <main className="h-screen overflow-hidden bg-[var(--lt-bg)] text-[var(--lt-text)]">
+    <main
+      className="h-screen overflow-hidden bg-[var(--lt-bg)] text-[var(--lt-text)]"
+      style={{ "--lt-sidebar-width": archiveSidebarCollapsed ? "72px" : "320px" } as CSSProperties}
+    >
       <div
         aria-label="LinguaType 工作区布局"
         className={`grid h-full min-h-0 ${
@@ -2384,6 +2873,14 @@ export function LinguaTypeApp() {
           onCreate={() => {
             createNewArchive();
             requestWorkspaceView("editor");
+          }}
+          onEnhanceCurrentSentence={() => {
+            requestWorkspaceView("editor");
+            void enhanceLatestSentence();
+          }}
+          onCheckCurrentParagraph={() => {
+            requestWorkspaceView("editor");
+            void checkCurrentParagraph();
           }}
           onSwitch={(id) => {
             switchArchive(id);
@@ -2407,7 +2904,13 @@ export function LinguaTypeApp() {
           onAssignArchiveDomain={(id, topicArea) => assignArchiveDomain(id, topicArea, "manual")}
         />
 
-        <section className="lt-scrollbar-hidden relative min-h-0 overflow-y-auto">
+        <section
+          className={
+            documentMapOpen
+              ? "lt-scrollbar-hidden relative min-h-0 overflow-hidden"
+              : "lt-scrollbar-hidden relative min-h-0 overflow-y-auto"
+          }
+        >
           <div className="sticky top-0 z-30 flex justify-end gap-3 px-8 py-6 pointer-events-none">
             <div className="pointer-events-auto">
               <ThemePreferenceControl settings={themeSettings} onChange={persistThemeSettings} compact />
@@ -2427,7 +2930,11 @@ export function LinguaTypeApp() {
               aria-label="沉浸式写作区"
               data-document-motion-reason={documentMotionReason}
               data-page-turn-motion="soft-page-turn"
-              className="flex min-h-[calc(100vh-88px)] w-full flex-col gap-8 px-8 pb-0"
+              className={
+                documentMapOpen
+                  ? "flex h-[calc(100vh-88px)] min-h-0 w-full flex-col gap-5 overflow-hidden px-8 pb-0"
+                  : "flex min-h-[calc(100vh-88px)] w-full flex-col gap-8 px-8 pb-0"
+              }
             >
               <section
                 data-writing-column="true"
@@ -2458,155 +2965,164 @@ export function LinguaTypeApp() {
                 ) : null}
               </section>
 
-              <div className="relative flex min-h-0 flex-1 flex-col">
-                <WritingEditor
-                  ref={editorRef}
-                  value={text}
-                  outlinePoints={writingSetup?.outlinePoints}
-                  isLoading={isLoading}
-                  isExpressionMenuOpen={inlineMenu.open}
-                  writingMode={writingMode}
-                  enhancementLevel={enhancementLevel}
-                  proofreadingResult={proofreadingResult}
-                  triggerSettings={triggerSettings}
-                  topicAreaLabel={topicAreaDisplayLabel(writingSetup)}
-                  wideLayout={archiveSidebarCollapsed}
-                  suggestionMarkers={suggestionMarkers}
-                  expressionReappearanceCues={expressionReappearanceMatches.map((match) => ({
-                    ...match,
-                    state: freshExpressionCueIds.has(match.id) ? "fresh" : "seen",
-                  }))}
-                  focusedSuggestionSentence={
-                    pending?.result && suggestionDisplayMode === "expanded"
-                      ? pending.originalSentence
-                      : ""
-                  }
-                  focusedSuggestionRange={
-                    pending?.result && suggestionDisplayMode === "expanded"
-                      ? pending.latestSentenceRange
-                      : null
-                  }
-                  focusedSuggestionSourceText={pending?.placeholderHint?.sourceText ?? ""}
-                  activeSuggestionSource={activePlaceholderInsight}
-                  focusedSuggestionDiffParts={
-                    pending?.result &&
-                    suggestionDisplayMode === "expanded"
-                      ? diffParts
-                      : []
-                  }
-                  activeSuggestionDiffId={activeSuggestionDiffId}
-                  onFocusedSuggestionDiffHover={setActiveSuggestionDiffId}
-                  onFocusedSuggestionSourceClick={() => setActivePlaceholderInsight(true)}
-                  onChange={handleEditorTextChange}
-                  onWritingModeChange={setWritingMode}
-                  onEnhancementLevelChange={setEnhancementLevel}
-                  onEnhance={enhanceLatestSentence}
-                  onOpenExpressionMenu={openInlineMenu}
-                  onCloseExpressionMenu={closeInlineMenu}
-                  onSelectionChange={handleSelectionChange}
-                  outlineEditState={inlineSetupEdit.kind === "outline-point" ? inlineSetupEdit : null}
-                  onStartOutlineEdit={startOutlineEdit}
-                  onOutlineDraftChange={(draft) =>
-                    setInlineSetupEdit((current) =>
-                      current.kind === "outline-point" ? { ...current, draft } : current,
-                    )
-                  }
-                  onSaveOutlineEdit={saveOutlinePointEdit}
-                  onCancelOutlineEdit={() => setInlineSetupEdit({ kind: "none" })}
-                  onAddOutlinePoint={addOutlinePoint}
-                  onDeleteOutlinePoint={deleteOutlinePoint}
-                  onEscape={() => {
-                    if (selectionAction) {
-                      closeSelectionActions();
-                      return;
-                    }
-                    closeCurrentSuggestion();
-                  }}
-                  onApplySuggestionShortcut={applyEnhancement}
-                  onRegenerateSuggestionShortcut={regenerateEnhancement}
-                  inlineSuggestionReviewOnly={pendingIsAppliedReview}
-                  inlineSuggestion={
-                    pending?.result && suggestionDisplayMode === "expanded" ? (
-                      <EnhancementPopover
-                        originalSentence={pending.originalSentence}
-                        result={pending.result}
-                        placeholderHint={pending.placeholderHint}
-                        isPlaceholderSuggestion={pending.source === "placeholder"}
-                        isReviewOnly={pendingIsAppliedReview}
-                        activePlaceholderFocus={activePlaceholderInsight}
-                        activeDiffId={activeSuggestionDiffId}
-                        onDiffHover={setActiveSuggestionDiffId}
-                        diffParts={diffParts}
-                        conflictMessage={conflictMessage}
-                        copyMessage={copyMessage}
-                        statusMessage={statusMessage}
-                        isRegenerating={isRegenerating}
-                        onApply={applyEnhancement}
-                        onCancel={closeCurrentSuggestion}
-                        onRegenerate={regenerateEnhancement}
-                        onCopy={copyRevisedSentence}
-                      />
-                    ) : null
-                  }
-                />
-                <InlineExpressionMenu
-                  open={inlineMenu.open}
-                  library={learningLibrary}
-                  onClose={closeInlineMenu}
-                  onInsert={(content) => insertIntoEditor(content, inlineMenu)}
-                  onCheckParagraph={() => void checkCurrentParagraph(inlineMenu.start)}
-                />
-                {selectionAction ? (
-                  <SelectionActionsPopover
-                    selectedText={selectionAction.selectedText}
-                    position={selectionAction.position}
-                    explanation={selectionAction.explanation}
-                    isLoading={isSelectionLoading}
-                    message={selectionAction.message}
-                    requested={selectionAction.requested}
-                    onExplain={() => void explainSelectedText()}
-                    onSave={saveSelectedTextToLibrary}
-                    onClose={closeSelectionActions}
-                  />
-                ) : null}
-              </div>
-
-              {paragraphHealthNotice ? (
-                <section className="pointer-events-auto absolute bottom-12 right-8 z-40 w-[min(360px,calc(100%-4rem))] rounded-md border border-[var(--lt-border)] bg-[var(--lt-menu-bg)] px-3 py-2 text-sm text-[var(--lt-text)] shadow-[0_18px_42px_var(--lt-shadow-strong)] backdrop-blur-xl">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span>段落健康：可能有 {paragraphHealthNotice.result.issueCount} 个问题</span>
-                    <button
-                      type="button"
-                      onClick={() => void viewParagraphHealthSuggestions()}
-                      className="rounded-md bg-[var(--lt-surface-soft)] px-2 py-1 text-xs font-medium text-[var(--lt-text)] transition hover:bg-[var(--lt-surface-hover)]"
-                    >
-                      查看建议
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setParagraphHealthNotice(null)}
-                      className="text-xs text-[var(--lt-muted)] transition hover:text-[var(--lt-text)]"
-                    >
-                      忽略
-                    </button>
+              <section
+                aria-label={documentMapOpen ? "文章地图对照区" : "正文写作区"}
+                data-scroll-mode={documentMapOpen ? "independent-panes" : undefined}
+                className={
+                  documentMapOpen
+                    ? "mx-auto grid min-h-0 w-full max-w-[1560px] flex-1 grid-cols-1 items-stretch gap-5 overflow-hidden px-4 sm:px-8 md:px-10 xl:grid-cols-[minmax(340px,0.76fr)_minmax(0,1fr)]"
+                    : "relative flex min-h-0 flex-1 flex-col"
+                }
+              >
+                {documentMapOpen ? (
+                  <div
+                    aria-label="文章地图栏"
+                    className="lt-scrollbar-hidden min-h-0 overflow-y-auto xl:h-full"
+                  >
+                    <DocumentMapPanel
+                      result={documentMapState.status === "ready" ? documentMapState.result : null}
+                      paragraphHealthById={documentMapParagraphHealthById}
+                      paragraphCheckView={paragraphCheckView}
+                      isLoading={documentMapState.status === "loading"}
+                      isStale={documentMapIsStale}
+                      message={documentMapState.message}
+                      onCheck={(force) => void checkDocumentMap(Boolean(force))}
+                      onClose={() => {
+                        setIsDocumentMapPanelOpen(false);
+                        setDocumentMapState({ status: "idle" });
+                      }}
+                      onBackToMap={() => {
+                        setParagraphCheckContext(null);
+                        setPendingParagraph(null);
+                        setParagraphMessage("");
+                        setParagraphConflictMessage("");
+                      }}
+                      onViewHealth={(paragraph) => void viewDocumentMapParagraphHealth(paragraph)}
+                      onCheckParagraph={(paragraph) => void checkDocumentMapParagraph(paragraph)}
+                      onLocateParagraph={locateDocumentMapParagraph}
+                      onApplyParagraph={applyParagraphCheck}
+                      onCancelParagraph={() => {
+                        setPendingParagraph(null);
+                        setParagraphCheckContext(null);
+                        setParagraphMessage("");
+                        setParagraphConflictMessage("");
+                      }}
+                    />
                   </div>
-                </section>
-              ) : null}
+                ) : null}
 
-              {pendingParagraph || paragraphMessage || paragraphConflictMessage || isParagraphLoading ? (
-                <ParagraphFlowPanel
-                  result={pendingParagraph?.result}
-                  diffParts={paragraphDiffParts}
-                  isLoading={isParagraphLoading}
-                  message={paragraphMessage}
-                  conflictMessage={paragraphConflictMessage}
-                  onApply={applyParagraphCheck}
-                  onCancel={() => {
-                    setPendingParagraph(null);
-                    setParagraphConflictMessage("");
-                  }}
-                />
-              ) : null}
+                <div
+                  aria-label={documentMapOpen ? "原文对照栏" : undefined}
+                  className={
+                    documentMapOpen
+                      ? "lt-scrollbar-hidden relative flex min-h-0 flex-1 flex-col overflow-y-auto xl:h-full"
+                      : "relative flex min-h-0 flex-1 flex-col"
+                  }
+                >
+                  <WritingEditor
+                    ref={editorRef}
+                    value={text}
+                    outlinePoints={writingSetup?.outlinePoints}
+                    isLoading={isLoading}
+                    writingMode={writingMode}
+                    enhancementLevel={enhancementLevel}
+                    triggerSettings={triggerSettings}
+                    topicAreaLabel={topicAreaDisplayLabel(writingSetup)}
+                    documentMapStatusLabel={documentMapButtonText}
+                    onOpenDocumentMap={() => void checkDocumentMap(false)}
+                    wideLayout={archiveSidebarCollapsed && !documentMapOpen}
+                    suggestionMarkers={suggestionMarkers}
+                    expressionReappearanceCues={expressionReappearanceMatches.map((match) => ({
+                      ...match,
+                      state: freshExpressionCueIds.has(match.id) ? "fresh" : "seen",
+                    }))}
+                    focusedSuggestionSentence={
+                      pending?.result && suggestionDisplayMode === "expanded"
+                        ? pending.originalSentence
+                        : ""
+                    }
+                    focusedSuggestionRange={
+                      pending?.result && suggestionDisplayMode === "expanded"
+                        ? pending.latestSentenceRange
+                        : null
+                    }
+                    focusedSuggestionSourceText={pending?.placeholderHint?.sourceText ?? ""}
+                    activeSuggestionSource={activePlaceholderInsight}
+                    focusedSuggestionDiffParts={
+                      pending?.result &&
+                      suggestionDisplayMode === "expanded"
+                        ? diffParts
+                        : []
+                    }
+                    activeSuggestionDiffId={activeSuggestionDiffId}
+                    onFocusedSuggestionDiffHover={setActiveSuggestionDiffId}
+                    onFocusedSuggestionSourceClick={() => setActivePlaceholderInsight(true)}
+                    onChange={handleEditorTextChange}
+                    onWritingModeChange={setWritingMode}
+                    onEnhancementLevelChange={setEnhancementLevel}
+                    onEnhance={enhanceLatestSentence}
+                    onCheckCurrentParagraph={(cursorPosition) => void checkCurrentParagraph(cursorPosition)}
+                    onSelectionChange={handleSelectionChange}
+                    outlineEditState={inlineSetupEdit.kind === "outline-point" ? inlineSetupEdit : null}
+                    onStartOutlineEdit={startOutlineEdit}
+                    onOutlineDraftChange={(draft) =>
+                      setInlineSetupEdit((current) =>
+                        current.kind === "outline-point" ? { ...current, draft } : current,
+                      )
+                    }
+                    onSaveOutlineEdit={saveOutlinePointEdit}
+                    onCancelOutlineEdit={() => setInlineSetupEdit({ kind: "none" })}
+                    onAddOutlinePoint={addOutlinePoint}
+                    onDeleteOutlinePoint={deleteOutlinePoint}
+                    onEscape={() => {
+                      if (selectionAction) {
+                        closeSelectionActions();
+                        return;
+                      }
+                      closeCurrentSuggestion();
+                    }}
+                    onApplySuggestionShortcut={applyEnhancement}
+                    onRegenerateSuggestionShortcut={regenerateEnhancement}
+                    inlineSuggestionReviewOnly={pendingIsAppliedReview}
+                    inlineSuggestion={
+                      pending?.result && suggestionDisplayMode === "expanded" ? (
+                        <EnhancementPopover
+                          originalSentence={pending.originalSentence}
+                          result={pending.result}
+                          placeholderHint={pending.placeholderHint}
+                          isPlaceholderSuggestion={pending.source === "placeholder"}
+                          isReviewOnly={pendingIsAppliedReview}
+                          activePlaceholderFocus={activePlaceholderInsight}
+                          activeDiffId={activeSuggestionDiffId}
+                          onDiffHover={setActiveSuggestionDiffId}
+                          diffParts={diffParts}
+                          conflictMessage={conflictMessage}
+                          copyMessage={copyMessage}
+                          statusMessage={statusMessage}
+                          isRegenerating={isRegenerating}
+                          onApply={applyEnhancement}
+                          onCancel={closeCurrentSuggestion}
+                          onRegenerate={regenerateEnhancement}
+                          onCopy={copyRevisedSentence}
+                        />
+                      ) : null
+                    }
+                  />
+                  {selectionAction ? (
+                    <SelectionActionsPopover
+                      selectedText={selectionAction.selectedText}
+                      position={selectionAction.position}
+                      explanation={selectionAction.explanation}
+                      isLoading={isSelectionLoading}
+                      message={selectionAction.message}
+                      requested={selectionAction.requested}
+                      onExplain={() => void explainSelectedText()}
+                      onSave={saveSelectedTextToLibrary}
+                      onClose={closeSelectionActions}
+                    />
+                  ) : null}
+                </div>
+              </section>
 
               {empty ? <EmptyState /> : null}
               {error ? <ErrorState message={error.message} rawResponse={error.rawResponse} /> : null}
@@ -2906,8 +3422,9 @@ function ShortcutHelpPage() {
     <section className="text-[var(--lt-text)]">
       <h1 className="font-serif text-[38px] font-normal leading-tight">快捷键帮助</h1>
       <dl className="mt-8 divide-y divide-[var(--lt-border)] border-y border-[var(--lt-border)] text-sm">
-        <ShortcutRow label="增强最新一句" value="Ctrl/Cmd + Enter" />
-        <ShortcutRow label="打开表达菜单" value="Ctrl/Cmd + K" />
+        <ShortcutRow label="增强当前句" value="Ctrl/Cmd + Enter" />
+        <ShortcutRow label="换一种表达（建议卡展开时）" value="Ctrl/Cmd + R" />
+        <ShortcutRow label="检查本段" value="Ctrl/Cmd + K" />
       </dl>
     </section>
   );
@@ -2950,6 +3467,40 @@ function LinguaTypeBrandMark({ className = "", theme }: { className?: string; th
   );
 }
 
+function CollapsedSidebarIconButton({
+  label,
+  active = false,
+  accent = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  active?: boolean;
+  accent?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={`group relative grid h-9 w-9 place-items-center rounded-md text-sm transition ${
+        active
+          ? "bg-[var(--lt-accent-soft)] text-[var(--lt-accent)]"
+          : accent
+            ? "text-[var(--lt-accent)] hover:bg-[var(--lt-accent-soft)] hover:text-[var(--lt-accent)]"
+            : "hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
+      }`}
+    >
+      {children}
+      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 rounded-md border border-[var(--lt-border)] bg-[var(--lt-bg)] px-2 py-1 text-xs font-medium text-[var(--lt-text)] opacity-0 shadow-[0_8px_22px_var(--lt-shadow)] transition group-hover:opacity-100 group-focus-visible:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
 function ArchiveSidebar({
   archives,
   collapsed,
@@ -2963,6 +3514,8 @@ function ArchiveSidebar({
   onCollapse,
   onExpand,
   onCreate,
+  onEnhanceCurrentSentence,
+  onCheckCurrentParagraph,
   onSwitch,
   onRenameArchive,
   onOpenMenu,
@@ -2984,6 +3537,8 @@ function ArchiveSidebar({
   onCollapse: () => void;
   onExpand: () => void;
   onCreate: () => void;
+  onEnhanceCurrentSentence: () => void;
+  onCheckCurrentParagraph: () => void;
   onSwitch: (id: string) => void;
   onRenameArchive: (id: string, title: string) => void;
   onOpenMenu: (id: string) => void;
@@ -3244,39 +3799,33 @@ function ArchiveSidebar({
           <div
             aria-label="LinguaType 标识"
             data-sidebar-motion-item
-            className="grid h-12 w-12 place-items-center text-[var(--lt-text)]"
+            className="group relative grid h-12 w-12 place-items-center text-[var(--lt-text)]"
           >
             <LinguaTypeBrandMark theme={resolvedTheme} className="block h-11 w-11" />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--lt-border)] bg-[var(--lt-surface)] px-2 py-1 text-xs text-[var(--lt-text)] opacity-0 shadow-[0_12px_32px_var(--lt-shadow)] transition group-hover:opacity-100"
+            >
+              LinguaType
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onExpand}
-            aria-label="展开写作存档"
-            className="rounded-md px-2 py-1.5 text-sm transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
-          >
+          <CollapsedSidebarIconButton label="展开写作存档" onClick={onExpand}>
             <Bars3Icon className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={onCreate}
-            aria-label="新建写作"
-            className="rounded-md px-2 py-1.5 text-lg transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
-          >
-            <PlusIcon className="h-5 w-5" />
-          </button>
+          </CollapsedSidebarIconButton>
+          <CollapsedSidebarIconButton label="增强当前句" onClick={onEnhanceCurrentSentence} accent>
+            <SparklesIcon className="h-5 w-5" />
+          </CollapsedSidebarIconButton>
+          <CollapsedSidebarIconButton label="检查本段" onClick={onCheckCurrentParagraph}>
+            <DocumentCheckIcon className="h-5 w-5" />
+          </CollapsedSidebarIconButton>
         </div>
         <div className="mt-auto grid gap-2">
           {WORKSPACE_NAV_ITEMS.map((item) => (
-            <button
+            <CollapsedSidebarIconButton
               key={item.id}
-              type="button"
               onClick={() => toggleWorkspaceView(item.id)}
-              aria-label={`打开${item.label}`}
-              className={`relative grid h-9 w-9 place-items-center rounded-md text-sm transition ${
-                activeView === item.id
-                  ? "bg-[var(--lt-accent-soft)] text-[var(--lt-accent)]"
-                  : "hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
-              }`}
+              label={item.label}
+              active={activeView === item.id}
             >
               <item.icon className="h-5 w-5" />
               {item.id === "library" && hasLearningUpdate ? (
@@ -3285,20 +3834,15 @@ function ArchiveSidebar({
                   className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--lt-accent)]"
                 />
               ) : null}
-            </button>
+            </CollapsedSidebarIconButton>
           ))}
-          <button
-            type="button"
+          <CollapsedSidebarIconButton
+            label="触发设置"
             onClick={() => toggleWorkspaceView("triggers")}
-            aria-label="打开触发设置"
-            className={`grid h-9 w-9 place-items-center rounded-md text-sm transition ${
-              activeView === "triggers"
-                ? "bg-[var(--lt-accent-soft)] text-[var(--lt-accent)]"
-                : "hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
-            }`}
+            active={activeView === "triggers"}
           >
             <AdjustmentsHorizontalIcon className="h-5 w-5" />
-          </button>
+          </CollapsedSidebarIconButton>
         </div>
       </aside>
     );
@@ -3767,6 +4311,38 @@ function withWritingSetupContext(previousContext: string, setup: WritingSetup | 
   ].filter(Boolean).join("\n");
 }
 
+function extractCompletedParagraphRanges(fullText: string): ParagraphRange[] {
+  const ranges: ParagraphRange[] = [];
+  const separatorPattern = /\n\s*\n/gu;
+  let rawStart = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = separatorPattern.exec(fullText)) !== null) {
+    const range = trimParagraphRange(fullText, rawStart, match.index);
+    if (range) {
+      ranges.push(range);
+    }
+    rawStart = match.index + match[0].length;
+  }
+
+  return ranges;
+}
+
+function trimParagraphRange(fullText: string, start: number, end: number): ParagraphRange | null {
+  let paragraphStart = start;
+  let paragraphEnd = end;
+
+  while (paragraphStart < paragraphEnd && /\s/u.test(fullText[paragraphStart])) {
+    paragraphStart += 1;
+  }
+  while (paragraphEnd > paragraphStart && /\s/u.test(fullText[paragraphEnd - 1])) {
+    paragraphEnd -= 1;
+  }
+
+  const paragraph = fullText.slice(paragraphStart, paragraphEnd);
+  return paragraph.trim() ? { paragraph, start: paragraphStart, end: paragraphEnd } : null;
+}
+
 function countSentences(paragraph: string): number {
   return paragraph.split(/[.!?。？！；;\n]+/u).filter((part) => part.trim().length > 0).length;
 }
@@ -3782,11 +4358,7 @@ function countMetadataWords(paragraph: string): number {
 }
 
 function countParagraphs(paragraph: string): number {
-  return paragraph
-    .trim()
-    .split(/\n{2,}/u)
-    .filter((part) => part.trim().length > 0)
-    .length;
+  return splitDocumentIntoParagraphs(paragraph).length;
 }
 
 function isEnglishSelection(text: string): boolean {

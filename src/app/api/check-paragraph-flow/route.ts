@@ -1,5 +1,6 @@
 import { InvalidModelJsonError, InvalidModelSchemaError, redactApiKey } from "@/lib/json";
 import { normalizeParagraphCheckResult } from "@/lib/llm/normalize";
+import { resolveServerApiConfig } from "@/lib/llm/serverConfig";
 import { checkParagraphFlowWithLLM } from "@/lib/llm/service";
 import { paragraphCheckRequestSchema, paragraphCheckResultSchema } from "@/lib/llm/types";
 import { NextResponse } from "next/server";
@@ -10,8 +11,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const input = paragraphCheckRequestSchema.parse(body);
-    apiKey = input.apiConfig.apiKey;
-    const result = await checkParagraphFlowWithLLM(input, input.apiConfig);
+    const apiConfig = resolveServerApiConfig(input.apiConfig);
+    const resolvedInput = { ...input, apiConfig };
+    apiKey = apiConfig.apiKey;
+    const result = await checkParagraphFlowWithLLM(resolvedInput, apiConfig);
     const normalized = normalizeParagraphCheckResult(result, input.currentParagraph);
     return NextResponse.json(paragraphCheckResultSchema.parse(normalized));
   } catch (error) {

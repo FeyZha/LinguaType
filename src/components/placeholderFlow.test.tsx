@@ -204,11 +204,16 @@ describe("Chinese placeholder writing flow", () => {
       ]),
     );
 
-    render(<LinguaTypeApp />);
+    const { container } = render(<LinguaTypeApp />);
 
     await screen.findByLabelText("写作编辑器");
-    const cue = await screen.findByLabelText("表达库命中：shape one's values");
+    await waitFor(() =>
+      expect(container.querySelector("[data-expression-reappearance-cue='seen']")).not.toBeNull(),
+    );
+    const cue = container.querySelector("[data-expression-reappearance-cue='seen']") as HTMLElement;
     expect(cue).toHaveAttribute("data-expression-reappearance-cue", "seen");
+    expect(cue).toHaveAttribute("data-expression-reappearance-visual", "idle");
+    expect(cue).toHaveAttribute("aria-hidden", "true");
     expect(fetchMock).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY) || "[]")[0].useCount).toBe(1);
   });
@@ -361,7 +366,7 @@ describe("Chinese placeholder writing flow", () => {
     );
     expect(screen.queryByRole("button", { name: "忽略" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "应用修改" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "换一种说法" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "换一种表达" })).toBeInTheDocument();
 
     await waitFor(() => {
       const cache = JSON.parse(localStorage.getItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY) ?? "[]");

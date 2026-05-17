@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { waapi } from "animejs/waapi";
@@ -16,11 +15,10 @@ import type { Change } from "diff";
 
 import type { ExpressionReappearanceMatch } from "@/lib/expressionReappearance";
 import type { EnhancementLevel, WritingMode } from "@/lib/llm/types";
-import type { ProofreadingResult } from "@/lib/proofreading";
-import type { ProofreadingSignal } from "@/lib/proofreading";
 import { extractCurrentSentence } from "@/lib/sentence";
 import type { TriggerSettings } from "@/lib/storage";
 import { buildMappedDiffRows, renderOriginalDiffTokens } from "./EnhancementPopover";
+import { ChartBarIcon } from "./HeroIcons";
 import { useDismissableLayer } from "./useDismissableLayer";
 
 type SelectionSnapshot = {
@@ -54,26 +52,26 @@ export type WritingEditorHandle = {
   focus: () => void;
   getSelectionRange: () => { start: number; end: number };
   setCursor: (offset: number) => void;
+  selectRange: (start: number, end: number) => void;
 };
 
 type WritingEditorProps = {
   value: string;
   outlinePoints?: string[];
   isLoading: boolean;
-  isExpressionMenuOpen?: boolean;
   writingMode: WritingMode;
   enhancementLevel: EnhancementLevel;
-  proofreadingResult: ProofreadingResult;
   triggerSettings: TriggerSettings;
   topicAreaLabel?: string;
+  documentMapStatusLabel?: string;
   onChange: (value: string) => void;
   onEnhance: () => void;
+  onOpenDocumentMap?: () => void;
   onWritingModeChange?: (mode: WritingMode) => void;
   onEnhancementLevelChange?: (level: EnhancementLevel) => void;
   onOpenModeMenu?: () => void;
   onOpenEnhancementMenu?: () => void;
-  onOpenExpressionMenu?: (selection: SelectionSnapshot) => void;
-  onCloseExpressionMenu?: () => void;
+  onCheckCurrentParagraph?: (cursorPosition?: number) => void;
   onSelectionChange?: (selection: SelectionSnapshot) => void;
   outlineEditState?: unknown;
   onStartOutlineEdit?: (index: number) => void;
@@ -167,8 +165,6 @@ function getParagraphIndex(text: string, offset: number) {
 const FALLBACK_FONT_SIZE = 21;
 const FALLBACK_LINE_HEIGHT = 48;
 const SELECTION_TOP_CLAMP = 4;
-const PROOFREADING_GROUP_CLOSED_HEIGHT = 28;
-const PROOFREADING_GROUP_GAP = 12;
 
 type TextareaVisualMetrics = {
   fontSize: number;
@@ -180,10 +176,10 @@ type TextareaVisualMetrics = {
   charsPerVisualLine: number;
 };
 
-type ProofreadingHintGroup = {
-  id: string;
-  start: number;
-  signals: ProofreadingSignal[];
+type WritingStats = {
+  englishWordCount: number;
+  sentenceCount: number;
+  paragraphCount: number;
 };
 
 function getTextareaVisualMetrics(
@@ -376,66 +372,21 @@ function estimateOffsetTop(
   return 8 + metrics.paddingTop + visualLineIndex * metrics.lineHeight;
 }
 
-function estimateInlineCueCursorOffset(
-  event: ReactMouseEvent<HTMLElement>,
-  start: number,
-  end: number,
-) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const cueLength = Math.max(0, end - start);
-  if (cueLength === 0 || rect.width <= 0) {
-    return start;
-  }
+function calculateWritingStats(text: string): WritingStats {
+  const trimmed = text.trim();
+  const englishWordCount = trimmed.match(/[A-Za-z]+(?:'[A-Za-z]+)?/gu)?.length ?? 0;
+  const sentenceCount = trimmed
+    ? trimmed.split(/[.!?。！？]+/u).filter((part) => part.trim().length > 0).length
+    : 0;
+  const paragraphCount = trimmed
+    ? trimmed.split(/\n\s*\n|\n/u).filter((part) => part.trim().length > 0).length
+    : 0;
 
-  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  return start + Math.round(ratio * cueLength);
-}
-
-function getSentenceStartForOffset(text: string, offset: number) {
-  const safeOffset = clampOffset(offset, text.length);
-  let sentenceStart = 0;
-
-  for (let index = 0; index < safeOffset; index += 1) {
-    const char = text[index];
-    if (
-      char === "." ||
-      char === "?" ||
-      char === "!" ||
-      char === "。" ||
-      char === "？" ||
-      char === "！" ||
-      char === "\n"
-    ) {
-      sentenceStart = index + 1;
-    }
-  }
-
-  return sentenceStart;
-}
-
-function groupProofreadingHints(
-  text: string,
-  signals: ProofreadingSignal[],
-): ProofreadingHintGroup[] {
-  const groups = new Map<number, ProofreadingHintGroup>();
-
-  for (const signal of [...signals].sort((first, second) => first.start - second.start)) {
-    const groupStart = getSentenceStartForOffset(text, signal.start);
-    const existing = groups.get(groupStart);
-    if (existing) {
-      existing.signals.push(signal);
-      existing.start = Math.min(existing.start, signal.start);
-      continue;
-    }
-
-    groups.set(groupStart, {
-      id: `proofreading-group-${groupStart}`,
-      start: signal.start,
-      signals: [signal],
-    });
-  }
-
-  return [...groups.values()].sort((first, second) => first.start - second.start);
+  return {
+    englishWordCount,
+    sentenceCount,
+    paragraphCount,
+  };
 }
 
 function splitFocusedText(value: string, range?: { start: number; end: number } | null) {
@@ -494,24 +445,12 @@ function syncTextareaHeight(element: HTMLTextAreaElement) {
 
 function sentenceTriggerLabel(triggerSettings: TriggerSettings) {
   switch (triggerSettings.sentenceEnhancementShortcut) {
-    case "disable_shortcut":
-      return "已关闭";
     case "button_only":
       return "按钮";
-    case "ctrl_j_legacy":
-      return "Ctrl/Cmd + J";
     case "ctrl_enter":
     default:
       return "Ctrl/Cmd + Enter";
   }
-}
-
-function proofreadingHintPosition(
-  value: string,
-  offset: number,
-  element?: HTMLTextAreaElement | null,
-): number {
-  return estimateOffsetTop(value, offset, element) + 6;
 }
 
 function StatusMenu({
@@ -545,19 +484,19 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
     {
       value,
       isLoading,
-      isExpressionMenuOpen = false,
       writingMode,
       enhancementLevel,
-      proofreadingResult,
       triggerSettings,
       topicAreaLabel = "自定义",
+      documentMapStatusLabel = "检查文章地图",
       onChange,
       onEnhance,
+      onOpenDocumentMap,
       onWritingModeChange,
       onEnhancementLevelChange,
       onOpenModeMenu,
       onOpenEnhancementMenu,
-      onOpenExpressionMenu,
+      onCheckCurrentParagraph,
       onSelectionChange,
       onEscape,
       inlineSuggestion = null,
@@ -582,7 +521,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
     const editorRef = useRef<HTMLTextAreaElement | null>(null);
     const markerElementRefs = useRef<Map<string, HTMLElement>>(new Map());
     const markerButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-    const proofreadingDetailRefs = useRef<Map<string, HTMLElement>>(new Map());
     const prevSuggestionMarkerIds = useRef<Set<string>>(new Set());
     const statusControlsRef = useRef<HTMLDivElement | null>(null);
     const [openStatusMenu, setOpenStatusMenu] = useState<"mode" | "level" | null>(
@@ -592,38 +530,10 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
     const [activeSuggestionMarkerId, setActiveSuggestionMarkerId] = useState<
       string | null
     >(null);
-    const [proofreadingTagPositions, setProofreadingTagPositions] = useState<
-      Record<string, { top: number }>
-    >({});
-    const [proofreadingTagHeights, setProofreadingTagHeights] = useState<
-      Record<string, { expandedHeight: number }>
-    >({});
-    const [activeProofreadingSignalId, setActiveProofreadingSignalId] = useState<string | null>(null);
-    const [activeExpressionCueId, setActiveExpressionCueId] = useState<string | null>(null);
-
-    const proofreadingIssueCount = proofreadingResult.signals.length;
-    const proofreadingHints = useMemo<ProofreadingSignal[]>(
-      () => proofreadingResult.signals,
-      [proofreadingResult.signals],
-    );
-    const proofreadingHintGroups = useMemo(
-      () => groupProofreadingHints(value, proofreadingHints),
-      [proofreadingHints, value],
-    );
-    const activeProofreadingSignal = useMemo(
-      () => proofreadingHints.find((signal) => signal.id === activeProofreadingSignalId),
-      [activeProofreadingSignalId, proofreadingHints],
-    );
-    const activeProofreadingGroup = useMemo(
-      () =>
-        proofreadingHintGroups.find((group) =>
-          group.signals.some((signal) => signal.id === activeProofreadingSignalId),
-        ),
-      [activeProofreadingSignalId, proofreadingHintGroups],
-    );
-    const showEditorEnhanceButton =
-      triggerSettings.sentenceEnhancementShortcut === "button_only" ||
-      triggerSettings.sentenceEnhancementShortcut === "disable_shortcut";
+    const writingStats = useMemo(() => calculateWritingStats(value), [value]);
+    const documentMapStatusTone =
+      /发现|可检查|过期|失败/u.test(documentMapStatusLabel) ? "attention" : "muted";
+    const showEditorEnhanceButton = triggerSettings.sentenceEnhancementShortcut === "button_only";
     const focusedText = useMemo(
       () => splitFocusedText(value, focusedSuggestionRange),
       [focusedSuggestionRange, value],
@@ -655,11 +565,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         activeSuggestionMarkers.find((marker) => marker.id === activeSuggestionMarkerId),
       [activeSuggestionMarkerId, activeSuggestionMarkers],
     );
-    const activeExpressionCue = useMemo(
-      () => expressionReappearanceCues.find((cue) => cue.id === activeExpressionCueId),
-      [activeExpressionCueId, expressionReappearanceCues],
-    );
-
     useDismissableLayer(statusControlsRef, () => setOpenStatusMenu(null), Boolean(openStatusMenu));
 
     useEffect(() => {
@@ -698,74 +603,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       }
       setMarkerPositions(nextPositions);
     }, [activeSuggestionMarkers, value]);
-
-    useEffect(() => {
-      const nextHeights: Record<string, { expandedHeight: number }> = {};
-      for (const signal of proofreadingResult.signals) {
-        const detailElement = proofreadingDetailRefs.current.get(signal.id);
-        const nextHeight = detailElement ? detailElement.scrollHeight : 0;
-        nextHeights[signal.id] = {
-          expandedHeight: Math.max(16, nextHeight),
-        };
-      }
-      setProofreadingTagHeights((previous) => {
-        const changed =
-          JSON.stringify(previous) !== JSON.stringify(nextHeights);
-        return changed ? nextHeights : previous;
-      });
-    }, [proofreadingResult.signals]);
-
-    useEffect(() => {
-      if (proofreadingHintGroups.length === 0) {
-        setProofreadingTagPositions((current) =>
-          Object.keys(current).length === 0 ? current : {},
-        );
-        return;
-      }
-
-      const nextPositions: Record<string, { top: number }> = {};
-      const activeGroupIndex = activeProofreadingGroup
-        ? proofreadingHintGroups.findIndex(
-            (group) => group.id === activeProofreadingGroup.id,
-          )
-        : -1;
-      const activeBaseTop = activeProofreadingGroup
-        ? proofreadingHintPosition(value, activeProofreadingGroup.start, editorRef.current)
-        : 0;
-      const activeHeight = activeProofreadingSignal
-        ? PROOFREADING_GROUP_CLOSED_HEIGHT +
-          (proofreadingTagHeights[activeProofreadingSignal.id]?.expandedHeight ?? 0)
-        : 0;
-
-      let previousBottom = 0;
-      for (let index = 0; index < proofreadingHintGroups.length; index += 1) {
-        const group = proofreadingHintGroups[index];
-        const baselineTop = proofreadingHintPosition(value, group.start, editorRef.current);
-        const isActiveGroup = group.id === activeProofreadingGroup?.id;
-        const minimumTop =
-          previousBottom > 0 ? previousBottom + PROOFREADING_GROUP_GAP : baselineTop;
-        const activePushTop =
-          activeGroupIndex >= 0 && index > activeGroupIndex
-            ? activeBaseTop + activeHeight + PROOFREADING_GROUP_GAP
-            : baselineTop;
-        const top = Math.max(baselineTop, minimumTop, activePushTop);
-        nextPositions[group.id] = { top };
-        previousBottom =
-          top +
-          PROOFREADING_GROUP_CLOSED_HEIGHT +
-          (isActiveGroup && activeProofreadingSignal
-            ? proofreadingTagHeights[activeProofreadingSignal.id]?.expandedHeight ?? 0
-            : 0);
-      }
-
-      setProofreadingTagPositions(nextPositions);
-    }, [
-      proofreadingHintGroups,
-      value,
-      activeProofreadingGroup,
-      activeProofreadingSignal,
-      proofreadingTagHeights,
-    ]);
 
     useEffect(() => {
       const nextIds = new Set(activeSuggestionMarkers.map((marker) => marker.id));
@@ -828,6 +665,16 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
           element.focus();
           element.setSelectionRange(safeOffset, safeOffset);
         },
+        selectRange: (start: number, end: number) => {
+          const element = editorRef.current;
+          if (!element) {
+            return;
+          }
+          const safeStart = clampOffset(start, element.value.length);
+          const safeEnd = clampOffset(end, element.value.length);
+          element.focus();
+          element.setSelectionRange(Math.min(safeStart, safeEnd), Math.max(safeStart, safeEnd));
+        },
       }),
       [value.length],
     );
@@ -862,7 +709,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
 
     function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
       if (event.key === "Escape") {
-        if (inlineSuggestion || isExpressionMenuOpen) {
+        if (inlineSuggestion) {
           event.preventDefault();
           onEscape?.();
         }
@@ -884,7 +731,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       }
 
       if (
-        triggerSettings.inlineExpressionMenuTrigger !== "disabled" &&
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "k"
       ) {
@@ -893,17 +739,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
           return;
         }
         event.preventDefault();
-        onOpenExpressionMenu?.(buildSelectionSnapshot(element));
-        return;
-      }
-
-      if (
-        triggerSettings.sentenceEnhancementShortcut === "ctrl_j_legacy" &&
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === "j"
-      ) {
-        event.preventDefault();
-        onEnhance();
+        onCheckCurrentParagraph?.(buildSelectionSnapshot(element).start);
         return;
       }
 
@@ -953,31 +789,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         nodes.push(value.slice(cursor));
       }
       return nodes;
-    }
-
-    function renderProofreadingHighlightLayer(activeSignal: ProofreadingSignal | undefined) {
-      if (!activeSignal) {
-        return null;
-      }
-      const sentenceRange = extractCurrentSentence(value, activeSignal.start + 1);
-      const start = clampOffset(sentenceRange.start, value.length);
-      const end = clampOffset(sentenceRange.end, value.length);
-      if (end <= start) {
-        return null;
-      }
-
-      return (
-        <>
-          <span>{value.slice(0, start)}</span>
-          <mark
-            data-proofreading-highlight="active"
-            className="rounded-[3px] bg-[var(--lt-accent-soft)] px-0.5 leading-[inherit] text-transparent"
-          >
-            {value.slice(start, end)}
-          </mark>
-          <span>{value.slice(end)}</span>
-        </>
-      );
     }
 
     function renderSuggestionHighlightLayer(activeMarker: SuggestionMarker | undefined) {
@@ -1036,51 +847,18 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
           );
         }
 
-        const isActive = activeExpressionCue?.id === cue.id;
+        const isFresh = cue.state === "fresh";
         nodes.push(
           <span
             key={cue.id}
-            tabIndex={0}
-            aria-label={`表达库命中：${cue.expression}`}
-            data-expression-reappearance-cue={cue.state === "fresh" ? "fresh" : "seen"}
-            className={`lt-expression-cue pointer-events-auto relative inline cursor-text whitespace-pre-wrap text-transparent outline-none ${
-              cue.state === "fresh" ? "lt-expression-cue--fresh" : ""
-            } ${isActive ? "lt-expression-cue--active" : ""}`}
-            onMouseEnter={() => setActiveExpressionCueId(cue.id)}
-            onMouseLeave={() =>
-              setActiveExpressionCueId((current) => (current === cue.id ? null : current))
-            }
-            onFocus={() => setActiveExpressionCueId(cue.id)}
-            onBlur={() =>
-              setActiveExpressionCueId((current) => (current === cue.id ? null : current))
-            }
-            onMouseDown={(event) => {
-              event.preventDefault();
-              const element = editorRef.current;
-              if (!element) {
-                return;
-              }
-              const cursorOffset = estimateInlineCueCursorOffset(event, start, end);
-              element.focus();
-              element.setSelectionRange(cursorOffset, cursorOffset);
-              reportSelection(element);
-            }}
+            aria-hidden="true"
+            data-expression-reappearance-cue={isFresh ? "fresh" : "seen"}
+            data-expression-reappearance-visual={isFresh ? "card-stamp" : "idle"}
+            className={`lt-expression-cue relative inline whitespace-pre-wrap text-transparent ${
+              isFresh ? "lt-expression-cue--fresh lt-expression-cue--card-stamp" : ""
+            }`}
           >
             {value.slice(start, end)}
-            {isActive ? (
-              <span
-                role="status"
-                data-expression-reappearance-detail="open"
-                data-expression-reappearance-detail-style="light-card"
-                className="pointer-events-none absolute left-0 top-[1.95em] z-30 min-w-[300px] max-w-[380px] rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] px-4 py-3 font-serif text-[13px] leading-6 text-[var(--lt-text)]"
-              >
-                <span className="block text-xs text-[var(--lt-muted)]">表达库命中</span>
-                <span className="mt-0.5 block text-[16px] font-medium leading-6 text-[var(--lt-text)]">{cue.expression}</span>
-                {cue.meaning ? (
-                  <span className="mt-1 block text-[13px] leading-5 text-[var(--lt-muted)]">{cue.meaning}</span>
-                ) : null}
-              </span>
-            ) : null}
           </span>,
         );
         cursor = end;
@@ -1107,11 +885,11 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       <section
         aria-label="写作区"
         data-input-priority="textarea-first"
-        className="flex min-h-[calc(100vh-56px)] flex-1 flex-col"
+        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div
           data-writing-column="true"
-          className={`mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-6 sm:px-8 md:px-10 md:pt-10 ${layoutClass}`}
+          className={`lt-scrollbar-hidden mx-auto flex w-full flex-1 flex-col overflow-y-auto px-4 pb-20 pt-6 sm:px-8 md:px-10 md:pt-10 ${layoutClass}`}
         >
           <div className="relative flex flex-1 flex-col">
             <textarea
@@ -1153,15 +931,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
 
             {!inlineSuggestion ? (
               <>
-                {activeProofreadingSignal ? (
-                  <div
-                    aria-hidden="true"
-                    className={`pointer-events-none absolute inset-x-0 top-0 min-h-[520px] ${writingPaperClass}`}
-                  >
-                    {renderProofreadingHighlightLayer(activeProofreadingSignal)}
-                  </div>
-                ) : null}
-
                 {activeSuggestionMarkers.length > 0 ? (
                   <div
                     aria-hidden="true"
@@ -1258,81 +1027,6 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
                     )}
                   </button>
                 ))}
-                {proofreadingHintGroups.map((group) => {
-                  const activeSignalInGroup =
-                    group.signals.find((signal) => signal.id === activeProofreadingSignalId) ?? null;
-                  return (
-                    <div
-                      key={group.id}
-                      data-proofreading-group={group.id}
-                      className="absolute left-[calc(100%+96px)] z-20 flex flex-col items-start"
-                      style={{
-                        top:
-                          proofreadingTagPositions[group.id]?.top ??
-                          proofreadingHintPosition(value, group.start, editorRef.current),
-                      }}
-                      onMouseLeave={() => setActiveProofreadingSignalId(null)}
-                    >
-                      <div
-                        data-proofreading-row="sentence"
-                        className="flex max-w-[320px] flex-wrap items-center gap-2"
-                      >
-                        {group.signals.map((signal) => {
-                          const isActiveProofreadingSignal =
-                            activeProofreadingSignal?.id === signal.id;
-                          return (
-                            <button
-                              key={signal.id}
-                              type="button"
-                              aria-label={signal.titleZh}
-                              aria-expanded={isActiveProofreadingSignal}
-                              data-proofreading-item={signal.id}
-                              data-proofreading-hint="inline-label"
-                              className={`group inline-flex min-h-7 max-w-[150px] items-center gap-2 rounded-[6px] border px-3 py-1 text-left text-[12px] font-medium leading-4 transition focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-warning)] ${
-                                isActiveProofreadingSignal
-                                  ? "border-[var(--lt-warning)] bg-[var(--lt-surface-soft)] text-[var(--lt-text)]"
-                                  : "border-[var(--lt-border)] bg-[var(--lt-bg)] text-[var(--lt-muted)] hover:border-[var(--lt-warning)] hover:text-[var(--lt-text)]"
-                              }`}
-                              onMouseEnter={() => setActiveProofreadingSignalId(signal.id)}
-                              onFocus={() => setActiveProofreadingSignalId(signal.id)}
-                              onBlur={() => setActiveProofreadingSignalId(null)}
-                            >
-                              <span className="truncate">{signal.titleZh}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {group.signals.map((signal) => {
-                        const isActiveProofreadingSignal = activeSignalInGroup?.id === signal.id;
-                        return (
-                          <section
-                            key={`${signal.id}-detail`}
-                            role="status"
-                            aria-live="polite"
-                            aria-hidden={!isActiveProofreadingSignal}
-                            data-proofreading-detail={
-                              isActiveProofreadingSignal ? "open" : "closed"
-                            }
-                            ref={(element) => {
-                              if (element) {
-                                proofreadingDetailRefs.current.set(signal.id, element);
-                              } else {
-                                proofreadingDetailRefs.current.delete(signal.id);
-                              }
-                            }}
-                            className={`pointer-events-none ml-1 mt-1 w-[268px] overflow-hidden border-l border-[var(--lt-border)] pl-2 text-left text-[11px] leading-4 text-[var(--lt-faint)] transition-[max-height,opacity,transform] duration-150 ${
-                              isActiveProofreadingSignal
-                                ? "max-h-[140px] translate-y-0 opacity-100"
-                                : "max-h-0 -translate-y-1 opacity-0"
-                            }`}
-                          >
-                            {signal.messageZh}
-                          </section>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
               </>
             ) : null}
             {inlineSuggestion ? (
@@ -1388,7 +1082,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         <footer
           aria-label="写作状态栏"
           data-status-layout="balanced-editorial"
-          className="sticky bottom-0 z-20 -mx-8 mt-auto grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)]"
+          className="fixed bottom-0 right-0 z-40 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)] shadow-[0_-1px_10px_var(--lt-shadow)] xl:left-[var(--lt-sidebar-width,320px)]"
         >
           <div
             aria-label="写作状态栏左侧"
@@ -1403,11 +1097,11 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
                 aria-label="写作统计"
                 className="flex flex-wrap items-center gap-x-2 text-[11px] text-[var(--lt-muted)]"
               >
-                <span>{proofreadingResult.stats.englishWordCount} 词</span>
+                <span>{writingStats.englishWordCount} 词</span>
                 <span>·</span>
-                <span>{proofreadingResult.stats.sentenceCount} 句</span>
+                <span>{writingStats.sentenceCount} 句</span>
                 <span>·</span>
-                <span>{proofreadingResult.stats.paragraphCount} 段</span>
+                <span>{writingStats.paragraphCount} 段</span>
               </div>
               <div className="relative">
                 <button
@@ -1496,16 +1190,19 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
             </div>
           </div>
 
-          <span
-            aria-label="写作状态栏文本校对"
-            className={`justify-self-end whitespace-nowrap text-right ${
-              proofreadingIssueCount > 0
+          <button
+            type="button"
+            aria-label={documentMapStatusLabel}
+            onClick={onOpenDocumentMap}
+            className={`inline-flex justify-self-end whitespace-nowrap text-right transition hover:text-[var(--lt-text)] ${
+              documentMapStatusTone === "attention"
                 ? "font-medium text-[#d97706]"
                 : "text-[var(--lt-muted)]"
             }`}
           >
-            文本校对：{proofreadingIssueCount} 条提示
-          </span>
+            <ChartBarIcon className="mr-1.5 h-3.5 w-3.5" />
+            {documentMapStatusLabel}
+          </button>
         </footer>
       </section>
     );

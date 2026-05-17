@@ -68,7 +68,7 @@ Theme Preference 不应出现在 Writing Setup 中，只应位于主写作界面
 #### Scenario: 用户查看其它浮层
 
 - **GIVEN** 用户使用深色模式
-- **WHEN** 用户打开 Selection Actions、Inline Expression Menu、Proofreading panel、API Settings modal 或 Paragraph Flow panel
+- **WHEN** 用户打开 Selection Actions、Proofreading panel、API Settings modal、Paragraph Health notice 或 Paragraph Flow panel
 - **THEN** 浮层正文、按钮和提示文本清晰可读
 
 ### Requirement: Theme Preference 默认跟随系统

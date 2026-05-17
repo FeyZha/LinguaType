@@ -13,7 +13,7 @@ export function CorrectionPanel({ result }: CorrectionPanelProps) {
       {!result ? (
         <p className="mt-3 text-sm text-slate-500">润色后会在这里显示修改说明。</p>
       ) : result.corrections.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">最新一句已经自然，无需修改。</p>
+        <p className="mt-3 text-sm text-slate-500">当前句已经自然，无需修改。</p>
       ) : (
         <ul className="mt-3 space-y-3">
           {result.corrections.map((correction, index) => (

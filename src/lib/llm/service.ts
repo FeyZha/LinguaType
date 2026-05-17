@@ -2,6 +2,7 @@ import {
   checkParagraphFlowWithMockProvider,
   checkParagraphHealthWithMockProvider,
   checkOutlineWithMockProvider,
+  checkDocumentMapWithMockProvider,
   classifyWritingDomainWithMockProvider,
   enhanceFastWithMockProvider,
   enhanceWithMockProvider,
@@ -12,6 +13,7 @@ import {
   checkParagraphFlowWithOpenAICompatibleProvider,
   checkParagraphHealthWithOpenAICompatibleProvider,
   checkOutlineWithOpenAICompatibleProvider,
+  checkDocumentMapWithOpenAICompatibleProvider,
   classifyWritingDomainWithOpenAICompatibleProvider,
   enhanceFastWithOpenAICompatibleProvider,
   enhanceWithOpenAICompatibleProvider,
@@ -23,6 +25,8 @@ import type {
   ApiConfig,
   ClassifyWritingDomainInput,
   ClassifyWritingDomainResult,
+  DocumentMapInput,
+  DocumentMapResult,
   EnhanceLatestSentenceInput,
   EnhanceLatestSentenceResult,
   FastEnhanceInput,
@@ -123,6 +127,19 @@ export async function checkOutlineWithLLM(
   }
 
   return checkOutlineWithOpenAICompatibleProvider(normalizedInput);
+}
+
+export async function checkDocumentMapWithLLM(
+  input: DocumentMapInput,
+  apiConfig: ApiConfig = input.apiConfig,
+): Promise<DocumentMapResult> {
+  const normalizedInput = { ...input, apiConfig };
+
+  if (apiConfig.mockMode) {
+    return checkDocumentMapWithMockProvider(normalizedInput);
+  }
+
+  return checkDocumentMapWithOpenAICompatibleProvider(normalizedInput);
 }
 
 export async function explainSelectionWithLLM(

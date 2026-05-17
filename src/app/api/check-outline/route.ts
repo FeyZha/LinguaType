@@ -1,5 +1,6 @@
 import { InvalidModelJsonError, InvalidModelSchemaError, redactApiKey } from "@/lib/json";
 import { normalizeOutlineCheckResult } from "@/lib/llm/normalize";
+import { resolveServerApiConfig } from "@/lib/llm/serverConfig";
 import { checkOutlineWithLLM } from "@/lib/llm/service";
 import { outlineCheckRequestSchema, outlineCheckResultSchema } from "@/lib/llm/types";
 import { NextResponse } from "next/server";
@@ -10,8 +11,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const input = outlineCheckRequestSchema.parse(body);
-    apiKey = input.apiConfig.apiKey;
-    const result = await checkOutlineWithLLM(input, input.apiConfig);
+    const apiConfig = resolveServerApiConfig(input.apiConfig);
+    const resolvedInput = { ...input, apiConfig };
+    apiKey = apiConfig.apiKey;
+    const result = await checkOutlineWithLLM(resolvedInput, apiConfig);
     const normalized = normalizeOutlineCheckResult(result);
     return NextResponse.json(outlineCheckResultSchema.parse(normalized));
   } catch (error) {

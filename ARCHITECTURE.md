@@ -10,7 +10,8 @@ src/app/page.tsx
       -> 写作准备 / 固定可折叠左侧导航 / 原生长文本写作面 / 表达库页 / 写作习惯页 / API 设置页 / 数据与触发设置页 / 行内当前句建议
       -> src/lib/sentence.ts
       -> src/lib/storage.ts
-      -> src/lib/proofreading.ts
+      -> src/lib/documentMap.ts
+      -> src/lib/personalDictionary.ts
       -> src/lib/expressionReappearance.ts
       -> src/app/api/* via fetch
 
@@ -29,9 +30,10 @@ src/app/api/*/route.ts
 - 写作存档的新建、切换、重命名、删除、侧栏折叠和 active archive 保存。
 - 主题偏好应用到 document root，并把解析后的 light/dark 主题传给侧栏品牌图片。
 - 草稿文本保存和恢复。
-- 最新句增强请求、快照、冲突检测和 Apply。
+- 当前句增强请求、快照、冲突检测和 Apply。
 - Apply 后后台学习提取。
 - 段落健康 / 段落流畅度。
+- 文章地图手动检查、自动预检查、缓存恢复、过期提示、段落定位和段落节点入口调度。
 - Selection Actions。
 - 编辑器内联 Writing Setup 修改和显式 outline check。
 - 原生长文本写作面、句旁建议入口、行内当前句建议展示和中间主舞台页面切换。
@@ -84,19 +86,19 @@ App load
 - 根据 textarea selection 暴露 `focus()`、`getSelectionRange()` 和 `setCursor()`。
 - 用透明 position probe 估算目标句行高位置，只用于放置句旁建议入口，不拦截文本点击。
 - 在无内联卡片时保持原生输入面；打开建议后临时把目标句拆出为焦点段落并把卡片放在句子下方。
-- 固定底部状态栏，展示词数、句数、段落数、模式、强度、触发、领域和本地校对数量。
-- 将本地校对问题渲染为写作区右侧轻量 tag，并在 tag hover/focus 时用覆盖层高亮对应正文范围。
-- 将表达库命中的 phrase/collocation 渲染为正文原位的极轻表达复现提示，并在 hover/focus 时显示小说明。
+- 固定底部状态栏，展示词数、句数、段落数、模式、强度、触发、领域和文章地图轻状态入口。
+- 不再渲染写作区右侧文本校对 tag 或底部/右下角校对卡片；细节问题进入用户主动触发的“检查本段”二级界面。
+- 将表达库命中的 phrase/collocation 渲染为正文原位的视觉-only 表达复现提示，使用卡片压印式一次性微动效，不接管 hover/focus。
 
 这样可以保留既有能力：
 
-- `extractLatestSentence(text)`
+- `extractCurrentSentence(text, cursor)`
 - `replaceLatestSentence(text, capturedRange, finalSentence)`
 - `getCurrentParagraph(text, cursor)`
 - Apply 冲突检测
 - 后台学习提取
 
-Selection Actions 和 Inline Expression Menu 仍接收全文 offset，不直接改写正文。
+Selection Actions 接收全文 offset，但解释和保存动作不直接改写正文。`检查本段` 使用当前光标 offset 定位当前段落，`Ctrl/Cmd + K` 和折叠侧边栏图标都直接进入段落流畅度检查，不再经过表达菜单弹窗。
 
 ## 中文占位建议数据流
 
@@ -116,11 +118,11 @@ Selection Actions 和 Inline Expression Menu 仍接收全文 offset，不直接�
 
 后台自动检测只处理已经稳定且包含中文的完整句。它不会自动替换正文，不会在正文下方显示常驻加载条，也不会阻塞用户继续输入。页面加载、切换存档或恢复草稿时，已有建议优先从 `linguatype.placeholderSuggestionCache.v1` 派生为句旁入口；只有缓存未命中且 API 设置可用时才请求 `/api/enhance-fast`。
 
-## 最新句增强数据流
+## 当前句增强数据流
 
 ```text
 用户触发增强
-  -> extractLatestSentence(text)
+  -> extractCurrentSentence(text, cursor)
   -> 捕获 snapshotFullText 和 latestSentenceRange
   -> POST /api/enhance-fast
   -> enhanceFastWithLLM()
@@ -139,11 +141,68 @@ Selection Actions 和 Inline Expression Menu 仍接收全文 offset，不直接�
 用户编辑正文
   -> findExpressionReappearanceCues(text, learningLibrary)
   -> 只匹配本地 phrase / collocation
-  -> WritingEditor 在命中文本上显示极轻微动效
-  -> hover/focus 显示表达库命中说明
+  -> WritingEditor 在命中文本上显示卡片压印式极轻一次性微动效
+  -> 不显示 hover/focus 说明卡片
 ```
 
-表达复现提示不调用模型，不触发 `/api/extract-learning`，不写入表达库或 Correction Events，也不修改正文。它与 AI 修改入口和本地校对 tag 是三套不同的交互。
+表达复现提示不调用模型，不触发 `/api/extract-learning`，不写入表达库或 Correction Events，也不修改正文。它是视觉-only 的被动强化提示，与 AI 修改入口和文章地图 / 段落检查入口保持不同视觉语言。
+
+## 段落健康数据流
+
+```text
+after_every_apply:
+  用户 Apply 当前句建议
+  -> 取当前句所在段落
+  -> 按段落指纹检查 cache / running / 30 秒节流 / 至少两句
+  -> POST /api/check-paragraph-health
+  -> 仅显示轻量提醒，不改正文
+
+after_paragraph_complete:
+  用户输入空行完成一段
+  -> 取刚完成段落
+  -> 按段落指纹检查 cache / running / 30 秒节流 / 至少两句
+  -> POST /api/check-paragraph-health
+  -> 仅显示轻量提醒，不改正文
+```
+
+段落健康始终开启，只允许选择 Apply 后触发或段落完成后触发。它不要求 40 个英文词，不返回 `revisedParagraph`，不生成 diff，不保存学习数据，也不会自动 Apply。段落健康运行态、段落流畅度运行态和 30 秒节流都按段落指纹分别判断，避免一个段落阻塞另一个段落。
+
+段落流畅度检查是手动动作。入口包括 `Ctrl/Cmd + K`、折叠侧边栏的“检查本段”图标和文章地图段落节点。前端只把当前段落作为可检查和可替换对象，`fullText` 仅作为上下文传给 `/api/check-paragraph-flow`。结果在文章地图二级检查界面展示，不再渲染主写作页底部的段落工具；模型等待期间显示 `paragraph-flow` 运行态。返回结构包含段落级 `issues` 和语法、拼写、标点等 `detailIssues`，但空格类细碎排版问题不单独铺满列表。
+
+## 文章地图数据流
+
+```text
+本地自动感知
+  -> splitDocumentIntoParagraphs(text)
+  -> createDocumentMapParagraphFingerprints()
+  -> evaluateDocumentMapFreshness()
+  -> 入口显示“可检查 / 可能已过期 / 整理中 / N 个发现”
+
+安静时预检查:
+  用户停止输入
+  -> documentMapAutoCheck === "auto_idle"
+  -> 至少 2 段 + 至少 120 词 + 变化达到阈值
+  -> 没有其他 AI 请求 + API 设置可用 + 间隔和会话次数未超限
+  -> POST /api/check-document-map with trigger="auto_idle"
+  -> 只 upsert linguatype.documentMapCache.v1
+  -> 不自动打开 DocumentMapPanel
+  -> 不定位段落 / 不触发 Paragraph Flow / 不保存学习数据
+
+用户点击“检查文章地图”
+  -> splitDocumentIntoParagraphs(text)
+  -> createDocumentMapCacheKey(archive + text hash + setup + model)
+  -> lookup linguatype.documentMapCache.v1
+  -> 命中时恢复缓存结果
+  -> 未命中时 POST /api/check-document-map with trigger="manual"
+  -> checkDocumentMapWithLLM()
+  -> provider 返回 overallMainIdeaZh / structureSummaryZh / paragraphs / globalIssues / nextActions
+  -> upsertDocumentMapCache()
+  -> DocumentMapPanel 展示可折叠全文结构地图
+  -> 宽屏下与 WritingEditor 组成左右对照区
+  -> 对照区锁定外层滚动，地图栏和原文栏独立隐藏滚动
+```
+
+文章地图只做全文结构诊断和段落导航，不返回 `revisedDocument`，不评分，不保存学习数据，不触发 `/api/extract-learning`。前端优先使用正文空行切分段落；当全文没有空行分隔时，单次手动换行也作为自然段落边界，并用得到的 range 定位段落。`documentMapAutoCheck` 支持 `off`、`remind_only`、`auto_idle` 和 `manual_first`：`remind_only` 与 `manual_first` 只更新本地 freshness，`auto_idle` 才允许在严格条件下静默请求模型并更新缓存。自动结果返回后如果当前正文 snapshot 已明显变化，只能作为过期缓存或过期状态处理，不能直接展开面板。打开地图时，`LinguaTypeApp` 在宽屏使用“文章地图对照区”把 `DocumentMapPanel` 和 `WritingEditor` 并排展示，窄屏回退为上下排列，正文仍是一个原生长文本面。对照区打开时外层写作舞台不再承载滚动，地图栏和原文栏各自使用隐藏滚动条的内部滚动容器，避免原文滚动时带动地图位置。“查看建议”复用 Paragraph Health，只在段落卡片内展示 `shortSummaryZh` 和风险类型，不触发 Paragraph Flow，也不显示右下角浮层；“检查本段”复用 Paragraph Flow，并进入 `DocumentMapPanel` 的二级检查界面，Apply Paragraph 仍沿用段落快照和 range 冲突检测。
 
 ## 大纲检查数据流
 
@@ -166,6 +225,7 @@ Selection Actions 和 Inline Expression Menu 仍接收全文 offset，不直接�
 - `extractLearningWithLLM`
 - `checkParagraphHealthWithLLM`
 - `checkParagraphFlowWithLLM`
+- `checkDocumentMapWithLLM`
 - `explainSelectionWithLLM`
 - `checkOutlineWithLLM`
 - legacy-only `enhanceLatestSentenceWithLLM`

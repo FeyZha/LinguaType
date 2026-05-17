@@ -13,7 +13,6 @@ import {
 import type {
   FastEnhanceResult,
   LearningExtractionResult,
-  LearningItem,
   ParagraphHealthResult,
 } from "@/lib/llm/types";
 
@@ -21,7 +20,7 @@ const fastResult: FastEnhanceResult = {
   taskType: "mixed_chinese_rewrite",
   originalSentence: "Many student believe that AI tools can 鎻愰珮瀛︿範鏁堢巼.",
   finalSentence: "Many students believe that AI tools can improve learning efficiency.",
-  explanationZh: "已快速润色最新一句。",
+  explanationZh: "已快速润色当前句。",
   hasChinese: true,
 };
 
@@ -29,7 +28,7 @@ const englishFastResult: FastEnhanceResult = {
   taskType: "english_polish",
   originalSentence: "Many student believe that AI tools are useful.",
   finalSentence: "Many students believe that AI tools are useful.",
-  explanationZh: "已轻量润色最新一句。",
+  explanationZh: "已轻量润色当前句。",
   hasChinese: false,
 };
 
@@ -155,7 +154,7 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/enhance-fast");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { enhancementLevel: string };
     expect(body.enhancementLevel).toBe("minimal");
-    expect(screen.getAllByText(fastResult.finalSentence).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("当前句行内建议")).toHaveTextContent(fastResult.finalSentence);
     expect(localStorage.getItem(LEARNING_LIBRARY_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(CORRECTION_EVENTS_STORAGE_KEY)).toBeNull();
   });
@@ -216,12 +215,10 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
     setEditorText(editor, englishFastResult.originalSentence);
     fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     await screen.findByRole("button", { name: "应用修改" });
-    fireEvent.click(screen.getByRole("button", { name: "换一种说法" }));
-    const suggestion = await screen.findByLabelText("当前句行内建议");
-    const addedText = Array.from(suggestion.querySelectorAll("[data-diff-part='added']")).map(
-      (part) => part.textContent,
-    );
-    expect(addedText.join(" ")).toContain("learners");
+    fireEvent.click(screen.getByRole("button", { name: "换一种表达" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("当前句行内建议")).toHaveTextContent(regenerated.finalSentence);
+    });
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "复制修改后的句子" }));
@@ -235,7 +232,7 @@ describe("LinguaType v0.2.1 fast enhancement flow", () => {
 });
 
 describe("LinguaType v0.2.1", () => {
-  it("runs health check after Apply only when paragraph is long enough, then expands full suggestions on demand", async () => {
+  it("runs health check after Apply only when paragraph is long enough without showing the old floating notice", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/enhance-fast") return Promise.resolve(response(fastResult));
       if (url === "/api/extract-learning") return Promise.resolve(response(extractionResult));
@@ -254,11 +251,11 @@ describe("LinguaType v0.2.1", () => {
     await screen.findByRole("button", { name: "应用修改" });
     fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
 
-    expect(await screen.findByText("段落健康：可能有 1 个问题")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map((call) => call[0]).filter((url) => url === "/api/check-paragraph-health")).toHaveLength(1),
+    );
+    expect(screen.queryByText("段落健康：可能有 1 个问题")).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.map((call) => call[0])).not.toContain("/api/check-paragraph-flow");
-    fireEvent.click(screen.getByRole("button", { name: "查看建议" }));
-    expect(await screen.findByText("段落流畅度检查")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/check-paragraph-flow");
   });
 
   it("does not run for short paragraphs, cancel, or copy", async () => {
@@ -280,46 +277,7 @@ describe("LinguaType v0.2.1", () => {
 });
 
 describe("LinguaType v0.2.1", () => {
-  it("opens with Ctrl/Cmd + K, inserts an intention template at the saved cursor, and closes with Escape", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    render(<LinguaTypeApp />);
-
-    const editor = await screen.findByLabelText("写作编辑器");
-    setEditorText(editor, "Hello world");
-    setEditorSelection(editor, 6);
-    fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-
-    expect(screen.getByText("表达菜单")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "解释原因" }));
-    fireEvent.click(screen.getByRole("button", { name: "This may be because..." }));
-
-    expectEditorText(editor, "Hello This may be because...world");
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.keyDown(editor, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByText("表达菜单")).not.toBeInTheDocument());
-  });
-
-  it("inserts expressions from the library and can trigger full paragraph flow check", async () => {
-    const library: LearningItem[] = [
-      {
-        id: "library-1",
-        type: "phrase",
-        content: "as a result",
-        chineseMeaning: "因此",
-        usageNote: "Show result.",
-        sourceSentence: "As a result, students learn faster.",
-        writingMode: "natural",
-        createdAt: "2026-05-12T00:00:00.000Z",
-        updatedAt: "2026-05-12T00:00:00.000Z",
-        useCount: 5,
-        favorite: true,
-        tags: [],
-      },
-    ];
-    localStorage.setItem(LEARNING_LIBRARY_STORAGE_KEY, JSON.stringify(library));
+  it("uses Ctrl/Cmd + K to check the current paragraph without opening the expression menu", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(paragraphResult));
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
@@ -328,15 +286,23 @@ describe("LinguaType v0.2.1", () => {
     setEditorText(editor, paragraphResult.originalParagraph);
     setEditorSelection(editor, 0);
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "从表达库插入" }));
-    fireEvent.click(screen.getByRole("button", { name: "as a result" }));
 
-    expectEditorText(editor, `as a result${paragraphResult.originalParagraph}`);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/check-paragraph-flow", expect.anything()));
+    expect(screen.queryByText("表达菜单")).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("文章地图二级检查")).toBeInTheDocument();
+    expect(screen.getByText("本段检查")).toBeInTheDocument();
+  });
 
+  it("keeps paragraph flow separate from correction memory when triggered directly", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response(paragraphResult));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LinguaTypeApp />);
+
+    const editor = await screen.findByLabelText("写作编辑器");
+    setEditorText(editor, paragraphResult.originalParagraph);
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "检查本段" }));
 
-    expect(await screen.findByText("段落流畅度检查")).toBeInTheDocument();
+    expect(await screen.findByLabelText("文章地图二级检查")).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/check-paragraph-flow");
     expect(localStorage.getItem(CORRECTION_MEMORY_STORAGE_KEY)).toBeNull();
   });

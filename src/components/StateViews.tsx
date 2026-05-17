@@ -11,7 +11,7 @@ export function EmptyState() {
 export function LoadingState() {
   return (
     <div className="rounded-md bg-sky-500/[0.08] px-4 py-3 text-sm text-sky-900">
-      正在增强最新一句...
+      正在增强当前句...
     </div>
   );
 }

@@ -108,7 +108,13 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
   }
 
   function update<K extends keyof ApiConfig>(key: K, value: ApiConfig[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+    setDraft((current) => ({
+      ...current,
+      [key]: value,
+      useServerApiKey: key === "apiKey" && typeof value === "string" && value.trim()
+        ? false
+        : current.useServerApiKey,
+    }));
     setFeedbackType("idle");
     setFeedbackText("");
   }
@@ -120,6 +126,11 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
         <p className="mt-1 text-sm leading-6 text-[var(--lt-muted)]">
           设置只保存在当前浏览器。API Key 会随请求发送到本地 API route，但不会保存到服务器。
         </p>
+        {settings.useServerApiKey ? (
+          <p className="mt-3 rounded-md bg-[var(--lt-accent-soft)] px-3 py-2 text-sm leading-6 text-[var(--lt-accent)]">
+            公开体验版已启用部署侧 API Key。密钥来自 Vercel 环境变量，不会下发到浏览器；如需改用自己的模型，可填写并保存下方配置。
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-3">
@@ -136,7 +147,7 @@ export function ApiSettingsPanel({ settings, onSave, onClear, className = "" }: 
             value={draft.apiKey}
             onChange={(event) => update("apiKey", event.target.value)}
             type="password"
-            placeholder="仅保存在浏览器 localStorage"
+            placeholder={draft.useServerApiKey ? "公开体验版可留空" : "仅保存在浏览器 localStorage"}
             className={inputClassName}
           />
         </SoftInputLabel>

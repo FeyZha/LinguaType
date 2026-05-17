@@ -117,12 +117,12 @@ Writing Setup 收集的领域、主题和大纲只能作为用户写作上下文
 - **WHEN** 用户进入编辑器
 - **THEN** 应用不得自动生成文章正文
 - **AND** 应用不得根据大纲自动续写下一句
-- **AND** latest-sentence enhancement 仍只处理用户已经写出的最新非空句
+- **AND** current-sentence enhancement 仍只处理用户已经写出的光标所在当前句
 
 #### Scenario: enhancement 使用 setup context
 
 - **GIVEN** 应用在 enhancement request 中使用 Writing Setup 信息作为 context
-- **WHEN** `/api/enhance-fast` 处理最新句
+- **WHEN** `/api/enhance-fast` 处理当前句
 - **THEN** setup 信息只能用于 tone、meaning、coherence reference
 - **AND** 模型不得生成新论点或决定用户写作方向
 
@@ -135,7 +135,7 @@ Writing Setup 收集的领域、主题和大纲只能作为用户写作上下文
 - **GIVEN** `linguatype.writingDraft.v1` 中存在非空 draft
 - **WHEN** 用户打开 LinguaType
 - **THEN** Writing Setup 应提供继续上次写作入口
-- **AND** 用户可以回到编辑器继续使用现有 latest-sentence flow
+- **AND** 用户可以回到编辑器继续使用现有 current-sentence flow
 
 ### Requirement: Writing Setup 不得保存学习数据
 

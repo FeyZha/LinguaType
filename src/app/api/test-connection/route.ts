@@ -1,4 +1,5 @@
 import { redactApiKey } from "@/lib/json";
+import { resolveServerApiConfig } from "@/lib/llm/serverConfig";
 import { testProviderConnection } from "@/lib/llm/service";
 import { apiConfigSchema } from "@/lib/llm/types";
 import { NextResponse } from "next/server";
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const apiConfig = apiConfigSchema.parse(body.apiConfig ?? body);
+    const apiConfig = resolveServerApiConfig(apiConfigSchema.parse(body.apiConfig ?? body));
     apiKey = apiConfig.apiKey;
     const ok = await testProviderConnection(apiConfig);
     return NextResponse.json({ ok });

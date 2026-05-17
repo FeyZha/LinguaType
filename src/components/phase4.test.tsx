@@ -82,14 +82,6 @@ async function findCurrentSentenceSuggestion() {
   return screen.findByLabelText("当前句行内建议");
 }
 
-function longParagraph(sentence = fastResult.originalSentence) {
-  return [
-    "AI tools are useful because they make daily writing practice easier for students who need steady language support.",
-    "For example, for example, they save time when students review vocabulary and organize short writing tasks before class, especially during independent study sessions.",
-    sentence,
-  ].join(" ");
-}
-
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem(
@@ -237,7 +229,7 @@ describe("LinguaType v0.2.2 ", () => {
     render(<LinguaTypeApp />);
 
     fireEvent.click(await screen.findByRole("button", { name: "触发设置" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "句子增强触发方式" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "句子增强触发模式" }));
     fireEvent.click(screen.getByRole("option", { name: "按钮触发" }));
     fireEvent.click(screen.getByRole("button", { name: /LinguaType/ }));
 
@@ -249,14 +241,23 @@ describe("LinguaType v0.2.2 ", () => {
     expect(JSON.parse(localStorage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").sentenceEnhancementShortcut).toBe("button_only");
   });
 
-  it("disables the inline expression shortcut when configured", async () => {
+  it("ignores the removed inline expression setting and keeps Ctrl/Cmd + K bound to paragraph check", async () => {
     localStorage.setItem(
       TRIGGER_SETTINGS_STORAGE_KEY,
       JSON.stringify({
         inlineExpressionMenuTrigger: "disabled",
       }),
     );
-    vi.stubGlobal("fetch", vi.fn());
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({
+        originalParagraph: "Hello world",
+        revisedParagraph: "Hello world",
+        hasIssues: false,
+        issues: [],
+        summary: "No paragraph flow issues found.",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
@@ -264,25 +265,39 @@ describe("LinguaType v0.2.2 ", () => {
     fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
 
     expect(screen.queryByText("表达菜单")).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/check-paragraph-flow", expect.anything()));
   });
 
-  it("supports disabling sentence shortcuts without restoring the old enhancement button", async () => {
+  it("does not expose the removed disable-shortcut sentence trigger", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(fastResult));
     vi.stubGlobal("fetch", fetchMock);
     render(<LinguaTypeApp />);
 
     fireEvent.click(await screen.findByRole("button", { name: "触发设置" }));
     fireEvent.click(screen.getByRole("combobox", { name: /句子增强触发|Sentence enhancement trigger/i }));
-    fireEvent.click(screen.getByRole("option", { name: /关闭 Off|关闭.*shortcut|Disable shortcut|关闭/i }));
-    fireEvent.click(screen.getByRole("button", { name: /LinguaType/ }));
-    expect(JSON.parse(localStorage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").sentenceEnhancementShortcut).toBe("disable_shortcut");
+    expect(screen.queryByRole("option", { name: /关闭 Off|关闭.*shortcut|Disable shortcut|关闭/i })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("migrates the legacy Ctrl/Cmd + J trigger and leaves Ctrl/Cmd + J inactive", async () => {
+    localStorage.setItem(
+      TRIGGER_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        sentenceEnhancementShortcut: "ctrl_j_legacy",
+      }),
+    );
+    const fetchMock = vi.fn().mockResolvedValue(response(fastResult));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
     setEditorText(editor, fastResult.originalSentence);
-    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
     fireEvent.keyDown(editor, { key: "j", ctrlKey: true });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /增强最新一句|Enhance latest sentence/i })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/enhance-fast", expect.anything()));
+    expect(JSON.parse(localStorage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").sentenceEnhancementShortcut).toBe("ctrl_enter");
   });
 
   it("keeps manual paragraph checking out of the unified settings page", async () => {
@@ -385,11 +400,11 @@ describe("LinguaType v0.2.2 selection actions", () => {
 });
 
 describe("LinguaType v0.2.2 settings and data control", () => {
-  it("runs only on the third applied edit when configured", async () => {
+  it("runs paragraph health after Apply for short two-sentence paragraphs", async () => {
     localStorage.setItem(
       TRIGGER_SETTINGS_STORAGE_KEY,
       JSON.stringify({
-        paragraphHealthTrigger: "after_3_applied_edits",
+        paragraphHealthTrigger: "after_every_apply",
       }),
     );
     const fetchMock = vi.fn((url: string) => {
@@ -402,17 +417,44 @@ describe("LinguaType v0.2.2 settings and data control", () => {
     render(<LinguaTypeApp />);
 
     const editor = await screen.findByLabelText("写作编辑器");
-    for (let index = 0; index < 3; index += 1) {
-      setEditorText(editor, longParagraph(fastResult.originalSentence));
-      fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
-      await screen.findByRole("button", { name: "应用修改" });
-      expect(await findCurrentSentenceSuggestion()).toHaveTextContent(fastResult.finalSentence);
-      fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
-      await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
-    }
+    setEditorText(editor, `Children need guidance. ${fastResult.originalSentence}`);
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    await screen.findByRole("button", { name: "应用修改" });
+    expect(await findCurrentSentenceSuggestion()).toHaveTextContent(fastResult.finalSentence);
+    fireEvent.click(screen.getByRole("button", { name: "应用修改" }));
+    await waitFor(() => expect(screen.queryByText("当前句建议")).not.toBeInTheDocument());
 
     await waitFor(() => expect(fetchMock.mock.calls.map((call) => call[0]).filter((url) => url === "/api/check-paragraph-health")).toHaveLength(1));
-    expect(await screen.findByText("段落健康：可能有 2 个问题")).toBeInTheDocument();
+    expect(screen.queryByText("段落健康：可能有 2 个问题")).not.toBeInTheDocument();
+  });
+
+  it("checks each completed paragraph once without global 30-second throttling", async () => {
+    localStorage.setItem(
+      TRIGGER_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        paragraphHealthTrigger: "after_paragraph_complete",
+      }),
+    );
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (url === "/api/check-paragraph-health") return Promise.resolve(response(healthResult));
+      return Promise.resolve(response({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LinguaTypeApp />);
+
+    const editor = await screen.findByLabelText("写作编辑器");
+    setEditorText(editor, "Children need guidance. They need examples.\n\nPractice builds skill. It improves confidence.\n\n");
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.map((call) => call[0]).filter((url) => url === "/api/check-paragraph-health")).toHaveLength(2);
+    });
+    const healthBodies = fetchMock.mock.calls
+      .filter((call) => call[0] === "/api/check-paragraph-health")
+      .map((call) => JSON.parse(call[1]?.body as string) as { currentParagraph: string });
+    expect(healthBodies.map((body) => body.currentParagraph)).toEqual([
+      "Children need guidance. They need examples.",
+      "Practice builds skill. It improves confidence.",
+    ]);
   });
 
   it("exports and clears local learning data through data control", async () => {

@@ -28,6 +28,7 @@ describe("checkParagraphFlowWithLLM", () => {
     expect(result.originalParagraph).toBe(input.currentParagraph);
     expect(result.hasIssues).toBe(true);
     expect(result.issues[0].type).toBe("repetition");
+    expect(result.detailIssues.length).toBeGreaterThan(0);
     expect(result.revisedParagraph).not.toBe(input.currentParagraph);
   });
 
@@ -44,6 +45,7 @@ describe("checkParagraphFlowWithLLM", () => {
     expect(result.hasIssues).toBe(false);
     expect(result.revisedParagraph).toBe(input.currentParagraph);
     expect(result.issues).toEqual([]);
+    expect(result.detailIssues).toEqual([]);
   });
 });
 

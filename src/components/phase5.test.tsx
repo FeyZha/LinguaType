@@ -22,6 +22,10 @@ function expectEditorText(editor: HTMLElement, value: string) {
   expect(editor).toHaveValue(value);
 }
 
+function response(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), { status });
+}
+
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("fetch", vi.fn());
@@ -405,6 +409,14 @@ describe("LinguaType v0.2.7 editor shell", () => {
 
     expect(screen.getByLabelText("表达库页面")).toHaveAttribute("data-motion-state", "exiting");
     await waitFor(() => expect(screen.getByLabelText("写作编辑器")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "快捷键帮助" }));
+    expect(screen.getByRole("heading", { name: "快捷键帮助" })).toBeInTheDocument();
+    expect(screen.getByText("增强当前句")).toBeInTheDocument();
+    expect(screen.getByText("换一种表达（建议卡展开时）")).toBeInTheDocument();
+    expect(screen.getByText("检查本段")).toBeInTheDocument();
+    expect(screen.getByText("Ctrl/Cmd + R")).toBeInTheDocument();
+    expect(screen.getByText("Ctrl/Cmd + K")).toBeInTheDocument();
   });
 
   it("uses one motion profile for Learning Library controls and list content", async () => {
@@ -445,6 +457,15 @@ describe("LinguaType v0.2.7 editor shell", () => {
   });
 
   it("collapses the writing archive sidebar without losing the current editor text", async () => {
+    localStorage.setItem(
+      API_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        ...defaultApiSettings(),
+        baseUrl: "https://api.example.test",
+        apiKey: "test-key",
+        model: "test-model",
+      }),
+    );
     localStorage.setItem(DRAFT_STORAGE_KEY, "Existing draft sentence.");
     localStorage.setItem(
       WRITING_SETUP_STORAGE_KEY,
@@ -492,8 +513,25 @@ describe("LinguaType v0.2.7 editor shell", () => {
     expect(Array.from(collapsedQuickActions.children).map((element) => element.getAttribute("aria-label"))).toEqual([
       "LinguaType 标识",
       "展开写作存档",
-      "新建写作",
+      "增强当前句",
+      "检查本段",
     ]);
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      originalParagraph: "Existing draft sentence.",
+      revisedParagraph: "Existing draft sentence.",
+      hasIssues: false,
+      issues: [],
+      summary: "No paragraph flow issues found.",
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "检查本段" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/check-paragraph-flow", expect.anything()));
+
+    vi.mocked(fetch).mockResolvedValueOnce(response({
+      finalSentence: "Existing draft sentence.",
+      explanationZh: "句子已经自然。",
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "增强当前句" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/enhance-fast", expect.anything()));
     expect(screen.getByLabelText("LinguaType 标识").tagName).not.toBe("BUTTON");
     expect(screen.getByLabelText("LinguaType 标识").querySelector('[data-brand-logo="mark"]')).toHaveClass(
       "h-11",

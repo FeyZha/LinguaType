@@ -304,7 +304,11 @@ export function EnhancementPopover({
         className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--lt-border)] pt-2"
       >
         <p className="text-xs text-[var(--lt-faint)]">
-          {result && !isReviewOnly ? "Tab 应用 · Esc 取消 · ⌘R 换一种说法" : result ? "⌘R 换一种说法" : ""}
+          {result && !isReviewOnly
+            ? "Tab 应用 · Esc 取消 · Ctrl/Cmd + R 换一种表达"
+            : result
+              ? "Ctrl/Cmd + R 换一种表达"
+              : ""}
         </p>
         <div className="flex flex-wrap justify-end gap-2">
           <button
@@ -313,7 +317,7 @@ export function EnhancementPopover({
             disabled={!result || isRegenerating}
             className="rounded-md px-2 py-1 text-sm text-[var(--lt-muted)] hover:bg-[var(--lt-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
           >
-            换一种说法
+            换一种表达
           </button>
           {!isReviewOnly ? (
             <button

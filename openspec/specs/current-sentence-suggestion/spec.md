@@ -4,12 +4,12 @@
 
 ### Requirement: 当前句建议必须以内联 diff 形式呈现
 
-latest-sentence enhancement 的结果必须靠近编辑器正文展示为当前句建议。建议可以使用行内建议条、当前段落附近浮层或等价的低干扰 UI，但不得变成聊天回复或整段改写面板。
+current-sentence enhancement 的结果必须靠近编辑器正文展示为当前句建议。建议可以使用行内建议条、当前段落附近浮层或等价的低干扰 UI，但不得变成聊天回复或整段改写面板。
 
-#### Scenario: 用户触发最新句增强
+#### Scenario: 用户触发当前句增强
 
 - **GIVEN** 用户已经输入至少一个非空句子
-- **WHEN** 用户触发 latest-sentence enhancement
+- **WHEN** 用户触发 current-sentence enhancement
 - **THEN** 应用调用 `POST /api/enhance-fast`
 - **AND** 应用在编辑器附近展示当前句建议
 - **AND** 建议展示本地代码生成的 diff
@@ -18,7 +18,7 @@ latest-sentence enhancement 的结果必须靠近编辑器正文展示为当前�
 
 #### Scenario: 模型返回未变化结果
 
-- **GIVEN** 用户触发 latest-sentence enhancement
+- **GIVEN** 用户触发 current-sentence enhancement
 - **WHEN** 模型返回的 final sentence 与 original sentence 语义和文本保持不变
 - **THEN** 当前句建议仍可展示为无明显 diff 的结果
 - **AND** 用户仍可 Cancel、Copy 或关闭建议
@@ -26,14 +26,14 @@ latest-sentence enhancement 的结果必须靠近编辑器正文展示为当前�
 
 ### Requirement: 当前句建议必须保留 Apply/Cancel gate
 
-当前句建议不得自动修改正文。只有用户显式 Apply 后，应用才可以替换 captured latest-sentence range 并触发背景学习提取。
+当前句建议不得自动修改正文。只有用户显式 Apply 后，应用才可以替换 captured current-sentence range 并触发背景学习提取。
 
 #### Scenario: 用户点击 Apply
 
 - **GIVEN** 当前句建议已经展示
 - **AND** 当前 editor text 与 snapshotFullText 一致
 - **WHEN** 用户点击 Apply
-- **THEN** 应用只替换 captured latest-sentence range
+- **THEN** 应用只替换 captured current-sentence range
 - **AND** 保留替换处周围 spacing
 - **AND** 应用可以在 Apply 后调用 `/api/extract-learning`
 
@@ -61,7 +61,7 @@ latest-sentence enhancement 的结果必须靠近编辑器正文展示为当前�
 
 #### Scenario: 前端请求当前句增强
 
-- **GIVEN** 用户触发 latest-sentence enhancement
+- **GIVEN** 用户触发 current-sentence enhancement
 - **WHEN** `/api/enhance-fast` 返回成功响应
 - **THEN** 响应只包含 `originalSentence`、`finalSentence`、`explanationZh`、`taskType` 和 `hasChinese`
 - **AND** 响应不包含 `learningItems`

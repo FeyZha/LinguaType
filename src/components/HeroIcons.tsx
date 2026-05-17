@@ -59,6 +59,16 @@ export function MagnifyingGlassIcon(props: IconProps) {
   );
 }
 
+export function DocumentCheckIcon(props: IconProps) {
+  return (
+    <HeroIcon {...props}>
+      <path d="M7.5 3.75h6.2l3.8 3.8v12.7H7.5A1.5 1.5 0 0 1 6 18.75V5.25a1.5 1.5 0 0 1 1.5-1.5Z" />
+      <path d="M13.5 3.75V8.25h4.5" />
+      <path d="m9.75 14.25 1.65 1.65 3.35-4.15" />
+    </HeroIcon>
+  );
+}
+
 export function EllipsisHorizontalIcon(props: IconProps) {
   return (
     <HeroIcon {...props}>

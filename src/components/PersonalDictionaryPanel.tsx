@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { normalizePersonalDictionary } from "@/lib/proofreading";
+import { normalizePersonalDictionary } from "@/lib/personalDictionary";
 
 type PersonalDictionaryPanelProps = {
   terms: string[];

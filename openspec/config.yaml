@@ -1,15 +1,15 @@
 project:
   name: LinguaType
-  version: "0.2.4"
+  version: "0.2.8"
   language: zh-CN
   description: >
     LinguaType 是面向中文母语英语学习者的 web-based 英文表达输入助手。
-    它以编辑器为中心，帮助用户在真实写作现场处理最新句中的中文意图、
+    它以编辑器为中心，帮助用户在真实写作现场处理光标所在当前句中的中文意图、
     中英混写和轻量英文润色，并把用户明确 Apply 后使用过的表达沉淀到本地学习数据中。
 
 product:
   source_of_truth: AGENTS.md
-  current_scope: v0.2.4 writing setup and theme preference with v0.2.2 latest-sentence flow preserved
+  current_scope: v0.2.8 immersive current-sentence writing workbench with paragraph health, paragraph flow, and expression reappearance cues
   target_users:
     - 中文母语的中级英语学习者
     - 正在进行英文写作练习的学生
@@ -19,10 +19,10 @@ product:
     - 提升表达判断能力
     - 把 Apply 过的表达沉淀为可复用的个人表达资产
   core_flow: >
-    latest sentence -> /api/enhance-fast -> code-generated diff ->
+    current sentence -> /api/enhance-fast -> code-generated diff ->
     Apply/Cancel -> immediate editor replacement -> background learning extraction after Apply
   is:
-    - input-method-like latest-sentence enhancer
+    - input-method-like current-sentence enhancer
     - mixed Chinese-English sentence converter
     - light pure-English polishing tool
     - local lightweight proofreading signals tool
@@ -82,14 +82,14 @@ architecture:
       - src/components/EnhancementPopover.tsx
       - src/components/DiffViewer.tsx
       - src/components/StateViews.tsx
+    document_map:
+      - src/components/DocumentMapPanel.tsx
     expression_and_selection:
-      - src/components/InlineExpressionMenu.tsx
       - src/components/SelectionActionsPopover.tsx
-      - src/components/NextExpressionToolbox.tsx
+      - src/lib/expressionReappearance.ts
     management_panels:
       - src/components/LearningLibraryPanel.tsx
       - src/components/WritingHabitsPanel.tsx
-      - src/components/ParagraphFlowPanel.tsx
       - src/components/TriggerSettingsPanel.tsx
       - src/components/DataControlPanel.tsx
       - src/components/PersonalDictionaryPanel.tsx
@@ -121,6 +121,7 @@ architecture:
       - POST /api/extract-learning
       - POST /api/check-paragraph-health
       - POST /api/check-paragraph-flow
+      - POST /api/check-outline
       - POST /api/explain-selection
       - POST /api/test-connection
     legacy:
@@ -159,8 +160,8 @@ conventions:
     - shared schemas and types 放在 src/lib/llm/types.ts。
     - API keys 不得 hardcode、log、commit 或 server-persist。
   editor_and_replacement:
-    - 只处理最新非空句。
-    - 最新句增强不要求选中文本，也不要求 slash trigger。
+    - 只处理光标所在当前句。
+    - 当前句增强不要求选中文本，也不要求 slash trigger。
     - 使用 range-based replacement，不使用字符串替换。
     - Apply 前必须做 snapshotFullText conflict detection。
     - diff highlighting 必须由代码生成，不由模型返回。

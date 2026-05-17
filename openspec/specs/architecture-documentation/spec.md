@@ -10,37 +10,37 @@
 
 - **GIVEN** 维护者打开 `PRODUCT.md`
 - **WHEN** 他们查找 LinguaType 是什么、不是什么
-- **THEN** 他们能看到 LinguaType 是面向中文母语学习者的 input-method-like latest-sentence 英文表达助手
+- **THEN** 他们能看到 LinguaType 是面向中文母语学习者的 input-method-like current-sentence 英文表达助手
 - **AND** 他们能看到 LinguaType 不是 chatbot、translator、essay generator、essay scorer、cloud-sync product、Chrome extension 或 system input method
 
 #### Scenario: 产品文档保持当前行为
 
-- **GIVEN** `PRODUCT.md` 描述 v0.2.2 行为
+- **GIVEN** `PRODUCT.md` 描述当前 v0.2.8 行为
 - **WHEN** 它描述 enhancement、Apply、learning data、paragraph checks、selection actions 和 local proofreading
 - **THEN** 它只描述当前已有行为
 - **AND** 它不引入新的 UX、storage、API 或 AI behavior
 
 ### Requirement: 架构文档必须记录当前数据流
 
-项目必须包含架构文档，用于追踪完整 latest-sentence flow：从编辑器输入，到增强结果、Apply、替换和本地保存。
+项目必须包含架构文档，用于追踪完整 current-sentence flow：从编辑器输入，到增强结果、Apply、替换和本地保存。
 
-#### Scenario: 最新句增强流程被记录
+#### Scenario: 当前句增强流程被记录
 
 - **GIVEN** 维护者打开 `ARCHITECTURE.md`
-- **WHEN** 他们阅读 latest-sentence flow
-- **THEN** 他们能跟踪 editor input、`extractLatestSentence`、enhancement request snapshot、`POST /api/enhance-fast`、LLM service/provider handling、返回结果 shape、code-generated diff 和 `EnhancementPopover` 展示
+- **WHEN** 他们阅读 current-sentence flow
+- **THEN** 他们能跟踪 editor input、`extractCurrentSentence`、enhancement request snapshot、`POST /api/enhance-fast`、LLM service/provider handling、返回结果 shape、code-generated diff 和 `EnhancementPopover` 展示
 
 #### Scenario: Apply 流程被记录
 
 - **GIVEN** 维护者打开 `ARCHITECTURE.md`
 - **WHEN** 他们阅读 Apply flow
-- **THEN** 他们能跟踪 conflict detection、range-based replacement、draft persistence、后台 `POST /api/extract-learning`、Learning Library upsert、Correction Events upsert 和可选 Paragraph Health gating
+- **THEN** 他们能跟踪 conflict detection、range-based replacement、draft persistence、后台 `POST /api/extract-learning`、Learning Library upsert、Correction Events upsert 和 Paragraph Health gating
 
 #### Scenario: 非 Apply 操作不保存学习数据
 
 - **GIVEN** 文档描述 Cancel、Regenerate、Copy revised sentence、Selection Explain 和 Paragraph Flow
 - **WHEN** 维护者检查这些操作的 persistence behavior
-- **THEN** 文档明确说明这些操作不会保存 latest-sentence learning data 或 correction events
+- **THEN** 文档明确说明这些操作不会保存 current-sentence learning data 或 correction events
 
 ### Requirement: 模块文档必须标注归属和边界
 
@@ -56,7 +56,7 @@
 
 - **GIVEN** 未来 change 涉及 AI behavior、storage、replacement 或 diffs
 - **WHEN** 维护者检查 `MODULES.md`
-- **THEN** 他们能看到 product logic 必须使用 LLM service abstraction、本地数据必须保留在 localStorage、latest-sentence replacement 必须基于 range、diff highlighting 必须由代码生成
+- **THEN** 他们能看到 product logic 必须使用 LLM service abstraction、本地数据必须保留在 localStorage、current-sentence replacement 必须基于 range、diff highlighting 必须由代码生成
 
 ### Requirement: Agent 交接必须引用架构文档但不重复长篇内容
 
@@ -80,13 +80,13 @@
 - **THEN** 他们能看到主要产品和文档里程碑
 - **AND** 详细实现规则仍保留在 `AGENTS.md`、`ARCHITECTURE.md` 和 `MODULES.md`
 
-### Requirement: 架构清理不得改变运行时行为
+### Requirement: 文档清理不得改变运行时行为
 
-v0.2.3 架构清理必须是 documentation-only，除非未来 proposal 明确扩大范围。
+单纯的架构或交接文档清理必须是 documentation-only，除非对应 change 明确扩大实现范围。
 
 #### Scenario: 实现完成
 
-- **GIVEN** v0.2.3 architecture cleanup 已实现
+- **GIVEN** documentation-only 清理已实现
 - **WHEN** 审查 changed files
 - **THEN** 改动仅限文档和 OpenSpec artifacts
 - **AND** `src/` 下的业务代码没有被修改

@@ -13,7 +13,7 @@ import {
 import { DesignSelect } from "./DesignSelect";
 import type { LearningItem, LearningItemType } from "@/lib/llm/types";
 import { exportLearningLibraryJson, filterLearningLibrary, type LearningItemDifficulty } from "@/lib/storage";
-import { normalizePersonalDictionary } from "@/lib/proofreading";
+import { normalizePersonalDictionary } from "@/lib/personalDictionary";
 
 const TYPE_LABELS: Record<LearningItemType, string> = {
   phrase: "短语",
@@ -317,7 +317,10 @@ export function LearningLibraryPanel({
               className="group relative flex h-full flex-col overflow-hidden rounded-[8px] border border-[var(--lt-border)] bg-[var(--lt-surface)] px-4 py-4 transition hover:border-[var(--lt-ring)]"
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
+                <div
+                  data-library-card-heading="fixed"
+                  className="h-[7.75rem] min-w-0 overflow-hidden"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-[var(--lt-surface-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--lt-muted)]">
                       {TYPE_LABELS[item.type]}
@@ -329,8 +332,8 @@ export function LearningLibraryPanel({
                       </span>
                     ) : null}
                   </div>
-                  <h2 className="mt-2 break-words text-[20px] font-semibold leading-snug">{item.content}</h2>
-                  <p className="mt-1 break-words text-sm leading-6 text-[var(--lt-muted)]">{item.chineseMeaning}</p>
+                  <h2 className="mt-2 line-clamp-2 break-words text-[20px] font-semibold leading-snug">{item.content}</h2>
+                  <p className="mt-1 line-clamp-2 break-words text-sm leading-6 text-[var(--lt-muted)]">{item.chineseMeaning}</p>
                 </div>
                 <button
                   type="button"
@@ -349,7 +352,12 @@ export function LearningLibraryPanel({
                 </button>
               </div>
 
-              <p className="mt-3 max-h-[4.75rem] overflow-hidden text-sm leading-6 text-[var(--lt-text)]">{item.usageNote}</p>
+              <p
+                data-library-usage-preview="fixed"
+                className="mt-3 h-[4.5rem] overflow-hidden text-sm leading-6 text-[var(--lt-text)] line-clamp-3"
+              >
+                {item.usageNote}
+              </p>
               {item.sourceSentence ? (
                 <button
                   type="button"
@@ -359,10 +367,12 @@ export function LearningLibraryPanel({
                   onClick={() =>
                     setExpandedSourceItemId((current) => (current === item.id ? null : item.id))
                   }
-                  className="mt-3 max-h-[5rem] overflow-hidden rounded-[6px] bg-[var(--lt-surface-soft)] px-3 py-2 text-left text-[12px] leading-5 text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-ring)]"
+                  className="mt-3 h-[5.25rem] w-full overflow-hidden rounded-[6px] bg-[var(--lt-surface-soft)] px-3 py-2 text-left text-[12px] leading-5 text-[var(--lt-muted)] transition hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-ring)]"
                 >
                   <span className="font-medium text-[var(--lt-text)]">来源</span>
-                  <p className="mt-1 break-words">{item.sourceSentence}</p>
+                  <p data-library-source-preview-text="clamped" className="mt-1 line-clamp-2 break-words">
+                    {item.sourceSentence}
+                  </p>
                 </button>
               ) : null}
 
