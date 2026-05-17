@@ -877,8 +877,9 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
 
     const writingTextClass =
       "font-serif text-[21px] leading-[2.22] tracking-[0] md:text-[22px] md:leading-[2.25] whitespace-pre-wrap break-words";
-    const writingPaperClass = `${writingTextClass} text-transparent`;
-    const writingSurfaceClass = `lt-writing-surface min-h-[520px] max-w-[860px] ${writingTextClass}`;
+    const writingGutterClass = "pl-0 pr-12 sm:pr-14";
+    const writingPaperClass = `${writingTextClass} ${writingGutterClass} text-transparent`;
+    const writingSurfaceClass = `lt-writing-surface min-h-[520px] max-w-[860px] ${writingTextClass} ${writingGutterClass}`;
     const layoutClass = wideLayout ? "max-w-[1120px]" : "max-w-[980px]";
 
     return (
@@ -899,7 +900,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
               className={
                 inlineSuggestion
                   ? "sr-only"
-                  : `lt-writing-textarea min-h-[520px] w-full resize-none overflow-hidden border-0 !bg-transparent px-0 py-0 ${writingTextClass} text-[var(--lt-text)] outline-none placeholder:text-[var(--lt-muted)] placeholder:opacity-60`
+                  : `lt-writing-textarea min-h-[520px] w-full resize-none overflow-hidden border-0 !bg-transparent ${writingGutterClass} py-0 ${writingTextClass} text-[var(--lt-text)] outline-none placeholder:text-[var(--lt-muted)] placeholder:opacity-60`
                 }
               data-input-mode="native-document"
               data-placeholder={EDITOR_PLACEHOLDER}
@@ -977,7 +978,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
                           ? "查看当前 AI 建议"
                           : "重新查看AI修改"
                     }
-                    className={`absolute left-[calc(100%+24px)] z-20 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--lt-accent)_58%,transparent)] bg-[var(--lt-bg)]/90 p-0 text-[var(--lt-accent)] opacity-85 shadow-[0_8px_22px_rgba(185,105,72,0.12)] backdrop-blur-sm transition-[opacity,background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-[var(--lt-accent)] hover:bg-[var(--lt-accent-soft)] hover:opacity-100 hover:shadow-[0_10px_28px_rgba(185,105,72,0.16)] focus:opacity-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-accent)] ${
+                    className={`absolute right-1 z-20 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--lt-accent)_58%,transparent)] bg-[var(--lt-bg)]/90 p-0 text-[var(--lt-accent)] opacity-85 shadow-[0_8px_22px_rgba(185,105,72,0.12)] backdrop-blur-sm transition-[opacity,background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-[var(--lt-accent)] hover:bg-[var(--lt-accent-soft)] hover:opacity-100 hover:shadow-[0_10px_28px_rgba(185,105,72,0.16)] focus:opacity-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--lt-accent)] sm:right-2 ${
                       activeSuggestionMarkerId === marker.id
                         ? "border-[var(--lt-accent)] bg-[var(--lt-accent-soft)] ring-1 ring-[var(--lt-accent)]"
                         : ""

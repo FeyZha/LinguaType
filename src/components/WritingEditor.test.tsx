@@ -427,7 +427,7 @@ describe("WritingEditor native long-text input", () => {
     expect(css).not.toContain("lt-expression-cue-card-flash");
   });
 
-  it("keeps AI suggestion marker near the right gutter", () => {
+  it("keeps AI suggestion marker inside the right gutter", () => {
     const value = "This is a proofing marker placement sentence.";
     const markerStart = 10;
     const { container } = renderEditor({
@@ -446,7 +446,9 @@ describe("WritingEditor native long-text input", () => {
       '[data-suggestion-entry="available"]',
     ) as HTMLElement;
     expect(aiButton).toBeInTheDocument();
-    expect(aiButton).toHaveClass("left-[calc(100%+24px)]");
+    expect(aiButton).toHaveClass("right-1", "sm:right-2");
+    expect(aiButton).not.toHaveClass("left-[calc(100%+24px)]");
+    expect(screen.getByRole("textbox")).toHaveClass("pr-12", "sm:pr-14");
   });
 
   it("renders a compact bottom writing status bar", () => {
