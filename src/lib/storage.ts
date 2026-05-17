@@ -222,9 +222,13 @@ export function loadWritingArchivesFromStorage(
   storage: StorageLike,
   options: { now?: string; createId?: () => string } = {},
 ): WritingArchivesState {
-  const stored = parseObject(storage.getItem(WRITING_ARCHIVES_STORAGE_KEY));
+  const rawStoredArchives = storage.getItem(WRITING_ARCHIVES_STORAGE_KEY);
+  const stored = parseObject(rawStoredArchives);
   if (stored) {
     return normalizeWritingArchives(stored);
+  }
+  if (rawStoredArchives !== null) {
+    return { activeId: null, items: [] };
   }
 
   const legacyText = storage.getItem(DRAFT_STORAGE_KEY) ?? "";

@@ -59,13 +59,13 @@ describe("LinguaType deprecated writing setup", () => {
     expect(await screen.findByLabelText("写作编辑器")).toBeInTheDocument();
     expect(screen.queryByText("写作准备")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "进入写作" })).not.toBeInTheDocument();
-    const title = screen.getByRole("heading", { level: 1, name: "未命名写作" });
+    const title = screen.getByRole("heading", { level: 1, name: "How students can build independent learning habits" });
     expect(title).toBeInTheDocument();
     expect(title).toHaveClass("font-semibold");
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("creates a blank local archive when no setup or archive exists", async () => {
+  it("creates a demo local archive when no setup or archive exists", async () => {
     render(<LinguaTypeApp />);
 
     expect(await screen.findByLabelText("写作编辑器")).toBeInTheDocument();
@@ -74,9 +74,13 @@ describe("LinguaType deprecated writing setup", () => {
     expect(archives.activeId).toBeTruthy();
     expect(archives.items).toHaveLength(1);
     expect(archives.items[0]).toMatchObject({
-      title: "未命名写作",
-      text: "",
+      title: "体验示例：Independent learning habits",
+      setup: {
+        essayTopic: "How students can build independent learning habits",
+        topicArea: "education",
+      },
     });
+    expect(archives.items[0].text).toContain("把它落实到每天的行动中");
   });
 
   it("restores a local draft directly without creating learning data", async () => {
@@ -258,6 +262,45 @@ describe("LinguaType v0.2.7 editor shell", () => {
 
     expect(screen.getByRole("button", { name: /^Technology older/u })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Custom newest/u })).not.toBeInTheDocument();
+  });
+
+  it("keeps archive item actions visible when the title is long", async () => {
+    const longTitle =
+      "ExtremelyLongArchiveTitleWithoutSpacesThatPreviouslyForcedHorizontalScrollingAndHidTheMenuButton";
+    localStorage.setItem(
+      WRITING_ARCHIVES_STORAGE_KEY,
+      JSON.stringify({
+        activeId: "archive-long",
+        items: [
+          {
+            id: "archive-long",
+            title: longTitle,
+            text: "Long archive text.",
+            setup: {
+              topicArea: "custom",
+              essayTopic: longTitle,
+              outlinePoints: ["Point"],
+              outline: "Point",
+              updatedAt: "2026-05-15T00:00:00.000Z",
+            },
+            createdAt: "2026-05-15T00:00:00.000Z",
+            updatedAt: "2026-05-15T00:00:00.000Z",
+            lastOpenedAt: "2026-05-15T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    render(<LinguaTypeApp />);
+
+    const archiveList = await screen.findByLabelText("写作存档列表");
+    expect(archiveList).toHaveClass("overflow-x-hidden");
+    const archiveButton = screen.getByRole("button", { name: new RegExp(`^${longTitle}`, "u") });
+    const archiveRow = archiveButton.closest("[data-archive-row]");
+    expect(archiveRow).toHaveClass("w-full", "min-w-0");
+    expect(archiveButton).toHaveClass("min-w-0", "overflow-hidden");
+    expect(within(archiveButton).getByText(longTitle)).toHaveClass("max-w-full", "truncate");
+    expect(screen.getByRole("button", { name: `打开存档操作：${longTitle}` })).toHaveClass("ml-auto", "shrink-0");
   });
 
   it("does not reorder archives on switch until the opened archive is edited", async () => {

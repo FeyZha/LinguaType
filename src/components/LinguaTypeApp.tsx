@@ -3968,7 +3968,7 @@ function ArchiveSidebar({
         data-archive-appear-animation="soft-list-rise"
         data-archive-motion-duration="320"
         data-archive-motion-reason={archiveMotionReason}
-        className="lt-scrollbar-hidden mt-4 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1"
+        className="lt-scrollbar-hidden mt-4 grid min-h-0 flex-1 content-start gap-1 overflow-x-hidden overflow-y-auto pr-1"
       >
         {visibleArchives.map((item) => (
           <div
@@ -3984,7 +3984,7 @@ function ArchiveSidebar({
             }}
             data-archive-drag-state={draggingArchiveId === item.id ? "dragging" : "idle"}
             data-archive-drag-preview={draggingArchiveId === item.id ? "compact-strip" : "full-row"}
-            className={`relative rounded-md transition-[background-color,box-shadow,opacity,transform,border-radius] duration-300 ${
+            className={`relative w-full min-w-0 rounded-md transition-[background-color,box-shadow,opacity,transform,border-radius] duration-300 ${
               item.id === openMenuArchiveId ? "z-50" : "z-0"
             } ${
               draggingArchiveId === item.id
@@ -3996,7 +3996,7 @@ function ArchiveSidebar({
                 : "text-[var(--lt-muted)] hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
             }`}
           >
-            <div className="flex items-center gap-1">
+            <div className="flex w-full min-w-0 items-center gap-1">
               {renamingArchiveId === item.id ? (
                 <input
                   value={item.title}
@@ -4020,13 +4020,13 @@ function ArchiveSidebar({
                   type="button"
                   onClick={() => onSwitch(item.id)}
                   aria-current={item.id === archives.activeId ? "true" : undefined}
-                  className={`min-w-0 flex-1 px-3 text-left text-sm transition-[padding] duration-300 ${
+                  className={`min-w-0 flex-1 overflow-hidden px-3 text-left text-sm transition-[padding] duration-300 ${
                     draggingArchiveId === item.id ? "py-1.5" : "py-2.5"
                   }`}
                 >
-                  <span className="block truncate font-serif text-[15px] font-medium">{archiveDisplayTitle(item)}</span>
+                  <span className="block max-w-full truncate font-serif text-[15px] font-medium">{archiveDisplayTitle(item)}</span>
                   <span
-                    className={`mt-1 truncate text-xs font-normal text-[var(--lt-faint)] ${
+                    className={`mt-1 max-w-full truncate text-xs font-normal text-[var(--lt-faint)] ${
                       draggingArchiveId === item.id ? "hidden" : "block"
                     }`}
                   >
@@ -4041,7 +4041,7 @@ function ArchiveSidebar({
                   onOpenMenu(item.id);
                 }}
                 aria-label={`打开存档操作：${item.title || "未命名写作"}`}
-                className="mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--lt-faint)] hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
+                className="ml-auto mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--lt-faint)] hover:bg-[var(--lt-surface-hover)] hover:text-[var(--lt-text)]"
               >
                 <EllipsisHorizontalIcon className="h-4 w-4" />
               </button>
