@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProofreadingResult } from "@/lib/proofreading";
 import { createWordDiff } from "@/lib/sentence";
 import { defaultTriggerSettings } from "@/lib/storage";
 import { calculateSelectionPopoverPosition } from "./LinguaTypeApp";
@@ -14,16 +15,6 @@ vi.mock("animejs/waapi", () => ({
 
 import { WritingEditor } from "./WritingEditor";
 
-const proofreadingResult: ProofreadingResult = {
-  stats: {
-    characterCount: 0,
-    englishWordCount: 0,
-    sentenceCount: 0,
-    paragraphCount: 0,
-  },
-  signals: [],
-};
-
 function renderEditor(overrides: Partial<React.ComponentProps<typeof WritingEditor>> = {}) {
   const props: React.ComponentProps<typeof WritingEditor> = {
     value: "Opening paragraph.\n\nSecond paragraph.",
@@ -31,13 +22,12 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof WritingEdit
     isLoading: false,
     writingMode: "natural",
     enhancementLevel: "balanced",
-    proofreadingResult,
     triggerSettings: defaultTriggerSettings(),
     onChange: vi.fn(),
     onWritingModeChange: vi.fn(),
     onEnhancementLevelChange: vi.fn(),
     onEnhance: vi.fn(),
-    onOpenExpressionMenu: vi.fn(),
+    onCheckCurrentParagraph: vi.fn(),
     onSelectionChange: vi.fn(),
     onEscape: vi.fn(),
     ...overrides,
@@ -94,6 +84,17 @@ describe("WritingEditor native long-text input", () => {
     });
 
     expect(onEnhance).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses Ctrl/Cmd + K for current paragraph checking", () => {
+    const onCheckCurrentParagraph = vi.fn();
+    renderEditor({ onCheckCurrentParagraph });
+
+    const editor = screen.getByRole("textbox") as HTMLTextAreaElement;
+    editor.setSelectionRange(3, 3);
+    fireEvent.keyDown(editor, { key: "k", ctrlKey: true });
+
+    expect(onCheckCurrentParagraph).toHaveBeenCalledWith(3);
   });
 
   it("keeps placeholder suggestions inline with lightweight keyboard actions", () => {
@@ -348,34 +349,85 @@ describe("WritingEditor native long-text input", () => {
       ],
     });
 
-    const cue = screen.getByLabelText("表达库命中：shape one's values");
+    const cue = container.querySelector("[data-expression-reappearance-cue='fresh']") as HTMLElement;
+    expect(cue).not.toBeNull();
     expect(cue).toHaveAttribute("data-expression-reappearance-cue", "fresh");
+    expect(cue).toHaveAttribute("data-expression-reappearance-visual", "card-stamp");
+    expect(cue).toHaveAttribute("aria-hidden", "true");
+    expect(cue).not.toHaveAttribute("tabindex");
     expect(cue).toHaveClass("lt-expression-cue--fresh");
+    expect(cue).toHaveClass("lt-expression-cue--card-stamp");
+    expect(cue).not.toHaveClass("pointer-events-auto");
+    expect(cue).not.toHaveClass("lt-expression-cue--paper-wash");
+    expect(cue).not.toHaveClass("lt-expression-cue--flash");
     expect(container.querySelector("[data-suggestion-entry]")).toBeNull();
     expect(container.querySelector("[data-proofreading-item]")).toBeNull();
 
     fireEvent.mouseEnter(cue);
-    expect(screen.getByText("表达库命中")).toBeInTheDocument();
-    expect(screen.getByText("shape one's values")).toBeInTheDocument();
-    expect(screen.getByText("塑造 / 影响某人的价值观")).toBeInTheDocument();
-    const detail = container.querySelector("[data-expression-reappearance-detail='open']");
-    expect(detail).toHaveAttribute("data-expression-reappearance-detail-style", "light-card");
-    expect(detail).toHaveClass("rounded-[8px]");
-    expect(detail).toHaveClass("min-w-[300px]");
-    expect(detail).toHaveClass("text-[13px]");
-    expect(detail).not.toHaveClass("backdrop-blur-sm");
-
-    Object.defineProperty(cue, "getBoundingClientRect", {
-      configurable: true,
-      value: () => new DOMRect(100, 100, 280, 24),
-    });
-    fireEvent.mouseDown(cue, { clientX: 240 });
-    const editor = screen.getByRole("textbox") as HTMLTextAreaElement;
-    expect(editor.selectionStart).toBeGreaterThan(start);
-    expect(editor.selectionStart).toBeLessThan(end);
+    expect(container.querySelector("[data-expression-reappearance-detail='open']")).toBeNull();
   });
 
-  it("keeps AI marker closer than proofreading marker", () => {
+  it("uses a neutral card-stamp animation without hover card, green, or persistent underline", () => {
+    const value = "Social media can shape young people's values.";
+    const start = value.indexOf("shape");
+    const end = start + "shape young people's values".length;
+    const { container } = renderEditor({
+      value,
+      expressionReappearanceCues: [
+        {
+          id: "cue-1",
+          itemId: "library-1",
+          expression: "shape one's values",
+          matchedText: "shape young people's values",
+          start,
+          end,
+          meaning: "塑造 / 影响某人的价值观",
+          state: "seen",
+        },
+      ],
+    });
+
+    const cue = container.querySelector("[data-expression-reappearance-cue='seen']") as HTMLElement;
+    expect(cue).not.toBeNull();
+    expect(cue).toHaveAttribute("data-expression-reappearance-cue", "seen");
+    expect(cue).toHaveAttribute("data-expression-reappearance-visual", "idle");
+    expect(cue).toHaveAttribute("aria-hidden", "true");
+    expect(cue).not.toHaveAttribute("tabindex");
+    expect(cue).not.toHaveClass("lt-expression-cue--fresh");
+    expect(cue).not.toHaveClass("lt-expression-cue--flash");
+    expect(cue).not.toHaveClass("lt-expression-cue--paper-wash");
+    expect(cue).not.toHaveClass("lt-expression-cue--card-stamp");
+
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+    const baseCueRule = css.match(/\.lt-expression-cue\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    const cardStampRule =
+      css.match(/\.lt-expression-cue--fresh,\s*\n\.lt-expression-cue--card-stamp\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    const cardStampKeyframes =
+      css.match(/@keyframes lt-expression-cue-card-stamp\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    const expressionCueCss = css.slice(
+      css.indexOf(".lt-expression-cue"),
+      css.indexOf("@media (prefers-reduced-motion: reduce)"),
+    );
+
+    expect(baseCueRule).not.toContain("100% 1px");
+    expect(baseCueRule).not.toContain("0 92%");
+    expect(baseCueRule).not.toContain("pointer-events");
+    expect(baseCueRule).toContain("box-decoration-break: clone");
+    expect(cardStampRule).toContain("lt-expression-cue-card-stamp");
+    expect(cardStampKeyframes).toContain("clip-path");
+    expect(cardStampKeyframes).toContain("inset 0 0 0 1px");
+    expect(cardStampKeyframes).not.toContain("var(--lt-memory)");
+    expect(cardStampKeyframes).not.toContain("scale");
+    expect(cardStampKeyframes).not.toContain("blur");
+    expect(expressionCueCss).not.toContain("lt-expression-cue--active");
+    expect(expressionCueCss).not.toContain("var(--lt-memory)");
+    expect(css).not.toContain("data-expression-reappearance-detail");
+    expect(css).not.toContain("lt-expression-cue-paper-wash");
+    expect(css).not.toContain("lt-expression-cue-flash");
+    expect(css).not.toContain("lt-expression-cue-card-flash");
+  });
+
+  it("keeps AI suggestion marker near the right gutter", () => {
     const value = "This is a proofing marker placement sentence.";
     const markerStart = 10;
     const { container } = renderEditor({
@@ -388,139 +440,25 @@ describe("WritingEditor native long-text input", () => {
           onOpen: vi.fn(),
         },
       ],
-      proofreadingResult: {
-        stats: {
-          characterCount: value.length,
-          englishWordCount: 8,
-          sentenceCount: 1,
-          paragraphCount: 1,
-        },
-        signals: [
-          {
-            id: "proofreading-inline",
-            type: "grammar",
-            titleZh: "重复",
-            messageZh: "示例提醒",
-            excerpt: "sentence",
-            start: 5,
-            end: 13,
-          },
-        ],
-      },
     });
 
     const aiButton = container.querySelector(
       '[data-suggestion-entry="available"]',
     ) as HTMLElement;
-    const proofreadingGroup = container.querySelector(
-      "[data-proofreading-group]",
-    ) as HTMLElement;
     expect(aiButton).toBeInTheDocument();
     expect(aiButton).toHaveClass("left-[calc(100%+24px)]");
-    expect(proofreadingGroup).toBeInTheDocument();
-    expect(proofreadingGroup).toHaveClass("left-[calc(100%+96px)]");
-  });
-
-  it("groups proofreading tags from the same sentence in one horizontal row and shifts later sentence groups on hover", async () => {
-    const value = "They they repeated, repeated words often. They should avoid this.";
-    const { container } = renderEditor({
-      value,
-      proofreadingResult: {
-        ...proofreadingResult,
-        stats: {
-          characterCount: value.length,
-          englishWordCount: 10,
-          sentenceCount: 2,
-          paragraphCount: 1,
-        },
-        signals: [
-          {
-            id: "duplicate-word",
-            type: "grammar",
-            titleZh: "重复",
-            messageZh: "重复词可能让句子不自然",
-            excerpt: "They",
-            start: 0,
-            end: 4,
-          },
-          {
-            id: "repeated-word",
-            type: "style",
-            titleZh: "重复",
-            messageZh: "重复用了两次“repeated”",
-            excerpt: "repeated",
-            start: 10,
-            end: 22,
-          },
-          {
-            id: "long-sentence",
-            type: "length",
-            titleZh: "句子过长",
-            messageZh: "句子偏长，请考虑拆分",
-            excerpt: "They should avoid this.",
-            start: value.indexOf("They should"),
-            end: value.length,
-          },
-        ],
-      },
-    });
-
-    const groups = container.querySelectorAll("[data-proofreading-group]");
-    const tags = container.querySelectorAll("[data-proofreading-item]");
-    expect(groups).toHaveLength(2);
-    expect(tags).toHaveLength(3);
-    expect(groups[0]?.querySelectorAll("[data-proofreading-item]")).toHaveLength(2);
-    expect(tags[0]?.parentElement).toBe(tags[1]?.parentElement);
-
-    const getTop = (node: Element) =>
-      Number((node as HTMLElement).style.top.replace("px", "")) || 0;
-    const firstTagButton = tags[0] as HTMLElement;
-
-    const closedFirstTop = getTop(groups[0] as HTMLElement);
-    const closedSecondTop = getTop(groups[1] as HTMLElement);
-    expect(closedSecondTop).toBeGreaterThanOrEqual(closedFirstTop);
-
-    fireEvent.mouseEnter(firstTagButton);
-    await waitFor(() => {
-      expect(groups[0]?.querySelector('[data-proofreading-detail="open"]')).not.toBeNull();
-    });
-    expect(container.querySelector("[data-proofreading-highlight='active']")).toHaveTextContent(
-      "They they repeated, repeated words often.",
-    );
-
-    const afterSecondTop = getTop(groups[1] as HTMLElement);
-    expect(afterSecondTop).toBeGreaterThan(closedSecondTop);
   });
 
   it("renders a compact bottom writing status bar", () => {
     renderEditor({
       value: "Opening paragraph.\n\nSecond paragraph.",
-      proofreadingResult: {
-        ...proofreadingResult,
-        stats: {
-          characterCount: 37,
-          englishWordCount: 4,
-          sentenceCount: 2,
-          paragraphCount: 2,
-        },
-        signals: [
-          {
-            id: "long-sentence-1",
-            type: "length",
-            titleZh: "句子偏长",
-            messageZh: "句子有些长。",
-            excerpt: "Opening paragraph.",
-            start: 0,
-            end: 17,
-          },
-        ],
-      },
     });
 
     const statusBar = screen.getByRole("contentinfo");
-    expect(statusBar).toHaveClass("sticky", "bottom-0");
-    expect(screen.getByLabelText("写作状态栏文本校对")).toHaveTextContent("文本校对");
-    expect(statusBar).not.toHaveTextContent("Proofreading");
+    expect(statusBar).toHaveClass("fixed", "bottom-0");
+    expect(statusBar).toHaveTextContent("文章地图");
+    expect(screen.getByRole("button", { name: /检查文章地图|文章地图 · /u })).toBeInTheDocument();
+    expect(statusBar).not.toHaveTextContent("文本校对");
   });
 
   it("opens lightweight upward menus for mode and enhancement level", async () => {

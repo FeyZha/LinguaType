@@ -39,6 +39,8 @@ describe("EnhancementPopover", () => {
     expect(screen.getByLabelText("修改后句子")).toHaveTextContent(result.finalSentence);
     expect(screen.getByText(/结构：结构提示示例/u)).toBeInTheDocument();
     expect(screen.getByText(/->/u)).toBeInTheDocument();
+    expect(screen.getByText(/Ctrl\/Cmd \+ R 换一种表达/u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "换一种表达" })).toBeInTheDocument();
 
     const changedRevisedDiff = container.querySelector("[data-revised-diff='changed']");
     expect(changedRevisedDiff).not.toBeNull();

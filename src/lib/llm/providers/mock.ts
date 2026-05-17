@@ -4,6 +4,7 @@ import {
   normalizeEnhancementResult,
   normalizeFastEnhanceResult,
   normalizeLearningExtractionResult,
+  normalizeDocumentMapResult,
   normalizeOutlineCheckResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
@@ -13,6 +14,8 @@ import {
 import type {
   ClassifyWritingDomainInput,
   ClassifyWritingDomainResult,
+  DocumentMapInput,
+  DocumentMapResult,
   CorrectionDraft,
   CorrectionEventDraft,
   EnhanceLatestSentenceInput,
@@ -130,7 +133,7 @@ export async function enhanceFastWithMockProvider(input: FastEnhanceInput): Prom
       finalSentence,
       explanationZh: finalSentence === input.latestSentence
         ? "The sentence is already natural."
-        : "Fast enhancement prepared for the latest sentence.",
+        : "Fast enhancement prepared for the current sentence.",
       hasChinese: containsChinese(input.latestSentence),
     },
     input.latestSentence,
@@ -180,7 +183,7 @@ export async function enhanceWithMockProvider(
     taskType: containsChinese(input.latestSentence) ? "mixed_chinese_rewrite" : "english_polish",
     originalSentence: input.latestSentence,
     finalSentence,
-    explanationZh: finalSentence === input.latestSentence ? "句子已经自然，无需修改。" : "已按当前增强强度修改最新一句。",
+    explanationZh: finalSentence === input.latestSentence ? "句子已经自然，无需修改。" : "已按当前增强强度修改当前句。",
     hasChinese: containsChinese(input.latestSentence),
     insertedExpressions: used
       .filter((item) => item.type === "expression_translation")
@@ -223,6 +226,14 @@ export async function checkParagraphFlowWithMockProvider(
             reason: "重复使用同一个举例连接表达，删去一次会更自然。",
           },
         ],
+        detailIssues: [
+          {
+            type: "punctuation",
+            original: "For example, for example,",
+            suggestion: "For example,",
+            reason: "重复连接表达也造成标点节奏拖沓，删去重复部分即可。",
+          },
+        ],
         summary: "段落整体清楚，但有重复表达。",
       },
       input.currentParagraph,
@@ -235,6 +246,7 @@ export async function checkParagraphFlowWithMockProvider(
       revisedParagraph: input.currentParagraph,
       hasIssues: false,
       issues: [],
+      detailIssues: [],
       summary: "未发现明显段落连贯问题。",
     },
     input.currentParagraph,
@@ -277,6 +289,67 @@ export async function checkOutlineWithMockProvider(
   });
 }
 
+export async function checkDocumentMapWithMockProvider(
+  input: DocumentMapInput,
+): Promise<DocumentMapResult> {
+  const duplicatePair = findRepeatedTopicPair(input.paragraphs.map((paragraph) => paragraph.text));
+  const issueId = duplicatePair ? "issue_1" : "";
+  const roles = ["背景 + 立场", "原因", "影响", "结论"];
+  const paragraphs = input.paragraphs.map((paragraph, index) => {
+    const involvedInIssue = duplicatePair?.some((pairIndex) => pairIndex === index) ?? false;
+    return {
+      paragraphId: paragraph.paragraphId,
+      index: paragraph.index,
+      range: paragraph.range,
+      roleZh: roles[Math.min(index, roles.length - 1)] ?? "段落",
+      mainPointZh: summarizeParagraphPoint(paragraph.text, index),
+      status: involvedInIssue && index > 0 ? "needs_attention" as const : "healthy" as const,
+      healthSummaryZh: involvedInIssue && index > 0 ? "与前文有部分重复，需要区分论证功能。" : "主旨清楚。",
+      relationToPreviousZh: index === 0 ? null : "承接前文，但仍可加强段落之间的功能区分。",
+      issueRefs: involvedInIssue ? [issueId] : [],
+    };
+  });
+
+  const globalIssues = duplicatePair
+    ? [
+        {
+          id: issueId,
+          type: "repetition" as const,
+          severity: "medium" as const,
+          titleZh: `第 ${duplicatePair[0] + 1} 段和第 ${duplicatePair[1] + 1} 段观点重复`,
+          paragraphIds: duplicatePair.map((index) => input.paragraphs[index].paragraphId),
+          explanationZh: "两个段落使用了相近关键词，可能没有形成清晰的论证推进。",
+          suggestionZh: `建议让第 ${duplicatePair[0] + 1} 段聚焦背景或原因，第 ${duplicatePair[1] + 1} 段聚焦影响或结果。`,
+        },
+      ]
+    : [];
+
+  return normalizeDocumentMapResult(
+    {
+      overallMainIdeaZh: input.essayTopic
+        ? `文章主要围绕「${input.essayTopic}」展开。`
+        : "文章主要围绕当前正文中的核心观点展开。",
+      structureSummaryZh: inferMockStructureSummary(input.paragraphs.length),
+      paragraphs,
+      globalIssues,
+      nextActions: globalIssues.length > 0
+        ? [
+            {
+              targetParagraphIds: globalIssues[0].paragraphIds,
+              actionZh: globalIssues[0].suggestionZh,
+            },
+          ]
+        : [
+            {
+              targetParagraphIds: input.paragraphs.slice(0, 1).map((paragraph) => paragraph.paragraphId),
+              actionZh: "先确认全文主旨和每段功能是否清楚，再逐段处理局部表达。",
+            },
+          ],
+    },
+    input,
+  );
+}
+
 export async function explainSelectionWithMockProvider(
   input: SelectionExplainInput,
 ): Promise<SelectionExplainResult> {
@@ -292,6 +365,48 @@ export async function explainSelectionWithMockProvider(
     },
     selectedText,
   );
+}
+
+function findRepeatedTopicPair(paragraphs: string[]): [number, number] | null {
+  for (let first = 0; first < paragraphs.length; first += 1) {
+    for (let second = first + 1; second < paragraphs.length; second += 1) {
+      const firstWords = importantWords(paragraphs[first]);
+      const secondWords = importantWords(paragraphs[second]);
+      const overlap = [...firstWords].filter((word) => secondWords.has(word));
+      if (overlap.length >= 2 || overlap.includes("exam") || overlap.includes("pressure")) {
+        return [first, second];
+      }
+    }
+  }
+  return null;
+}
+
+function importantWords(paragraph: string): Set<string> {
+  const stopWords = new Set(["the", "a", "an", "to", "and", "or", "but", "it", "is", "are", "how", "that", "this"]);
+  return new Set(
+    paragraph
+      .toLowerCase()
+      .match(/[a-z]+/gu)
+      ?.filter((word) => word.length > 4 && !stopWords.has(word)) ?? [],
+  );
+}
+
+function summarizeParagraphPoint(paragraph: string, index: number): string {
+  const firstSentence = paragraph.split(/[.!?。？！]/u).find((part) => part.trim())?.trim() ?? paragraph.trim();
+  if (!firstSentence) {
+    return `第 ${index + 1} 段主旨还不够明确。`;
+  }
+  return `第 ${index + 1} 段主要围绕：${firstSentence}`;
+}
+
+function inferMockStructureSummary(paragraphCount: number): string {
+  if (paragraphCount >= 4) {
+    return "当前结构接近：背景 -> 原因 -> 影响 -> 结论。";
+  }
+  if (paragraphCount === 3) {
+    return "当前结构接近：背景 -> 论证 -> 结论。";
+  }
+  return "当前结构接近：背景 -> 论证展开。";
 }
 
 export async function classifyWritingDomainWithMockProvider(

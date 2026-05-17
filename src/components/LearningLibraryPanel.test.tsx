@@ -73,6 +73,25 @@ describe("LearningLibraryPanel", () => {
     expect(container.querySelector("[data-library-card='compact']")).toHaveClass("h-full");
   });
 
+  it("keeps source previews aligned and clipped by full text lines", () => {
+    const { container } = renderPanel();
+
+    const headingSlot = container.querySelector("[data-library-card-heading='fixed']");
+    const usageSlot = container.querySelector("[data-library-usage-preview='fixed']");
+    const sourcePreview = container.querySelector("[data-library-source-preview='item-1']");
+    const sourceText = sourcePreview?.querySelector("[data-library-source-preview-text='clamped']");
+
+    expect(headingSlot).not.toBeNull();
+    expect(usageSlot).not.toBeNull();
+    expect(sourcePreview).not.toBeNull();
+    expect(sourceText).not.toBeNull();
+    expect(headingSlot).toHaveClass("h-[7.75rem]", "overflow-hidden");
+    expect(usageSlot).toHaveClass("h-[4.5rem]", "overflow-hidden", "line-clamp-3");
+    expect(sourcePreview).toHaveClass("h-[5.25rem]", "overflow-hidden");
+    expect(sourcePreview).not.toHaveClass("max-h-[5rem]");
+    expect(sourceText).toHaveClass("line-clamp-2");
+  });
+
   it("opens the full source inside the card without changing the card footprint", () => {
     const { container } = renderPanel();
 

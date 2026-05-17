@@ -3,6 +3,7 @@ import {
   API_SETTINGS_STORAGE_KEY,
   CORRECTION_MEMORY_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
+  DOCUMENT_MAP_CACHE_STORAGE_KEY,
   DRAFT_STORAGE_KEY,
   THEME_SETTINGS_STORAGE_KEY,
   TRIGGER_SETTINGS_STORAGE_KEY,
@@ -22,6 +23,7 @@ import {
   exportWritingHabitsJson,
   filterLearningLibrary,
   loadCorrectionEventsFromStorage,
+  loadDocumentMapCache,
   loadLearningLibraryFromStorage,
   loadPlaceholderSuggestionCache,
   loadPersonalDictionaryFromStorage,
@@ -31,12 +33,14 @@ import {
   loadWritingSetupFromStorage,
   savePlaceholderSuggestionCache,
   savePersonalDictionary,
+  saveDocumentMapCache,
   saveParagraphHealthCache,
   saveThemeSettings,
   saveTriggerSettings,
   saveWritingArchives,
   saveWritingSetup,
   upsertPlaceholderSuggestionCache,
+  upsertDocumentMapCache,
   upsertCorrectionEvents,
   upsertLearningItems,
   type PlaceholderSuggestionCacheRecord,
@@ -48,6 +52,7 @@ import type {
   LearningItemDraft,
   ParagraphHealthCacheItem,
   ParagraphHealthResult,
+  DocumentMapCacheRecord,
   WritingMode,
 } from "./llm/types";
 
@@ -71,6 +76,7 @@ describe("storage constants", () => {
     expect(LEARNING_LIBRARY_STORAGE_KEY).toBe("linguatype.learningLibrary.v1");
     expect(CORRECTION_MEMORY_STORAGE_KEY).toBe("linguatype.correctionMemory.v1");
     expect(CORRECTION_EVENTS_STORAGE_KEY).toBe("linguatype.correctionEvents.v1");
+    expect(DOCUMENT_MAP_CACHE_STORAGE_KEY).toBe("linguatype.documentMapCache.v1");
     expect(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY).toBe("linguatype.paragraphHealthCache.v1");
     expect(TRIGGER_SETTINGS_STORAGE_KEY).toBe("linguatype.triggerSettings.v1");
     expect(PERSONAL_DICTIONARY_STORAGE_KEY).toBe("linguatype.personalDictionary.v1");
@@ -86,10 +92,35 @@ describe("storage constants", () => {
     expect(settings.supportsJsonMode).toBe(false);
     expect(settings.maxTokens).toBe(20000);
     expect(settings.mockMode).toBe(false);
+    expect(settings.useServerApiKey).toBe(false);
   });
 });
 
 describe("writing archives storage", () => {
+  it("seeds a complete demo archive for first-time visitors", () => {
+    const storage = createMemoryStorage();
+
+    const archives = loadWritingArchivesFromStorage(storage, {
+      now: "2026-05-17T01:00:00.000Z",
+      createId: () => "demo-archive",
+    });
+
+    expect(archives.activeId).toBe("demo-archive");
+    expect(archives.items).toHaveLength(1);
+    expect(archives.items[0]).toMatchObject({
+      id: "demo-archive",
+      title: "体验示例：Independent learning habits",
+      setup: expect.objectContaining({
+        topicArea: "education",
+        essayTopic: "How students can build independent learning habits",
+      }),
+      createdAt: "2026-05-17T01:00:00.000Z",
+    });
+    expect(archives.items[0].text).toContain("把它落实到每天的行动中");
+    expect(archives.items[0].text.split("\n\n")).toHaveLength(4);
+    expect(JSON.parse(storage.getItem(WRITING_ARCHIVES_STORAGE_KEY) ?? "{}").items).toHaveLength(1);
+  });
+
   it("initializes a default archive from legacy draft and setup without deleting legacy keys", () => {
     const setup = {
       topicArea: "technology",
@@ -241,8 +272,8 @@ describe("v0.2.2  storage", () => {
   it("loads default low-intrusion ", () => {
     expect(defaultTriggerSettings()).toEqual({
       sentenceEnhancementShortcut: "ctrl_enter",
-      inlineExpressionMenuTrigger: "ctrl_k",
       paragraphHealthTrigger: "after_every_apply",
+      documentMapAutoCheck: "auto_idle",
       writingHabitsFeedback: "badge",
       statusFeedbackStyle: "popover_footer",
       popoverBehavior: {
@@ -262,8 +293,9 @@ describe("v0.2.2  storage", () => {
     });
 
     const loaded = loadTriggerSettingsFromStorage(storage);
-    expect(loaded.sentenceEnhancementShortcut).toBe("disable_shortcut");
-    expect(loaded.inlineExpressionMenuTrigger).toBe("ctrl_k");
+    expect(loaded.sentenceEnhancementShortcut).toBe("button_only");
+    expect(loaded.documentMapAutoCheck).toBe("auto_idle");
+    expect("inlineExpressionMenuTrigger" in loaded).toBe(false);
     expect(loaded.popoverBehavior).toEqual({
       autoCloseAfterApply: true,
       escapeCloses: true,
@@ -272,10 +304,61 @@ describe("v0.2.2  storage", () => {
 
     const saved = saveTriggerSettings(storage, {
       ...loaded,
-      paragraphHealthTrigger: "manual_only",
+      paragraphHealthTrigger: "after_paragraph_complete",
     });
-    expect(saved.paragraphHealthTrigger).toBe("manual_only");
-    expect(JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe("manual_only");
+    expect(saved.paragraphHealthTrigger).toBe("after_paragraph_complete");
+    expect(saved.documentMapAutoCheck).toBe("auto_idle");
+    expect(JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe("after_paragraph_complete");
+  });
+
+  it("normalizes document map auto check modes", () => {
+    const storage = createMemoryStorage({
+      [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        documentMapAutoCheck: "remind_only",
+      }),
+    });
+    expect(loadTriggerSettingsFromStorage(storage).documentMapAutoCheck).toBe("remind_only");
+
+    const invalid = createMemoryStorage({
+      [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        documentMapAutoCheck: "always",
+      }),
+    });
+    expect(loadTriggerSettingsFromStorage(invalid).documentMapAutoCheck).toBe("auto_idle");
+  });
+
+  it("migrates removed paragraph health triggers to enabled modes", () => {
+    const legacyThreeApply = createMemoryStorage({
+      [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        paragraphHealthTrigger: "after_3_applied_edits",
+      }),
+    });
+    expect(loadTriggerSettingsFromStorage(legacyThreeApply).paragraphHealthTrigger).toBe("after_paragraph_complete");
+    expect(JSON.parse(legacyThreeApply.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe(
+      "after_paragraph_complete",
+    );
+
+    for (const legacyTrigger of ["manual_only", "off"]) {
+      const storage = createMemoryStorage({
+        [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+          paragraphHealthTrigger: legacyTrigger,
+        }),
+      });
+      expect(loadTriggerSettingsFromStorage(storage).paragraphHealthTrigger).toBe("after_every_apply");
+      expect(JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe(
+        "after_every_apply",
+      );
+    }
+  });
+
+  it("migrates the removed legacy Ctrl/Cmd + J trigger to Ctrl/Cmd + Enter", () => {
+    const storage = createMemoryStorage({
+      [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
+        sentenceEnhancementShortcut: "ctrl_j_legacy",
+      }),
+    });
+
+    expect(loadTriggerSettingsFromStorage(storage).sentenceEnhancementShortcut).toBe("ctrl_enter");
   });
 });
 
@@ -601,6 +684,127 @@ describe("paragraph health cache", () => {
     const saved = JSON.parse(storage.getItem(PARAGRAPH_HEALTH_CACHE_STORAGE_KEY) ?? "[]") as ParagraphHealthCacheItem[];
     expect(saved).toHaveLength(20);
     expect(saved.filter((item) => item.paragraphFingerprint === "same")).toHaveLength(1);
+  });
+});
+
+describe("document map cache", () => {
+  const sampleRecord: DocumentMapCacheRecord = {
+    cacheKey: "archive-1|hash|topic|outline|education|model",
+    archiveId: "archive-1",
+    textHash: "hash",
+    essayTopic: "How exam pressure affects students",
+    outlinePointsHash: "outline",
+    essayTopicHash: "topic-hash",
+    paragraphFingerprints: [
+      {
+        paragraphId: "p1",
+        range: { start: 0, end: 40 },
+        hash: "paragraph-hash",
+        wordCount: 16,
+      },
+    ],
+    freshness: "ready",
+    generatedAt: "2026-05-17T00:00:00.000Z",
+    autoCheckCountInSession: 0,
+    domain: "education",
+    model: "model",
+    createdAt: "2026-05-17T00:00:00.000Z",
+    result: {
+      overallMainIdeaZh: "文章主要讨论考试压力对学生学习方式的影响。",
+      structureSummaryZh: "背景 -> 原因 -> 影响",
+      paragraphs: [
+        {
+          paragraphId: "p1",
+          index: 1,
+          range: { start: 0, end: 40 },
+          roleZh: "背景 + 立场",
+          mainPointZh: "提出考试压力影响学习方式。",
+          status: "healthy",
+          healthSummaryZh: "主旨清楚。",
+          relationToPreviousZh: null,
+          issueRefs: [],
+        },
+      ],
+      globalIssues: [],
+      nextActions: [],
+    },
+  };
+
+  it("stores document map cache records and replaces the same cache key", () => {
+    const storage = createMemoryStorage();
+    const first = upsertDocumentMapCache(storage, [], sampleRecord);
+    const second = upsertDocumentMapCache(storage, first, {
+      ...sampleRecord,
+      createdAt: "2026-05-17T00:01:00.000Z",
+      result: {
+        ...sampleRecord.result,
+        structureSummaryZh: "更新后的结构判断",
+      },
+    });
+
+    expect(second).toHaveLength(1);
+    expect(second[0].result.structureSummaryZh).toBe("更新后的结构判断");
+    expect(loadDocumentMapCache(storage)[0].createdAt).toBe("2026-05-17T00:01:00.000Z");
+  });
+
+  it("caps saved document map cache records to recent entries", () => {
+    const storage = createMemoryStorage();
+    const records = Array.from({ length: 26 }, (_, index): DocumentMapCacheRecord => ({
+      ...sampleRecord,
+      cacheKey: `cache-${index}`,
+      createdAt: `2026-05-17T00:${String(index).padStart(2, "0")}:00.000Z`,
+    }));
+
+    const saved = saveDocumentMapCache(storage, records);
+
+    expect(saved).toHaveLength(20);
+    expect(saved[0].cacheKey).toBe("cache-25");
+    expect(JSON.parse(storage.getItem(DOCUMENT_MAP_CACHE_STORAGE_KEY) ?? "[]")).toHaveLength(20);
+  });
+
+  it("loads legacy document map cache items without schema upgrades", () => {
+    const storage = createMemoryStorage({
+      [DOCUMENT_MAP_CACHE_STORAGE_KEY]: JSON.stringify([
+        {
+          cacheKey: "archive-legacy|hash|topic|outline|education|model",
+          archiveId: "archive-legacy",
+          textHash: "legacy-hash",
+          essayTopic: "Legacy topic",
+          outlinePointsHash: "legacy-outline",
+          domain: "education",
+          model: "gpt-4o-mini",
+          createdAt: "2026-05-16T00:00:00.000Z",
+          result: {
+            overallMainIdeaZh: "Legacy map summary",
+            structureSummaryZh: "Legacy structure",
+            paragraphs: [
+              {
+                paragraphId: "p1",
+                index: 1,
+                range: { start: 0, end: 1 },
+                roleZh: "背景",
+                mainPointZh: "Legacy main point",
+                status: "healthy",
+                healthSummaryZh: "Legacy status",
+                issueRefs: [],
+                relationToPreviousZh: null,
+              },
+            ],
+            globalIssues: [],
+            nextActions: [],
+          },
+        },
+      ]),
+    });
+
+    const loaded = loadDocumentMapCache(storage);
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({
+      cacheKey: "archive-legacy|hash|topic|outline|education|model",
+      freshness: "ready",
+    });
+    expect(loaded[0].paragraphFingerprints).toEqual([]);
   });
 });
 

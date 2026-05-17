@@ -8,6 +8,7 @@ import {
   buildFastEnhancementUserPrompt,
   buildEnhancementUserPrompt,
   buildLearningExtractionUserPrompt,
+  buildDocumentMapUserPrompt,
   buildOutlineCheckUserPrompt,
   buildParagraphHealthUserPrompt,
   buildParagraphFlowUserPrompt,
@@ -16,6 +17,7 @@ import {
   FAST_ENHANCEMENT_SYSTEM_PROMPT,
   LINGUATYPE_SYSTEM_PROMPT,
   LEARNING_EXTRACTION_SYSTEM_PROMPT,
+  DOCUMENT_MAP_SYSTEM_PROMPT,
   OUTLINE_CHECK_SYSTEM_PROMPT,
   PARAGRAPH_HEALTH_SYSTEM_PROMPT,
   PARAGRAPH_FLOW_SYSTEM_PROMPT,
@@ -26,6 +28,7 @@ import {
   normalizeEnhancementResult,
   normalizeFastEnhanceResult,
   normalizeLearningExtractionResult,
+  normalizeDocumentMapResult,
   normalizeOutlineCheckResult,
   normalizeParagraphCheckResult,
   normalizeParagraphHealthResult,
@@ -34,6 +37,7 @@ import {
 } from "../normalize";
 import {
   classifyWritingDomainResultSchema,
+  documentMapResultSchema,
   enhancementResultSchema,
   fastEnhanceModelResultSchema,
   fastEnhanceResultSchema,
@@ -45,6 +49,8 @@ import {
   type ApiConfig,
   type ClassifyWritingDomainInput,
   type ClassifyWritingDomainResult,
+  type DocumentMapInput,
+  type DocumentMapResult,
   type EnhanceLatestSentenceInput,
   type EnhanceLatestSentenceResult,
   type FastEnhanceInput,
@@ -251,6 +257,26 @@ export async function checkOutlineWithOpenAICompatibleProvider(
   }
 
   return normalizeOutlineCheckResult(validated.data);
+}
+
+export async function checkDocumentMapWithOpenAICompatibleProvider(
+  input: DocumentMapInput,
+): Promise<DocumentMapResult> {
+  const content = await requestOpenAICompatibleJson(
+    input.apiConfig,
+    DOCUMENT_MAP_SYSTEM_PROMPT,
+    buildDocumentMapUserPrompt(input),
+  );
+  const parsed = parseModelJson(content);
+  const validated = documentMapResultSchema.safeParse(extractEnhancementCandidate(parsed));
+  if (!validated.success) {
+    throw new InvalidModelSchemaError(
+      `Provider returned an invalid document map response shape: ${validated.error.message}`,
+      content,
+    );
+  }
+
+  return normalizeDocumentMapResult(validated.data, input);
 }
 
 export async function explainSelectionWithOpenAICompatibleProvider(

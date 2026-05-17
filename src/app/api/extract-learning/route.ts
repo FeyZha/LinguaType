@@ -1,5 +1,6 @@
 import { InvalidModelJsonError, InvalidModelSchemaError, redactApiKey } from "@/lib/json";
 import { normalizeLearningExtractionResult } from "@/lib/llm/normalize";
+import { resolveServerApiConfig } from "@/lib/llm/serverConfig";
 import { extractLearningWithLLM } from "@/lib/llm/service";
 import { learningExtractionRequestSchema, learningExtractionResultSchema } from "@/lib/llm/types";
 import { NextResponse } from "next/server";
@@ -10,8 +11,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const input = learningExtractionRequestSchema.parse(body);
-    apiKey = input.apiConfig.apiKey;
-    const result = await extractLearningWithLLM(input, input.apiConfig);
+    const apiConfig = resolveServerApiConfig(input.apiConfig);
+    const resolvedInput = { ...input, apiConfig };
+    apiKey = apiConfig.apiKey;
+    const result = await extractLearningWithLLM(resolvedInput, apiConfig);
     const normalized = normalizeLearningExtractionResult(result);
     return NextResponse.json(learningExtractionResultSchema.parse(normalized));
   } catch (error) {

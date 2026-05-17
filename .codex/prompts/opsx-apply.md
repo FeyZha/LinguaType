@@ -26,7 +26,7 @@ argument-hint: change name
 - 按 tasks 逐项执行。
 - 每完成一项，立即在 `tasks.md` 中把 `- [ ]` 改为 `- [x]`。
 - 改动必须最小化，符合 proposal/design/spec。
-- 对 LinguaType：不要破坏最新句主流程，不自动 Apply，不新增 cloud/database/login/payment，不把产品改成 chatbot 或 dashboard。
+- 对 LinguaType：不要破坏光标所在当前句主流程，不自动 Apply，不新增 cloud/database/login/payment，不把产品改成 chatbot 或 dashboard。
 - 文档和 specs 默认使用中文。
 
 ## CLI 优先

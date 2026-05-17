@@ -1,6 +1,8 @@
 import { containsChinese } from "@/lib/sentence";
 import type {
   ClassifyWritingDomainResult,
+  DocumentMapInput,
+  DocumentMapResult,
   FastEnhanceModelResult,
   FastEnhanceResult,
   LearningExtractionResult,
@@ -74,11 +76,13 @@ export function normalizeParagraphCheckResult(
   currentParagraph: string,
 ): ParagraphCheckResult {
   const revisedParagraph = result.revisedParagraph || currentParagraph;
+  const detailIssues = result.detailIssues ?? [];
   return {
     originalParagraph: currentParagraph,
     revisedParagraph,
-    hasIssues: result.issues.length > 0 || revisedParagraph !== currentParagraph,
+    hasIssues: result.issues.length > 0 || detailIssues.length > 0 || revisedParagraph !== currentParagraph,
     issues: result.issues,
+    detailIssues,
     summary: result.summary || "No paragraph flow issues found.",
   };
 }
@@ -117,6 +121,56 @@ export function normalizeOutlineCheckResult(result: OutlineCheckResult): Outline
   return {
     hasIssues: result.hasIssues && suggestionsZh.length > 0,
     suggestionsZh: result.hasIssues ? suggestionsZh : [],
+  };
+}
+
+export function normalizeDocumentMapResult(
+  result: DocumentMapResult,
+  input?: Pick<DocumentMapInput, "paragraphs">,
+): DocumentMapResult {
+  const inputParagraphs = input?.paragraphs ?? [];
+  const inputById = new Map(inputParagraphs.map((paragraph) => [paragraph.paragraphId, paragraph]));
+  const knownIssueIds = new Set(result.globalIssues.map((issue) => issue.id));
+  const paragraphs = result.paragraphs
+    .map((paragraph) => {
+      const source = inputById.get(paragraph.paragraphId);
+      return {
+        ...paragraph,
+        index: source?.index ?? paragraph.index,
+        range: source?.range ?? paragraph.range,
+        roleZh: paragraph.roleZh.trim() || "段落",
+        mainPointZh: paragraph.mainPointZh.trim() || "这一段的主旨还不够明确。",
+        healthSummaryZh: paragraph.healthSummaryZh.trim() || "未发现明显结构问题。",
+        relationToPreviousZh: paragraph.index <= 1 ? null : paragraph.relationToPreviousZh ?? null,
+        issueRefs: paragraph.issueRefs.filter((issueId) => knownIssueIds.has(issueId)),
+      };
+    })
+    .sort((first, second) => first.index - second.index);
+
+  const paragraphIds = new Set(paragraphs.map((paragraph) => paragraph.paragraphId));
+  const globalIssues = result.globalIssues
+    .map((issue) => ({
+      ...issue,
+      paragraphIds: issue.paragraphIds.filter((paragraphId) => paragraphIds.has(paragraphId)),
+      titleZh: issue.titleZh.trim(),
+      explanationZh: issue.explanationZh.trim(),
+      suggestionZh: issue.suggestionZh.trim(),
+    }))
+    .filter((issue) => issue.titleZh && issue.paragraphIds.length > 0)
+    .slice(0, 6);
+
+  return {
+    overallMainIdeaZh: result.overallMainIdeaZh.trim() || "文章主旨还不够明确。",
+    structureSummaryZh: result.structureSummaryZh.trim() || "结构关系还需要进一步确认。",
+    paragraphs,
+    globalIssues,
+    nextActions: result.nextActions
+      .map((action) => ({
+        targetParagraphIds: action.targetParagraphIds.filter((paragraphId) => paragraphIds.has(paragraphId)),
+        actionZh: action.actionZh.trim(),
+      }))
+      .filter((action) => action.actionZh)
+      .slice(0, 5),
   };
 }
 

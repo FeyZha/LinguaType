@@ -5,6 +5,7 @@ import type {
   CorrectionEventDraft,
   CorrectionEventType,
   CorrectionMemory,
+  DocumentMapCacheRecord,
   LearningItem,
   LearningItemDraft,
   LearningItemType,
@@ -15,7 +16,9 @@ import type {
   FastEnhanceResult,
   WritingHabitInsight,
 } from "./llm/types";
-import { normalizePersonalDictionary } from "./proofreading";
+import { documentMapCacheRecordSchema } from "./llm/types";
+import { createStableHash } from "./documentMap";
+import { normalizePersonalDictionary } from "./personalDictionary";
 import type { SentenceRange } from "./sentence";
 
 export const API_SETTINGS_STORAGE_KEY = "linguatype.apiSettings.v1";
@@ -23,6 +26,7 @@ export const LEARNING_HISTORY_STORAGE_KEY = "linguatype.learningHistory.v1";
 export const LEARNING_LIBRARY_STORAGE_KEY = "linguatype.learningLibrary.v1";
 export const CORRECTION_MEMORY_STORAGE_KEY = "linguatype.correctionMemory.v1";
 export const CORRECTION_EVENTS_STORAGE_KEY = "linguatype.correctionEvents.v1";
+export const DOCUMENT_MAP_CACHE_STORAGE_KEY = "linguatype.documentMapCache.v1";
 export const PARAGRAPH_HEALTH_CACHE_STORAGE_KEY = "linguatype.paragraphHealthCache.v1";
 export const TRIGGER_SETTINGS_STORAGE_KEY = "linguatype.triggerSettings.v1";
 export const PERSONAL_DICTIONARY_STORAGE_KEY = "linguatype.personalDictionary.v1";
@@ -33,6 +37,7 @@ export const THEME_SETTINGS_STORAGE_KEY = "linguatype.themeSettings.v1";
 export const PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY = "linguatype.placeholderSuggestionCache.v1";
 
 const MAX_PLACEHOLDER_SUGGESTION_CACHE_ENTRIES = 120;
+const MAX_DOCUMENT_MAP_CACHE_ENTRIES = 20;
 
 export type PlaceholderSuggestionCacheRange = SentenceRange & {
   placeholders: Array<{
@@ -119,9 +124,9 @@ export type ThemeSettings = {
 };
 
 export type TriggerSettings = {
-  sentenceEnhancementShortcut: "ctrl_enter" | "ctrl_j_legacy" | "button_only" | "disable_shortcut";
-  inlineExpressionMenuTrigger: "ctrl_k" | "floating_button" | "disabled";
-  paragraphHealthTrigger: "after_every_apply" | "after_3_applied_edits" | "manual_only" | "off";
+  sentenceEnhancementShortcut: "ctrl_enter" | "button_only";
+  paragraphHealthTrigger: "after_every_apply" | "after_paragraph_complete";
+  documentMapAutoCheck: "off" | "remind_only" | "auto_idle" | "manual_first";
   writingHabitsFeedback: "badge" | "manual_only";
   statusFeedbackStyle: "popover_footer" | "inline" | "toast";
   popoverBehavior: {
@@ -163,14 +168,15 @@ export function defaultApiSettings(): ApiConfig {
     maxTokens: 20000,
     supportsJsonMode: false,
     mockMode: false,
+    useServerApiKey: isPublicDemoApiEnabled(),
   };
 }
 
 export function defaultTriggerSettings(): TriggerSettings {
   return {
     sentenceEnhancementShortcut: "ctrl_enter",
-    inlineExpressionMenuTrigger: "ctrl_k",
     paragraphHealthTrigger: "after_every_apply",
+    documentMapAutoCheck: "auto_idle",
     writingHabitsFeedback: "badge",
     statusFeedbackStyle: "popover_footer",
     popoverBehavior: {
@@ -224,7 +230,9 @@ export function loadWritingArchivesFromStorage(
   const legacyText = storage.getItem(DRAFT_STORAGE_KEY) ?? "";
   const legacySetup = loadWritingSetupFromStorage(storage);
   if (!legacyText.trim() && !legacySetup) {
-    return { activeId: null, items: [] };
+    const demo = createDemoWritingArchive(options.now, options.createId);
+    storage.setItem(WRITING_ARCHIVES_STORAGE_KEY, JSON.stringify(demo));
+    return demo;
   }
 
   const now = options.now ?? new Date().toISOString();
@@ -269,7 +277,59 @@ export function saveThemeSettings(storage: StorageLike, settings: ThemeSettings)
 }
 
 export function loadTriggerSettingsFromStorage(storage: StorageLike): TriggerSettings {
-  return normalizeTriggerSettings(parseObject(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY)));
+  const stored = parseObject(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY));
+  const normalized = normalizeTriggerSettings(stored);
+  if (stored) {
+    storage.setItem(TRIGGER_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  }
+  return normalized;
+}
+
+function isPublicDemoApiEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_LINGUATYPE_DEMO_API_ENABLED === "true";
+}
+
+function createDemoWritingArchive(
+  now = new Date().toISOString(),
+  createId?: () => string,
+): WritingArchivesState {
+  const id = createId?.() ?? "linguatype-demo-archive";
+  const setup: WritingSetup = {
+    topicArea: "education",
+    essayTopic: "How students can build independent learning habits",
+    outlinePoints: [
+      "Explain why school pressure makes independent learning difficult.",
+      "Show how small routines and feedback loops help students keep learning.",
+      "Connect independent learning habits with long-term language growth.",
+    ],
+    outline: [
+      "Explain why school pressure makes independent learning difficult.",
+      "Show how small routines and feedback loops help students keep learning.",
+      "Connect independent learning habits with long-term language growth.",
+    ].join("\n"),
+    updatedAt: now,
+  };
+  const text = [
+    "Many students understand that independent learning is important, but they often do not know how to 把它落实到每天的行动中. In class, they can follow a teacher's plan, finish homework, and prepare for exams, yet their learning may stop as soon as the class ends. This makes English writing feel like a task that only happens under pressure.",
+    "A better habit starts with a small and repeatable routine. For example, a student can spend ten minutes after each lesson rewriting one confusing sentence, saving a useful expression, and asking why the revised sentence sounds more natural. This routine is not dramatic, but it turns passive correction into active noticing.",
+    "Technology can support this process when it stays close to the writing moment. If a learner writes, I cannot clearly 表达这个观点 in English, an assistant can help convert that mixed sentence into a natural English sentence without replacing the whole paragraph. The learner still owns the idea, compares the difference, and decides whether to apply the suggestion.",
+    "Independent learning also needs a broader view of the article. After several paragraphs are drafted, a structure map can show whether the main idea is clear, whether two paragraphs repeat the same point, and which paragraph should be checked first. In this way, students do not simply chase perfect sentences; they learn how sentences, paragraphs, and the whole article work together.",
+  ].join("\n\n");
+
+  return {
+    activeId: id,
+    items: [
+      {
+        id,
+        title: "体验示例：Independent learning habits",
+        text,
+        setup,
+        createdAt: now,
+        updatedAt: now,
+        lastOpenedAt: now,
+      },
+    ],
+  };
 }
 
 export function saveTriggerSettings(storage: StorageLike, settings: TriggerSettings): TriggerSettings {
@@ -575,6 +635,39 @@ export function saveParagraphHealthCache(
   return normalized;
 }
 
+export function loadDocumentMapCache(storage: StorageLike): DocumentMapCacheRecord[] {
+  return normalizeDocumentMapCache(parseArray(storage.getItem(DOCUMENT_MAP_CACHE_STORAGE_KEY)));
+}
+
+export function saveDocumentMapCache(
+  storage: StorageLike,
+  items: DocumentMapCacheRecord[],
+): DocumentMapCacheRecord[] {
+  const normalized = normalizeDocumentMapCache(items);
+  storage.setItem(DOCUMENT_MAP_CACHE_STORAGE_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+export function upsertDocumentMapCache(
+  storage: StorageLike,
+  current: DocumentMapCacheRecord[],
+  incoming: DocumentMapCacheRecord,
+): DocumentMapCacheRecord[] {
+  const next = new Map(current.map((item) => [item.cacheKey, item]));
+  const existing = next.get(incoming.cacheKey);
+  if (!existing || incoming.createdAt >= existing.createdAt) {
+    next.set(incoming.cacheKey, incoming);
+  }
+  return saveDocumentMapCache(storage, Array.from(next.values()));
+}
+
+export function lookupDocumentMapCache(
+  storageItems: DocumentMapCacheRecord[],
+  cacheKey: string,
+): DocumentMapCacheRecord | undefined {
+  return storageItems.find((item) => item.cacheKey === cacheKey);
+}
+
 export function loadPlaceholderSuggestionCache(storage: StorageLike): PlaceholderSuggestionCacheRecord[] {
   return normalizePlaceholderSuggestionCache(parseArray(storage.getItem(PLACEHOLDER_SUGGESTION_CACHE_STORAGE_KEY)));
 }
@@ -704,15 +797,17 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
   const defaults = defaultTriggerSettings();
   const popoverBehavior = isRecord(value?.popoverBehavior) ? value.popoverBehavior : {};
   return {
-    sentenceEnhancementShortcut: isSentenceEnhancementShortcut(value?.sentenceEnhancementShortcut)
-      ? value.sentenceEnhancementShortcut
-      : defaults.sentenceEnhancementShortcut,
-    inlineExpressionMenuTrigger: isInlineExpressionMenuTrigger(value?.inlineExpressionMenuTrigger)
-      ? value.inlineExpressionMenuTrigger
-      : defaults.inlineExpressionMenuTrigger,
-    paragraphHealthTrigger: isParagraphHealthTrigger(value?.paragraphHealthTrigger)
-      ? value.paragraphHealthTrigger
-      : defaults.paragraphHealthTrigger,
+    sentenceEnhancementShortcut: normalizeSentenceEnhancementShortcut(
+      value?.sentenceEnhancementShortcut,
+      defaults.sentenceEnhancementShortcut,
+    ),
+    paragraphHealthTrigger: normalizeParagraphHealthTrigger(
+      value?.paragraphHealthTrigger,
+      defaults.paragraphHealthTrigger,
+    ),
+    documentMapAutoCheck: isDocumentMapAutoCheckMode(value?.documentMapAutoCheck)
+      ? value.documentMapAutoCheck
+      : defaults.documentMapAutoCheck,
     writingHabitsFeedback: isWritingHabitsFeedback(value?.writingHabitsFeedback)
       ? value.writingHabitsFeedback
       : defaults.writingHabitsFeedback,
@@ -909,6 +1004,36 @@ function normalizeParagraphHealthCache(
   return Array.from(byFingerprint.values())
     .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))
     .slice(0, 20);
+}
+
+function normalizeDocumentMapCache(
+  items: Array<Record<string, unknown> | DocumentMapCacheRecord>,
+): DocumentMapCacheRecord[] {
+  const byCacheKey = new Map<string, DocumentMapCacheRecord>();
+
+  for (const item of items) {
+    const parsed = documentMapCacheRecordSchema.safeParse(item);
+    if (!parsed.success) {
+      continue;
+    }
+    const normalized: DocumentMapCacheRecord = {
+      ...parsed.data,
+      essayTopicHash: parsed.data.essayTopicHash ?? createStableHash(parsed.data.essayTopic.trim()),
+      outlineHash: parsed.data.outlineHash ?? parsed.data.outlinePointsHash,
+      generatedAt: parsed.data.generatedAt ?? parsed.data.createdAt,
+      paragraphFingerprints: parsed.data.paragraphFingerprints ?? [],
+      freshness: parsed.data.freshness ?? "ready",
+      autoCheckCountInSession: parsed.data.autoCheckCountInSession ?? 0,
+    };
+    const match = byCacheKey.get(normalized.cacheKey);
+    if (!match || normalized.createdAt >= match.createdAt) {
+      byCacheKey.set(normalized.cacheKey, normalized);
+    }
+  }
+
+  return Array.from(byCacheKey.values())
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, MAX_DOCUMENT_MAP_CACHE_ENTRIES);
 }
 
 function normalizePlaceholderSuggestionCache(
@@ -1147,16 +1272,42 @@ function isParagraphIssueType(value: unknown): value is ParagraphIssueType {
   );
 }
 
-function isSentenceEnhancementShortcut(value: unknown): value is TriggerSettings["sentenceEnhancementShortcut"] {
-  return value === "ctrl_enter" || value === "ctrl_j_legacy" || value === "button_only" || value === "disable_shortcut";
+function normalizeSentenceEnhancementShortcut(
+  value: unknown,
+  fallback: TriggerSettings["sentenceEnhancementShortcut"],
+): TriggerSettings["sentenceEnhancementShortcut"] {
+  if (value === "ctrl_j_legacy") {
+    return "ctrl_enter";
+  }
+  if (value === "disable_shortcut") {
+    return "button_only";
+  }
+  return isSentenceEnhancementShortcut(value) ? value : fallback;
 }
 
-function isInlineExpressionMenuTrigger(value: unknown): value is TriggerSettings["inlineExpressionMenuTrigger"] {
-  return value === "ctrl_k" || value === "floating_button" || value === "disabled";
+function isSentenceEnhancementShortcut(value: unknown): value is TriggerSettings["sentenceEnhancementShortcut"] {
+  return value === "ctrl_enter" || value === "button_only";
 }
 
 function isParagraphHealthTrigger(value: unknown): value is TriggerSettings["paragraphHealthTrigger"] {
-  return value === "after_every_apply" || value === "after_3_applied_edits" || value === "manual_only" || value === "off";
+  return value === "after_every_apply" || value === "after_paragraph_complete";
+}
+
+function isDocumentMapAutoCheckMode(value: unknown): value is TriggerSettings["documentMapAutoCheck"] {
+  return value === "off" || value === "remind_only" || value === "auto_idle" || value === "manual_first";
+}
+
+function normalizeParagraphHealthTrigger(
+  value: unknown,
+  fallback: TriggerSettings["paragraphHealthTrigger"],
+): TriggerSettings["paragraphHealthTrigger"] {
+  if (value === "after_3_applied_edits") {
+    return "after_paragraph_complete";
+  }
+  if (value === "manual_only" || value === "off") {
+    return "after_every_apply";
+  }
+  return isParagraphHealthTrigger(value) ? value : fallback;
 }
 
 function isWritingHabitsFeedback(value: unknown): value is TriggerSettings["writingHabitsFeedback"] {

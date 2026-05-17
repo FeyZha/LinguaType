@@ -36,7 +36,7 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
 
   function update(next: Partial<TriggerSettings>, label: string) {
     onChange({ ...settings, ...next });
-    showMessage(`已更新${label}。`);
+    showMessage(`设置已更新：${label}`);
   }
 
   function updatePopoverBehavior(next: Partial<TriggerSettings["popoverBehavior"]>, label: string) {
@@ -44,119 +44,116 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
       ...settings,
       popoverBehavior: { ...settings.popoverBehavior, ...next },
     });
-    showMessage(`已更新${label}。`);
+    showMessage(`设置已更新：${label}`);
   }
 
   return (
     <section className="text-[var(--lt-text)]">
       <h2 className="text-base font-semibold">触发设置</h2>
       <p className="mt-1 text-xs leading-5 text-[var(--lt-muted)]">
-        触发设置为本地配置，修改后立即生效并保存草稿，不会直接请求 LLM。
+        触发设置仅控制提示时机，不会发起额外模型调用，保存后立即生效。
       </p>
 
       <div className="mt-5 space-y-4">
-        <SoftSelect label="句子增强方式" htmlFor="sentence-trigger">
+        <SoftSelect label="句子增强触发模式" htmlFor="sentence-trigger">
           <DesignSelect
             id="sentence-trigger"
-            aria-label="句子增强触发方式"
+            aria-label="句子增强触发模式"
             value={settings.sentenceEnhancementShortcut}
             onChange={(event) =>
               update(
                 {
                   sentenceEnhancementShortcut: event.target.value as TriggerSettings["sentenceEnhancementShortcut"],
                 },
-                "句子增强触发方式",
+                "句子增强触发模式",
               )
             }
             wrapperClassName="w-full"
           >
             <option value="ctrl_enter">Ctrl/Cmd + Enter</option>
-            <option value="ctrl_j_legacy">Ctrl/Cmd + J（传统）</option>
             <option value="button_only">按钮触发</option>
-            <option value="disable_shortcut">关闭快捷键</option>
           </DesignSelect>
         </SoftSelect>
 
-        <SoftSelect label="表达菜单触发方式" htmlFor="expression-trigger">
-          <DesignSelect
-            id="expression-trigger"
-            aria-label="表达菜单触发方式"
-            value={settings.inlineExpressionMenuTrigger}
-            onChange={(event) =>
-              update(
-                {
-                  inlineExpressionMenuTrigger: event.target.value as TriggerSettings["inlineExpressionMenuTrigger"],
-                },
-                "表达菜单触发方式",
-              )
-            }
-            wrapperClassName="w-full"
-          >
-            <option value="ctrl_k">Ctrl/Cmd + K</option>
-            <option value="floating_button">悬浮按钮</option>
-            <option value="disabled">关闭</option>
-          </DesignSelect>
-        </SoftSelect>
-
-        <SoftSelect label="段落健康触发方式" htmlFor="paragraph-health-trigger">
+        <SoftSelect label="段落健康触发模式" htmlFor="paragraph-health-trigger">
           <DesignSelect
             id="paragraph-health-trigger"
-            aria-label="段落健康触发方式"
+            aria-label="段落健康触发模式"
             value={settings.paragraphHealthTrigger}
             onChange={(event) =>
               update(
                 {
                   paragraphHealthTrigger: event.target.value as TriggerSettings["paragraphHealthTrigger"],
                 },
-                "段落健康触发方式",
+                "段落健康触发模式",
               )
             }
             wrapperClassName="w-full"
           >
             <option value="after_every_apply">每次应用后</option>
-            <option value="after_3_applied_edits">每三次应用后</option>
-            <option value="manual_only">仅手动</option>
+            <option value="after_paragraph_complete">段落完成后</option>
+          </DesignSelect>
+        </SoftSelect>
+
+        <SoftSelect label="文章地图自动检查" htmlFor="document-map-auto-check">
+          <DesignSelect
+            id="document-map-auto-check"
+            aria-label="文章地图自动检查模式"
+            value={settings.documentMapAutoCheck}
+            onChange={(event) =>
+              update(
+                {
+                  documentMapAutoCheck: event.target.value as TriggerSettings["documentMapAutoCheck"],
+                },
+                "文章地图自动检查",
+              )
+            }
+            wrapperClassName="w-full"
+          >
             <option value="off">关闭</option>
+            <option value="remind_only">仅提醒</option>
+            <option value="auto_idle">安静时预检查</option>
+            <option value="manual_first">手动优先</option>
           </DesignSelect>
         </SoftSelect>
 
         <div className="space-y-2 text-sm text-[var(--lt-muted)]">
           <SoftCheckbox
             checked={settings.popoverBehavior.autoCloseAfterApply}
-            onChange={(checked) => updatePopoverBehavior({ autoCloseAfterApply: checked }, "应用后自动关闭弹层")}
+            onChange={(checked) => updatePopoverBehavior({ autoCloseAfterApply: checked }, "应用后自动关闭")}
           >
-            应用后自动关闭弹层
+            应用后自动关闭弹窗
           </SoftCheckbox>
           <SoftCheckbox
             checked={settings.popoverBehavior.suppressLargePanelAutoOpen}
             onChange={(checked) =>
               updatePopoverBehavior(
                 { suppressLargePanelAutoOpen: checked },
-                "关闭时抑制大面板自动弹出",
+                "关闭大面板自动弹出",
               )
             }
           >
-            关闭时抑制大面板自动弹出
+            关闭大面板自动弹出
           </SoftCheckbox>
         </div>
 
-        <SoftSelect label="写作习惯反馈方式" htmlFor="writing-habits-feedback">
+        <SoftSelect label="写作习惯反馈" htmlFor="writing-habits-feedback">
           <DesignSelect
             id="writing-habits-feedback"
-            aria-label="写作习惯反馈方式"
+            aria-label="写作习惯反馈"
             value={settings.writingHabitsFeedback}
             onChange={(event) =>
               update(
                 {
                   writingHabitsFeedback: event.target.value as TriggerSettings["writingHabitsFeedback"],
                 },
-                "写作习惯反馈方式",
+                "写作习惯反馈",
               )
             }
             wrapperClassName="w-full"
           >
-            <option value="badge">徽标提示</option>
-            <option value="manual_only">仅手动</option>
+            <option value="badge">徽标</option>
+            <option value="manual_only">仅手动查看</option>
           </DesignSelect>
         </SoftSelect>
       </div>
@@ -183,7 +180,11 @@ function SoftCheckbox({
   checked,
   onChange,
   children,
-}: { checked: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: ReactNode;
+}) {
   return (
     <label className="flex items-center gap-2 rounded-md px-0.5 py-1">
       <input

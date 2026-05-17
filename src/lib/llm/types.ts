@@ -131,6 +131,7 @@ export const apiConfigSchema = z.object({
   maxTokens: z.number().int().positive().optional().default(900),
   supportsJsonMode: z.boolean().optional().default(false),
   mockMode: z.boolean().optional().default(false),
+  useServerApiKey: z.boolean().optional(),
 });
 export type ApiConfig = z.infer<typeof apiConfigSchema>;
 
@@ -242,11 +243,33 @@ export const paragraphIssueSchema = z.object({
 });
 export type ParagraphIssue = z.infer<typeof paragraphIssueSchema>;
 
+export const paragraphDetailIssueTypeSchema = z.enum([
+  "grammar",
+  "spelling",
+  "punctuation",
+  "article",
+  "tense",
+  "word_form",
+  "preposition",
+  "collocation",
+  "spacing",
+]);
+export type ParagraphDetailIssueType = z.infer<typeof paragraphDetailIssueTypeSchema>;
+
+export const paragraphDetailIssueSchema = z.object({
+  type: paragraphDetailIssueTypeSchema,
+  original: z.string(),
+  suggestion: z.string(),
+  reason: z.string(),
+});
+export type ParagraphDetailIssue = z.infer<typeof paragraphDetailIssueSchema>;
+
 export const paragraphCheckResultSchema = z.object({
   originalParagraph: z.string(),
   revisedParagraph: z.string(),
   hasIssues: z.boolean(),
   issues: z.array(paragraphIssueSchema),
+  detailIssues: z.array(paragraphDetailIssueSchema).optional().default([]),
   summary: z.string(),
 });
 export type ParagraphCheckResult = z.infer<typeof paragraphCheckResultSchema>;
@@ -311,6 +334,135 @@ export const outlineCheckResultSchema = z.object({
   suggestionsZh: z.array(z.string()),
 });
 export type OutlineCheckResult = z.infer<typeof outlineCheckResultSchema>;
+
+export const documentMapParagraphRangeSchema = z.object({
+  start: z.number().int().nonnegative(),
+  end: z.number().int().nonnegative(),
+}).strict();
+export type DocumentMapParagraphRange = z.infer<typeof documentMapParagraphRangeSchema>;
+
+export const documentMapParagraphInputSchema = z.object({
+  paragraphId: z.string().min(1),
+  index: z.number().int().positive(),
+  range: documentMapParagraphRangeSchema,
+  text: z.string(),
+  hash: z.string().optional(),
+  wordCount: z.number().nonnegative().int().optional(),
+}).strict();
+export type DocumentMapParagraphInput = z.infer<typeof documentMapParagraphInputSchema>;
+
+export const documentMapParagraphFingerprintSchema = z.object({
+  paragraphId: z.string().min(1),
+  range: documentMapParagraphRangeSchema,
+  hash: z.string(),
+  wordCount: z.number().int().nonnegative(),
+}).strict();
+export type DocumentMapParagraphFingerprint = z.infer<typeof documentMapParagraphFingerprintSchema>;
+
+export const documentMapParagraphStatusSchema = z.enum([
+  "healthy",
+  "has_suggestions",
+  "needs_attention",
+  "weak_connection",
+  "repeated",
+  "insufficient_response",
+]);
+export type DocumentMapParagraphStatus = z.infer<typeof documentMapParagraphStatusSchema>;
+
+export const documentMapIssueTypeSchema = z.enum([
+  "main_idea_drift",
+  "repetition",
+  "jump",
+  "weak_transition",
+  "unclear_progression",
+  "insufficient_topic_response",
+]);
+export type DocumentMapIssueType = z.infer<typeof documentMapIssueTypeSchema>;
+
+export const documentMapIssueSeveritySchema = z.enum(["low", "medium", "high"]);
+export type DocumentMapIssueSeverity = z.infer<typeof documentMapIssueSeveritySchema>;
+
+export const documentMapParagraphSchema = z.object({
+  paragraphId: z.string().min(1),
+  index: z.number().int().positive(),
+  range: documentMapParagraphRangeSchema,
+  roleZh: z.string(),
+  mainPointZh: z.string(),
+  status: documentMapParagraphStatusSchema,
+  healthSummaryZh: z.string(),
+  relationToPreviousZh: z.string().nullable().optional().default(null),
+  issueRefs: z.array(z.string()).optional().default([]),
+}).strict();
+export type DocumentMapParagraph = z.infer<typeof documentMapParagraphSchema>;
+
+export const documentMapGlobalIssueSchema = z.object({
+  id: z.string().min(1),
+  type: documentMapIssueTypeSchema,
+  severity: documentMapIssueSeveritySchema,
+  titleZh: z.string(),
+  paragraphIds: z.array(z.string()),
+  explanationZh: z.string(),
+  suggestionZh: z.string(),
+}).strict();
+export type DocumentMapGlobalIssue = z.infer<typeof documentMapGlobalIssueSchema>;
+
+export const documentMapNextActionSchema = z.object({
+  targetParagraphIds: z.array(z.string()),
+  actionZh: z.string(),
+}).strict();
+export type DocumentMapNextAction = z.infer<typeof documentMapNextActionSchema>;
+
+export const documentMapResultSchema = z.object({
+  overallMainIdeaZh: z.string(),
+  structureSummaryZh: z.string(),
+  paragraphs: z.array(documentMapParagraphSchema),
+  globalIssues: z.array(documentMapGlobalIssueSchema),
+  nextActions: z.array(documentMapNextActionSchema),
+}).strict();
+export type DocumentMapResult = z.infer<typeof documentMapResultSchema>;
+
+export const documentMapRequestSchema = z.object({
+  text: z.string(),
+  essayTopic: z.string().optional().default(""),
+  outlinePoints: z.array(z.string()).optional().default([]),
+  domain: z.string().optional().default("custom"),
+  writingMode: writingModeSchema,
+  paragraphs: z.array(documentMapParagraphInputSchema).min(2),
+  trigger: z.enum(["manual", "auto_idle", "after_apply", "after_outline_change"]).default("manual"),
+  apiConfig: apiConfigSchema,
+});
+export type DocumentMapInput = z.infer<typeof documentMapRequestSchema>;
+
+export const documentMapFreshnessSchema = z.enum([
+  "empty",
+  "fresh",
+  "stale",
+  "needs_check",
+  "checking",
+  "ready",
+  "failed",
+]);
+export type DocumentMapFreshness = z.infer<typeof documentMapFreshnessSchema>;
+
+export const documentMapCacheRecordSchema = z.object({
+  cacheKey: z.string().min(1),
+  archiveId: z.string().nullable(),
+  textHash: z.string().min(1),
+  essayTopic: z.string(),
+  essayTopicHash: z.string().optional(),
+  outlinePointsHash: z.string().optional(),
+  outlineHash: z.string().optional(),
+  paragraphFingerprints: z.array(documentMapParagraphFingerprintSchema).default([]),
+  domain: z.string(),
+  model: z.string(),
+  createdAt: z.string(),
+  generatedAt: z.string().optional(),
+  freshness: documentMapFreshnessSchema.default("ready"),
+  lastAutoCheckedAt: z.string().optional(),
+  autoCheckCountInSession: z.number().int().nonnegative().default(0),
+  result: documentMapResultSchema,
+}).strict();
+export type DocumentMapCacheRecord = z.infer<typeof documentMapCacheRecordSchema>;
 
 export const writingDomainSchema = z.enum([
   "technology",
