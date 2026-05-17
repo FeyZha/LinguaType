@@ -458,6 +458,7 @@ describe("WritingEditor native long-text input", () => {
 
     const statusBar = screen.getByRole("contentinfo");
     expect(statusBar).toHaveClass("fixed", "bottom-0");
+    expect(statusBar.className).not.toMatch(/\bshadow-/u);
     expect(statusBar).toHaveTextContent("文章地图");
     expect(screen.getByRole("button", { name: /检查文章地图|文章地图 · /u })).toBeInTheDocument();
     expect(statusBar).not.toHaveTextContent("文本校对");

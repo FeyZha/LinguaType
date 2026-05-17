@@ -1083,7 +1083,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         <footer
           aria-label="写作状态栏"
           data-status-layout="balanced-editorial"
-          className="fixed bottom-0 right-0 z-40 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)] shadow-[0_-1px_10px_var(--lt-shadow)] xl:left-[var(--lt-sidebar-width,320px)]"
+          className="fixed bottom-0 right-0 z-40 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)] xl:left-[var(--lt-sidebar-width,320px)]"
         >
           <div
             aria-label="写作状态栏左侧"
