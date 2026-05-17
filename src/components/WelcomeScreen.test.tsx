@@ -16,18 +16,13 @@ describe("WelcomeScreen", () => {
   it("uses visible brand assets for the resolved theme", () => {
     const { container, rerender } = render(<WelcomeScreen theme="light" onStart={vi.fn()} />);
 
-    expect(container.querySelector("[data-welcome-brand-mark]")).toHaveAttribute(
-      "src",
-      "/brand/linguatype-mark-light.png",
-    );
+    expect(container.querySelector("[data-welcome-brand-mark]")).not.toBeInTheDocument();
     expect(screen.getByAltText("LinguaType")).toHaveAttribute("src", "/brand/linguatype-wordmark-light.png");
+    expect(screen.getByAltText("LinguaType")).toHaveClass("h-16");
 
     rerender(<WelcomeScreen theme="dark" onStart={vi.fn()} />);
 
-    expect(container.querySelector("[data-welcome-brand-mark]")).toHaveAttribute(
-      "src",
-      "/brand/linguatype-mark-dark.png",
-    );
+    expect(container.querySelector("[data-welcome-brand-mark]")).not.toBeInTheDocument();
     expect(screen.getByAltText("LinguaType")).toHaveAttribute("src", "/brand/linguatype-wordmark-dark.png");
   });
 
@@ -38,7 +33,7 @@ describe("WelcomeScreen", () => {
     expect(screen.getByText("产品定位")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "围绕中文母语者的英文写作过程，提供中英文混合改写、英文句子润色、修改差异解释、表达沉淀、写作存档与文章地图检查；模型输出始终先作为建议呈现，由用户确认后再应用。",
+        "把中文思路稳稳写成自然英文。LinguaType 像贴在光标旁的写作搭档：卡住时帮你把中英混合句改顺，写完后带你看清每一次修改，沉淀可复用表达，再用文章地图检查全文结构。",
       ),
     ).toBeInTheDocument();
 

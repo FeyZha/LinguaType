@@ -83,17 +83,10 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
           <div>
             <div data-welcome-brand className="flex items-center gap-3 opacity-0">
               <img
-                src={`/brand/linguatype-mark-${theme}.png`}
-                alt=""
-                data-welcome-brand-mark
-                draggable={false}
-                className="h-11 w-11 select-none rounded-md object-contain ring-1 ring-[var(--lt-border)]"
-              />
-              <img
                 src={`/brand/linguatype-wordmark-${theme}.png`}
                 alt="LinguaType"
                 draggable={false}
-                className="h-10 w-[220px] select-none object-contain object-left"
+                className="h-16 w-[300px] select-none object-contain object-left"
               />
             </div>
             <div data-welcome-rule className="mt-5 h-px w-full bg-[var(--lt-border)]" />
@@ -104,7 +97,7 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
                 面向中文母语者的英文写作辅助工具
               </h1>
               <p className="mt-6 max-w-[760px] text-[18px] leading-8 text-[var(--lt-muted)]">
-                围绕中文母语者的英文写作过程，提供中英文混合改写、英文句子润色、修改差异解释、表达沉淀、写作存档与文章地图检查；模型输出始终先作为建议呈现，由用户确认后再应用。
+                把中文思路稳稳写成自然英文。LinguaType 像贴在光标旁的写作搭档：卡住时帮你把中英混合句改顺，写完后带你看清每一次修改，沉淀可复用表达，再用文章地图检查全文结构。
               </p>
             </div>
           </div>
@@ -168,7 +161,7 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
               </ol>
             </div>
             <p className="rounded-md bg-white/[0.06] px-3 py-2 text-xs leading-5 text-[#a09d96]">
-              示例文档只写入本机浏览器存档，不保存学习数据，也不会自动改写正文。
+              示例文档只写入本机浏览器；建议、解释和文章地图已预置，仍不会自动改写正文。
             </p>
           </div>
         </aside>

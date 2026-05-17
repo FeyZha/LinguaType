@@ -17,6 +17,7 @@ import type {
   WritingHabitInsight,
 } from "./llm/types";
 import { documentMapCacheRecordSchema } from "./llm/types";
+import { createDemoWritingArchive } from "./demoArchive";
 import { createStableHash } from "./documentMap";
 import { normalizePersonalDictionary } from "./personalDictionary";
 import type { SentenceRange } from "./sentence";
@@ -291,49 +292,6 @@ export function loadTriggerSettingsFromStorage(storage: StorageLike): TriggerSet
 
 function isPublicDemoApiEnabled(): boolean {
   return process.env.NEXT_PUBLIC_LINGUATYPE_DEMO_API_ENABLED === "true";
-}
-
-function createDemoWritingArchive(
-  now = new Date().toISOString(),
-  createId?: () => string,
-): WritingArchivesState {
-  const id = createId?.() ?? "linguatype-demo-archive";
-  const setup: WritingSetup = {
-    topicArea: "education",
-    essayTopic: "How students can build independent learning habits",
-    outlinePoints: [
-      "Explain why school pressure makes independent learning difficult.",
-      "Show how small routines and feedback loops help students keep learning.",
-      "Connect independent learning habits with long-term language growth.",
-    ],
-    outline: [
-      "Explain why school pressure makes independent learning difficult.",
-      "Show how small routines and feedback loops help students keep learning.",
-      "Connect independent learning habits with long-term language growth.",
-    ].join("\n"),
-    updatedAt: now,
-  };
-  const text = [
-    "Many students understand that independent learning is important, but they often do not know how to 把它落实到每天的行动中. In class, they can follow a teacher's plan, finish homework, and prepare for exams, yet their learning may stop as soon as the class ends. This makes English writing feel like a task that only happens under pressure.",
-    "A better habit starts with a small and repeatable routine. For example, a student can spend ten minutes after each lesson rewriting one confusing sentence, saving a useful expression, and asking why the revised sentence sounds more natural. This routine is not dramatic, but it turns passive correction into active noticing.",
-    "Technology can support this process when it stays close to the writing moment. If a learner writes, I cannot clearly 表达这个观点 in English, an assistant can help convert that mixed sentence into a natural English sentence without replacing the whole paragraph. The learner still owns the idea, compares the difference, and decides whether to apply the suggestion.",
-    "Independent learning also needs a broader view of the article. After several paragraphs are drafted, a structure map can show whether the main idea is clear, whether two paragraphs repeat the same point, and which paragraph should be checked first. In this way, students do not simply chase perfect sentences; they learn how sentences, paragraphs, and the whole article work together.",
-  ].join("\n\n");
-
-  return {
-    activeId: id,
-    items: [
-      {
-        id,
-        title: "体验示例：Independent learning habits",
-        text,
-        setup,
-        createdAt: now,
-        updatedAt: now,
-        lastOpenedAt: now,
-      },
-    ],
-  };
 }
 
 export function saveTriggerSettings(storage: StorageLike, settings: TriggerSettings): TriggerSettings {

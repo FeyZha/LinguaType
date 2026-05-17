@@ -54,6 +54,18 @@ import {
   type SentenceRange,
   type ChinesePlaceholderSentenceRange,
 } from "@/lib/sentence";
+import {
+  createDemoDocumentMapCache,
+  createDemoParagraphHealthCache,
+  createDemoPlaceholderSuggestionCache,
+  getDemoEnhancementResult,
+  getDemoLearningExtractionResult,
+  getDemoParagraphHealthResult,
+  getDemoParagraphFlowResult,
+  getDemoSelectionExplainResult,
+  isDemoArchiveContext,
+  isDemoWritingArchive,
+} from "@/lib/demoArchive";
 import { findExpressionReappearanceCues } from "@/lib/expressionReappearance";
 import {
   createDocumentMapCacheKey,
@@ -454,8 +466,12 @@ export function LinguaTypeApp() {
     setWritingSetup(activeSetup);
     setThemeSettings(loadThemeSettingsFromStorage(localStorage));
     const storedSettings = localStorage.getItem(API_SETTINGS_STORAGE_KEY);
-    if (storedSettings) {
-      setApiSettings({ ...defaultApiSettings(), ...(JSON.parse(storedSettings) as Partial<ApiConfig>), mockMode: false });
+    const hydratedApiSettings = storedSettings
+      ? { ...defaultApiSettings(), ...(JSON.parse(storedSettings) as Partial<ApiConfig>), mockMode: false }
+      : defaultApiSettings();
+    setApiSettings(hydratedApiSettings);
+    if (activeArchive && isDemoWritingArchive(activeArchive)) {
+      seedDemoExperienceCaches(activeArchive, hydratedApiSettings);
     }
     setLearningLibrary(loadLearningLibraryFromStorage(localStorage));
     setCorrectionEvents(loadCorrectionEventsFromStorage(localStorage));
@@ -517,6 +533,24 @@ export function LinguaTypeApp() {
       return next;
     });
   }, [isHydrated, text, writingSetup, writingArchives.activeId]);
+
+  function seedDemoExperienceCaches(archive: WritingArchiveItem, demoApiSettings: ApiConfig) {
+    let nextPlaceholderCache = loadPlaceholderSuggestionCache(localStorage);
+    for (const record of createDemoPlaceholderSuggestionCache(archive.id)) {
+      nextPlaceholderCache = upsertPlaceholderSuggestionCache(localStorage, nextPlaceholderCache, record);
+    }
+
+    upsertDocumentMapCache(
+      localStorage,
+      loadDocumentMapCache(localStorage),
+      createDemoDocumentMapCache(demoApiSettings, archive.id),
+    );
+
+    saveParagraphHealthCache(localStorage, [
+      ...loadParagraphHealthCache(localStorage),
+      ...createDemoParagraphHealthCache(),
+    ]);
+  }
 
   useEffect(() => {
     if (!isHydrated) {
@@ -818,6 +852,7 @@ export function LinguaTypeApp() {
     () => writingArchives.items.find((item) => item.id === writingArchives.activeId) ?? null,
     [writingArchives],
   );
+  const activeArchiveIsDemo = isDemoArchiveContext({ archive: activeArchive, text });
 
   function getPlaceholderDomain(setup: WritingSetup | null): string {
     if (setup?.topicArea === "custom") {
@@ -1760,6 +1795,13 @@ export function LinguaTypeApp() {
   async function requestEnhancement(
     requestInput: Omit<FastEnhanceInput, "apiConfig">,
   ): Promise<FastEnhanceResult> {
+    if (activeArchiveIsDemo) {
+      const demoResult = getDemoEnhancementResult(requestInput.latestSentence);
+      if (demoResult) {
+        return demoResult;
+      }
+    }
+
     const response = await fetch("/api/enhance-fast", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1939,7 +1981,8 @@ export function LinguaTypeApp() {
       return;
     }
 
-    if (!ensureApiSettings()) {
+    const canUseDemoEnhancement = activeArchiveIsDemo && Boolean(getDemoEnhancementResult(range.sentence));
+    if (!canUseDemoEnhancement && !ensureApiSettings()) {
       setStatusMessage("");
       return;
     }
@@ -2097,6 +2140,16 @@ export function LinguaTypeApp() {
     currentParagraph: string,
   ) {
     try {
+      const demoExtraction = activeArchiveIsDemo
+        ? getDemoLearningExtractionResult(applied.originalSentence, applied.result.finalSentence)
+        : null;
+      if (demoExtraction) {
+        persistLearningExtraction(demoExtraction, applied);
+        setLearningExtractionMessage("");
+        setStatusMessage("");
+        return;
+      }
+
       const response = await fetch("/api/extract-learning", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2117,31 +2170,35 @@ export function LinguaTypeApp() {
       }
 
       const extraction = payload as LearningExtractionResult;
-      setLearningLibrary((current) => {
-        const nextLibrary = upsertLearningItems(current, extraction.learningItems, {
-          sourceSentence: applied.result.finalSentence,
-          writingMode: applied.requestInput.writingMode,
-        });
-        localStorage.setItem(LEARNING_LIBRARY_STORAGE_KEY, JSON.stringify(nextLibrary));
-        localStorage.setItem(LEARNING_HISTORY_STORAGE_KEY, JSON.stringify(nextLibrary));
-        return nextLibrary;
-      });
-      setCorrectionEvents((current) => {
-        const nextEvents = upsertCorrectionEvents(current, extraction.correctionEvents, {
-          sourceSentence: applied.result.finalSentence,
-          writingMode: applied.requestInput.writingMode,
-        });
-        localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(nextEvents));
-        return nextEvents;
-      });
-      if (extraction.learningItems.length > 0) {
-        markLearningLibraryUpdated();
-      }
+      persistLearningExtraction(extraction, applied);
       setLearningExtractionMessage("");
       setStatusMessage("");
     } catch {
       setLearningExtractionMessage("");
       setStatusMessage("");
+    }
+  }
+
+  function persistLearningExtraction(extraction: LearningExtractionResult, applied: CompletedEnhancement) {
+    setLearningLibrary((current) => {
+      const nextLibrary = upsertLearningItems(current, extraction.learningItems, {
+        sourceSentence: applied.result.finalSentence,
+        writingMode: applied.requestInput.writingMode,
+      });
+      localStorage.setItem(LEARNING_LIBRARY_STORAGE_KEY, JSON.stringify(nextLibrary));
+      localStorage.setItem(LEARNING_HISTORY_STORAGE_KEY, JSON.stringify(nextLibrary));
+      return nextLibrary;
+    });
+    setCorrectionEvents((current) => {
+      const nextEvents = upsertCorrectionEvents(current, extraction.correctionEvents, {
+        sourceSentence: applied.result.finalSentence,
+        writingMode: applied.requestInput.writingMode,
+      });
+      localStorage.setItem(CORRECTION_EVENTS_STORAGE_KEY, JSON.stringify(nextEvents));
+      return nextEvents;
+    });
+    if (extraction.learningItems.length > 0) {
+      markLearningLibraryUpdated();
     }
   }
 
@@ -2157,6 +2214,22 @@ export function LinguaTypeApp() {
     const cached = healthCacheRef.current.find((item) => item.paragraphFingerprint === fingerprint);
     if (cached) {
       return cached.result;
+    }
+
+    if (activeArchiveIsDemo) {
+      const demoResult = getDemoParagraphHealthResult(paragraphRange.paragraph);
+      if (demoResult) {
+        healthCacheRef.current = saveParagraphHealthCache(localStorage, [
+          ...healthCacheRef.current,
+          {
+            paragraphFingerprint: demoResult.paragraphFingerprint,
+            result: demoResult,
+            checkedAt: new Date().toISOString(),
+          },
+        ]);
+        return demoResult;
+      }
+      return null;
     }
 
     if (!shouldRunParagraphHealth(paragraphRange.paragraph, fingerprint)) {
@@ -2367,6 +2440,20 @@ export function LinguaTypeApp() {
     const context = buildDocumentMapCacheContext(paragraphs);
     const cached = documentMapCacheRef.current.find((item) => item.cacheKey === context.cacheKey);
     const existingAutoCount = cached?.autoCheckCountInSession ?? 0;
+    if (activeArchiveIsDemo) {
+      const demoCache = createDemoDocumentMapCache(apiSettings, writingArchives.activeId ?? undefined);
+      documentMapCacheRef.current = upsertDocumentMapCache(localStorage, documentMapCacheRef.current, demoCache);
+      setDocumentMapParagraphHealthById({});
+      setDocumentMapState({
+        status: "ready",
+        result: demoCache.result,
+        snapshotFullText: text,
+        paragraphs,
+        cacheKey: context.cacheKey,
+        textHash: context.textHash,
+      });
+      return;
+    }
     if (cached && !force) {
       setDocumentMapParagraphHealthById({});
       setDocumentMapState({
@@ -2576,6 +2663,20 @@ export function LinguaTypeApp() {
       return;
     }
 
+    if (activeArchiveIsDemo) {
+      const demoResult = getDemoParagraphFlowResult(range.paragraph);
+      if (demoResult) {
+        setPendingParagraph({
+          requestId: `demo-flow-${createParagraphFingerprint(range.paragraph)}`,
+          snapshotFullText,
+          paragraphRange: range,
+          originalParagraph: range.paragraph,
+          result: demoResult,
+        });
+        return;
+      }
+    }
+
     if (!ensureApiSettings()) {
       return;
     }
@@ -2712,7 +2813,26 @@ export function LinguaTypeApp() {
   }
 
   async function explainSelectedText() {
-    if (!selectionAction || !ensureApiSettings()) {
+    if (!selectionAction) {
+      return;
+    }
+    const demoExplanation = activeArchiveIsDemo
+      ? getDemoSelectionExplainResult(selectionAction.selectedText, text)
+      : null;
+    if (demoExplanation) {
+      setSelectionAction((current) =>
+        current
+          ? {
+              ...current,
+              requested: true,
+              explanation: demoExplanation,
+              message: "",
+            }
+          : current,
+      );
+      return;
+    }
+    if (!ensureApiSettings()) {
       return;
     }
     setIsSelectionLoading(true);
