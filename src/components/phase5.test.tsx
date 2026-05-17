@@ -1,6 +1,6 @@
 ﻿import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LinguaTypeApp } from "./LinguaTypeApp";
+import { LinguaTypeApp, shouldShowWelcomeOnOpen } from "./LinguaTypeApp";
 import {
   API_SETTINGS_STORAGE_KEY,
   CORRECTION_EVENTS_STORAGE_KEY,
@@ -53,6 +53,33 @@ afterEach(() => {
 });
 
 describe("LinguaType deprecated writing setup", () => {
+  it("shows the welcome screen on every non-test app open regardless of stored drafts", () => {
+    expect(
+      shouldShowWelcomeOnOpen({
+        nodeEnv: "production",
+        hasStoredArchives: true,
+        hasLegacyDraftText: true,
+        hasStoredSetup: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowWelcomeOnOpen({
+        nodeEnv: "development",
+        hasStoredArchives: false,
+        hasLegacyDraftText: false,
+        hasStoredSetup: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowWelcomeOnOpen({
+        nodeEnv: "test",
+        hasStoredArchives: true,
+        hasLegacyDraftText: true,
+        hasStoredSetup: true,
+      }),
+    ).toBe(false);
+  });
+
   it("opens the writing editor directly without rendering the deprecated setup page", async () => {
     render(<LinguaTypeApp />);
 

@@ -248,6 +248,17 @@ const DOMAIN_OPTIONS: Array<{ value: WritingTopicArea; label: string }> = [
 
 const WORKSPACE_EXIT_MOTION_DURATION = 520;
 
+export function shouldShowWelcomeOnOpen({
+  nodeEnv,
+}: {
+  nodeEnv: string | undefined;
+  hasStoredArchives?: boolean;
+  hasLegacyDraftText?: boolean;
+  hasStoredSetup?: boolean;
+}) {
+  return nodeEnv !== "test";
+}
+
 export function LinguaTypeApp() {
   const editorRef = useRef<WritingEditorHandle>(null);
   const writingSurfaceRef = useRef<HTMLElement | null>(null);
@@ -423,8 +434,12 @@ export function LinguaTypeApp() {
     const storedSetup = loadWritingSetupFromStorage(localStorage);
     const rawArchiveStorage = localStorage.getItem(WRITING_ARCHIVES_STORAGE_KEY);
     const legacyDraftText = localStorage.getItem(DRAFT_STORAGE_KEY) ?? "";
-    const shouldShowWelcome =
-      process.env.NODE_ENV !== "test" && rawArchiveStorage === null && !legacyDraftText.trim() && !storedSetup;
+    const shouldShowWelcome = shouldShowWelcomeOnOpen({
+      nodeEnv: process.env.NODE_ENV,
+      hasStoredArchives: rawArchiveStorage !== null,
+      hasLegacyDraftText: Boolean(legacyDraftText.trim()),
+      hasStoredSetup: Boolean(storedSetup),
+    });
     const storedArchives = loadWritingArchivesFromStorage(localStorage);
     const shouldPreserveExistingArchiveStorage = rawArchiveStorage !== null && storedArchives.items.length === 0;
     const ensuredArchives = shouldPreserveExistingArchiveStorage ? storedArchives : ensureWritableArchiveState(storedArchives);
