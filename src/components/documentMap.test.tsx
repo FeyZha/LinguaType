@@ -188,7 +188,31 @@ describe("LinguaType document map", () => {
     expect(screen.getByLabelText("沉浸式写作区")).toHaveClass("overflow-hidden");
     expect(mapPane).toHaveClass("lt-scrollbar-hidden");
     expect(sourcePane).toHaveClass("lt-scrollbar-hidden");
-    expect(within(screen.getByRole("contentinfo")).getByRole("button", { name: /文章地图 · 1 个发现/u })).toBeInTheDocument();
+    const statusBar = within(sourcePane).getByRole("contentinfo");
+    expect(statusBar).toHaveAttribute("data-status-scope", "source-pane");
+    expect(statusBar).toHaveClass("relative", "w-full", "shrink-0");
+    expect(statusBar).not.toHaveClass("fixed", "xl:left-[var(--lt-sidebar-width,320px)]");
+    expect(within(statusBar).getByRole("button", { name: /文章地图 · 1 个发现/u })).toBeInTheDocument();
+
+    const writingColumn = within(sourcePane)
+      .getByLabelText("写作区")
+      .querySelector<HTMLElement>("[data-writing-column='true']");
+    expect(writingColumn).toBeTruthy();
+    Object.defineProperty(writingColumn, "clientHeight", { configurable: true, value: 40 });
+    const scrollTo = vi.fn((options: ScrollToOptions) => {
+      writingColumn!.scrollTop = Number(options.top ?? 0);
+    });
+    Object.defineProperty(writingColumn, "scrollTo", { configurable: true, value: scrollTo });
+
+    const secondParagraph = screen.getByRole("group", { name: "第 2 段 原因" });
+    fireEvent.click(within(secondParagraph).getByRole("button", { name: "定位段落" }));
+
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    expect(writingColumn!.scrollTop).toBeGreaterThan(0);
+    const sourceEditor = within(sourcePane).getByLabelText("写作编辑器") as HTMLTextAreaElement;
+    expect(sourceEditor.value.slice(sourceEditor.selectionStart, sourceEditor.selectionEnd)).toContain(
+      "Exam pressure also weakens independent learning.",
+    );
   });
 
   it("shows paragraph advice inline and filters spacing-only detail issues in the secondary check view", async () => {

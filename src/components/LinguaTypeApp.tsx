@@ -2577,7 +2577,7 @@ export function LinguaTypeApp() {
       }));
       return;
     }
-    editorRef.current?.selectRange(range.start, range.end);
+    editorRef.current?.selectRange(range.start, range.end, { scroll: "center" });
     if (documentMapHighlightTimerRef.current) {
       clearTimeout(documentMapHighlightTimerRef.current);
     }
@@ -3184,6 +3184,7 @@ export function LinguaTypeApp() {
                     documentMapStatusLabel={documentMapButtonText}
                     onOpenDocumentMap={() => void checkDocumentMap(false)}
                     wideLayout={archiveSidebarCollapsed && !documentMapOpen}
+                    statusBarScope={documentMapOpen ? "source-pane" : "workspace"}
                     suggestionMarkers={suggestionMarkers}
                     expressionReappearanceCues={expressionReappearanceMatches.map((match) => ({
                       ...match,

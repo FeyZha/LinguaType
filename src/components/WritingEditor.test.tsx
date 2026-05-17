@@ -458,10 +458,24 @@ describe("WritingEditor native long-text input", () => {
 
     const statusBar = screen.getByRole("contentinfo");
     expect(statusBar).toHaveClass("fixed", "bottom-0");
+    expect(statusBar).toHaveAttribute("data-status-scope", "workspace");
     expect(statusBar.className).not.toMatch(/\bshadow-/u);
     expect(statusBar).toHaveTextContent("文章地图");
     expect(screen.getByRole("button", { name: /检查文章地图|文章地图 · /u })).toBeInTheDocument();
     expect(statusBar).not.toHaveTextContent("文本校对");
+  });
+
+  it("contains the bottom status bar inside the source pane when the article map is open", () => {
+    renderEditor({
+      statusBarScope: "source-pane",
+      value: "Opening paragraph.\n\nSecond paragraph.",
+    });
+
+    const statusBar = screen.getByRole("contentinfo");
+    expect(statusBar).toHaveAttribute("data-status-scope", "source-pane");
+    expect(statusBar).toHaveClass("relative", "w-full", "shrink-0");
+    expect(statusBar).not.toHaveClass("fixed", "xl:left-[var(--lt-sidebar-width,320px)]");
+    expect(statusBar.className).not.toMatch(/\bshadow-/u);
   });
 
   it("opens lightweight upward menus for mode and enhancement level", async () => {

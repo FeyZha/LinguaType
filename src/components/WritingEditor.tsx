@@ -52,7 +52,7 @@ export type WritingEditorHandle = {
   focus: () => void;
   getSelectionRange: () => { start: number; end: number };
   setCursor: (offset: number) => void;
-  selectRange: (start: number, end: number) => void;
+  selectRange: (start: number, end: number, options?: { scroll?: "center" | "none" }) => void;
 };
 
 type WritingEditorProps = {
@@ -99,6 +99,7 @@ type WritingEditorProps = {
   onApplySuggestionShortcut?: () => void;
   onRegenerateSuggestionShortcut?: () => void;
   wideLayout?: boolean;
+  statusBarScope?: "workspace" | "source-pane";
 };
 
 const WRITING_MODE_LABELS: Record<WritingMode, string> = {
@@ -443,6 +444,38 @@ function syncTextareaHeight(element: HTMLTextAreaElement) {
   element.style.height = `${nextHeight}px`;
 }
 
+function scrollRangeToWritingCenter(
+  element: HTMLTextAreaElement,
+  container: HTMLElement | null,
+  start: number,
+  end: number,
+) {
+  if (!container) {
+    return;
+  }
+
+  syncTextareaHeight(element);
+  const metrics = getTextareaVisualMetrics(element);
+  const startPosition = getVisualCaretPosition(element.value, start, metrics);
+  const endPosition = getVisualCaretPosition(element.value, end, metrics);
+  const paragraphMiddleLine = (startPosition.visualLineIndex + endPosition.visualLineIndex + 1) / 2;
+  const containerRect = container.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const elementTopInContainer = elementRect.top - containerRect.top + container.scrollTop;
+  const targetTop = elementTopInContainer
+    + metrics.paddingTop
+    + paragraphMiddleLine * metrics.lineHeight
+    - container.clientHeight / 2;
+  const nextScrollTop = Math.max(0, targetTop);
+
+  if (typeof container.scrollTo === "function") {
+    container.scrollTo({ top: nextScrollTop, behavior: "smooth" });
+    return;
+  }
+
+  container.scrollTop = nextScrollTop;
+}
+
 function sentenceTriggerLabel(triggerSettings: TriggerSettings) {
   switch (triggerSettings.sentenceEnhancementShortcut) {
     case "button_only":
@@ -514,6 +547,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
       onApplySuggestionShortcut,
       onRegenerateSuggestionShortcut,
       wideLayout = false,
+      statusBarScope = "workspace",
       inlineSuggestionReviewOnly = false,
     },
     ref,
@@ -523,6 +557,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
     const markerButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
     const prevSuggestionMarkerIds = useRef<Set<string>>(new Set());
     const statusControlsRef = useRef<HTMLDivElement | null>(null);
+    const writingColumnRef = useRef<HTMLDivElement | null>(null);
     const [openStatusMenu, setOpenStatusMenu] = useState<"mode" | "level" | null>(
       null,
     );
@@ -665,15 +700,20 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
           element.focus();
           element.setSelectionRange(safeOffset, safeOffset);
         },
-        selectRange: (start: number, end: number) => {
+        selectRange: (start: number, end: number, options = { scroll: "none" }) => {
           const element = editorRef.current;
           if (!element) {
             return;
           }
           const safeStart = clampOffset(start, element.value.length);
           const safeEnd = clampOffset(end, element.value.length);
+          const normalizedStart = Math.min(safeStart, safeEnd);
+          const normalizedEnd = Math.max(safeStart, safeEnd);
           element.focus();
-          element.setSelectionRange(Math.min(safeStart, safeEnd), Math.max(safeStart, safeEnd));
+          element.setSelectionRange(normalizedStart, normalizedEnd);
+          if (options.scroll === "center") {
+            scrollRangeToWritingCenter(element, writingColumnRef.current, normalizedStart, normalizedEnd);
+          }
         },
       }),
       [value.length],
@@ -881,6 +921,10 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
     const writingPaperClass = `${writingTextClass} ${writingGutterClass} text-transparent`;
     const writingSurfaceClass = `lt-writing-surface min-h-[520px] max-w-[860px] ${writingTextClass} ${writingGutterClass}`;
     const layoutClass = wideLayout ? "max-w-[1120px]" : "max-w-[980px]";
+    const statusBarClass =
+      statusBarScope === "source-pane"
+        ? "relative z-40 grid min-h-8 w-full shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)]"
+        : "fixed bottom-0 right-0 z-40 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)] xl:left-[var(--lt-sidebar-width,320px)]";
 
     return (
       <section
@@ -889,6 +933,7 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div
+          ref={writingColumnRef}
           data-writing-column="true"
           className={`lt-scrollbar-hidden mx-auto flex w-full flex-1 flex-col overflow-y-auto px-4 pb-20 pt-6 sm:px-8 md:px-10 md:pt-10 ${layoutClass}`}
         >
@@ -1083,7 +1128,8 @@ export const WritingEditor = forwardRef<WritingEditorHandle, WritingEditorProps>
         <footer
           aria-label="写作状态栏"
           data-status-layout="balanced-editorial"
-          className="fixed bottom-0 right-0 z-40 grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--lt-border)] bg-[var(--lt-bg)] px-8 py-1 text-[12px] text-[var(--lt-muted)] xl:left-[var(--lt-sidebar-width,320px)]"
+          data-status-scope={statusBarScope}
+          className={statusBarClass}
         >
           <div
             aria-label="写作状态栏左侧"
