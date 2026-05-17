@@ -259,11 +259,11 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
             <div data-welcome-rule className="mt-5 h-px w-full bg-[var(--lt-border)]" />
 
             <div data-welcome-motion data-welcome-copy className="mt-12 opacity-0">
-              <p className="text-sm font-medium text-[var(--lt-accent)]">产品定位</p>
-              <h1 className="mt-4 max-w-[860px] font-serif text-[44px] font-semibold leading-[1.08] tracking-[0] text-[var(--lt-text)] sm:text-[58px]">
+              <h1 className="max-w-[860px] font-serif text-[44px] font-semibold leading-[1.08] tracking-[0] text-[var(--lt-text)] sm:text-[58px]">
                 用中文思路，写出自然英文
               </h1>
-              <p className="mt-6 max-w-[760px] text-[18px] leading-8 text-[var(--lt-muted)]">
+              <p className="mt-7 text-sm font-medium text-[var(--lt-accent)]">产品定位</p>
+              <p className="mt-2 max-w-[760px] text-[18px] leading-8 text-[var(--lt-muted)]">
                 LinguaType 是一款面向中文母语者的英文写作辅助工具。你可以先用中英混合写下想法，再在原文位置附近获得自然英文改写、修改解释和表达沉淀，让每一次写作都变成可积累的英文表达训练。
               </p>
             </div>

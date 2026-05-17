@@ -33,13 +33,17 @@ describe("WelcomeScreen", () => {
     try {
       render(<WelcomeScreen theme="light" onStart={onStart} />);
 
-      expect(screen.getByText("产品定位")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "用中文思路，写出自然英文" })).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          "LinguaType 是一款面向中文母语者的英文写作辅助工具。你可以先用中英混合写下想法，再在原文位置附近获得自然英文改写、修改解释和表达沉淀，让每一次写作都变成可积累的英文表达训练。",
-        ),
-      ).toBeInTheDocument();
+      const positioningLabel = screen.getByText("产品定位");
+      const heading = screen.getByRole("heading", { name: "用中文思路，写出自然英文" });
+      const positioningBody = screen.getByText(
+        "LinguaType 是一款面向中文母语者的英文写作辅助工具。你可以先用中英混合写下想法，再在原文位置附近获得自然英文改写、修改解释和表达沉淀，让每一次写作都变成可积累的英文表达训练。",
+      );
+
+      expect(positioningLabel).toBeInTheDocument();
+      expect(heading).toBeInTheDocument();
+      expect(positioningBody).toBeInTheDocument();
+      expect(heading.compareDocumentPosition(positioningLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(positioningLabel.compareDocumentPosition(positioningBody) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
       fireEvent.click(screen.getByRole("button", { name: "打开示例文档" }));
 
