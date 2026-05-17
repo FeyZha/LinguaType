@@ -3625,15 +3625,22 @@ function CollapsedSidebarIconButton({
   label,
   active = false,
   accent = false,
+  tooltipPlacement = "right",
   onClick,
   children,
 }: {
   label: string;
   active?: boolean;
   accent?: boolean;
+  tooltipPlacement?: "right" | "above-right";
   onClick: () => void;
   children: ReactNode;
 }) {
+  const tooltipPlacementClass =
+    tooltipPlacement === "above-right"
+      ? "bottom-[calc(100%+6px)] left-[calc(100%+10px)]"
+      : "left-[calc(100%+10px)] top-1/2 -translate-y-1/2";
+
   return (
     <button
       type="button"
@@ -3648,7 +3655,11 @@ function CollapsedSidebarIconButton({
       }`}
     >
       {children}
-      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 rounded-md border border-[var(--lt-border)] bg-[var(--lt-bg)] px-2 py-1 text-xs font-medium text-[var(--lt-text)] opacity-0 shadow-[0_8px_22px_var(--lt-shadow)] transition group-hover:opacity-100 group-focus-visible:opacity-100">
+      <span
+        data-sidebar-tooltip
+        data-sidebar-tooltip-placement={tooltipPlacement}
+        className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-[var(--lt-border)] bg-[var(--lt-bg)] px-2 py-1 text-[11px] font-normal leading-none text-[var(--lt-faint)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 ${tooltipPlacementClass}`}
+      >
         {label}
       </span>
     </button>
@@ -3958,7 +3969,9 @@ function ArchiveSidebar({
             <LinguaTypeBrandMark theme={resolvedTheme} className="block h-11 w-11" />
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--lt-border)] bg-[var(--lt-surface)] px-2 py-1 text-xs text-[var(--lt-text)] opacity-0 shadow-[0_12px_32px_var(--lt-shadow)] transition group-hover:opacity-100"
+              data-sidebar-tooltip
+              data-sidebar-tooltip-placement="right"
+              className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-[var(--lt-border)] bg-[var(--lt-bg)] px-2 py-1 text-[11px] font-normal leading-none text-[var(--lt-faint)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
             >
               LinguaType
             </span>
@@ -3980,6 +3993,7 @@ function ArchiveSidebar({
               onClick={() => toggleWorkspaceView(item.id)}
               label={item.label}
               active={activeView === item.id}
+              tooltipPlacement="above-right"
             >
               <item.icon className="h-5 w-5" />
               {item.id === "library" && hasLearningUpdate ? (
@@ -3994,6 +4008,7 @@ function ArchiveSidebar({
             label="触发设置"
             onClick={() => toggleWorkspaceView("triggers")}
             active={activeView === "triggers"}
+            tooltipPlacement="above-right"
           >
             <AdjustmentsHorizontalIcon className="h-5 w-5" />
           </CollapsedSidebarIconButton>

@@ -275,7 +275,7 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
                 <div
                   key={feature}
                   data-welcome-feature-card
-                  className="rounded-md bg-[var(--lt-surface-soft)] px-4 py-3 text-sm font-medium text-[var(--lt-text)] ring-1 ring-[var(--lt-border)]"
+                  className="lt-welcome-feature-card rounded-md bg-[var(--lt-surface-soft)] px-4 py-3 text-sm font-medium text-[var(--lt-text)] ring-1 ring-[var(--lt-border)]"
                 >
                   {feature}
                 </div>
@@ -296,20 +296,21 @@ export function WelcomeScreen({ onStart, theme = "light" }: WelcomeScreenProps) 
         <aside
           data-welcome-motion
           data-welcome-preview
+          data-welcome-live-motion="staggered-preview"
           aria-label="快速使用说明"
           className="flex min-h-[70vh] flex-col justify-between gap-5 rounded-md bg-[#181715] p-5 text-[#faf9f5] opacity-0 ring-1 ring-black/10 sm:p-6"
         >
           <div className="rounded-md bg-[#252320] p-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3 text-xs text-[#a09d96]">
               <span>Demo archive</span>
-              <span>文章地图 · 可检查</span>
+              <span className="lt-welcome-map-status">文章地图 · 可检查</span>
             </div>
             <div className="mt-4 grid gap-3 text-sm leading-6">
-              <p className="text-[#faf9f5]">I cannot clearly 表达这个观点 in English.</p>
-              <p className="rounded-md bg-[#1f1e1b] p-3 text-[#d8d2c8] ring-1 ring-white/10">
+              <p className="lt-welcome-caret text-[#faf9f5]">I cannot clearly 表达这个观点 in English.</p>
+              <p className="lt-welcome-suggestion-card rounded-md bg-[#1f1e1b] p-3 text-[#d8d2c8] ring-1 ring-white/10">
                 建议会出现在当前句附近。你先看差异，再决定是否采纳。
               </p>
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs text-[#a09d96]">
+              <div className="lt-welcome-conversion-row grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs text-[#a09d96]">
                 <span className="rounded-md bg-[#1f1e1b] p-2">表达这个观点</span>
                 <span>→</span>
                 <span className="rounded-md bg-[#1f1e1b] p-2">express this idea clearly</span>

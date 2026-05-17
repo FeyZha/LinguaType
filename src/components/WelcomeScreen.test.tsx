@@ -38,10 +38,18 @@ describe("WelcomeScreen", () => {
       const positioningBody = screen.getByText(
         "LinguaType 是一款面向中文母语者的英文写作辅助工具。你可以先用中英混合写下想法，再在原文位置附近获得自然英文改写、修改解释和表达沉淀，让每一次写作都变成可积累的英文表达训练。",
       );
+      const preview = screen.getByLabelText("快速使用说明");
 
       expect(positioningLabel).toBeInTheDocument();
       expect(heading).toBeInTheDocument();
       expect(positioningBody).toBeInTheDocument();
+      expect(preview).toHaveAttribute("data-welcome-live-motion", "staggered-preview");
+      expect(screen.getByText("文章地图 · 可检查")).toHaveClass("lt-welcome-map-status");
+      expect(screen.getByText("I cannot clearly 表达这个观点 in English.")).toHaveClass("lt-welcome-caret");
+      expect(screen.getByText("建议会出现在当前句附近。你先看差异，再决定是否采纳。")).toHaveClass(
+        "lt-welcome-suggestion-card",
+      );
+      expect(screen.getByText("英文句子润色")).toHaveClass("lt-welcome-feature-card");
       expect(heading.compareDocumentPosition(positioningLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(positioningLabel.compareDocumentPosition(positioningBody) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 

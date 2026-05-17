@@ -314,6 +314,11 @@ describe("LinguaType document map", () => {
     expect(screen.getByText("检查本段")).toBeInTheDocument();
     expect(screen.getByText("增强当前句")).toBeInTheDocument();
     expect(screen.getByText("表达库")).toBeInTheDocument();
+    expect(within(paragraphShortcut).getByText("检查本段")).toHaveClass("whitespace-nowrap", "text-[var(--lt-faint)]");
+    const triggerShortcut = screen.getByRole("button", { name: "触发设置" });
+    const triggerTooltip = within(triggerShortcut).getByText("触发设置");
+    expect(triggerTooltip).toHaveAttribute("data-sidebar-tooltip-placement", "above-right");
+    expect(triggerTooltip).toHaveClass("whitespace-nowrap", "text-[var(--lt-faint)]", "bottom-[calc(100%+6px)]");
 
     fireEvent.click(paragraphShortcut);
 
