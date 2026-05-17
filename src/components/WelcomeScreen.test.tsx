@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WelcomeScreen } from "./WelcomeScreen";
 
@@ -27,18 +27,36 @@ describe("WelcomeScreen", () => {
   });
 
   it("presents formal product copy and starts the demo archive", () => {
+    vi.useFakeTimers();
     const onStart = vi.fn();
-    render(<WelcomeScreen theme="light" onStart={onStart} />);
 
-    expect(screen.getByText("产品定位")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "把中文思路稳稳写成自然英文。LinguaType 像贴在光标旁的写作搭档：卡住时帮你把中英混合句改顺，写完后带你看清每一次修改，沉淀可复用表达，再用文章地图检查全文结构。",
-      ),
-    ).toBeInTheDocument();
+    try {
+      render(<WelcomeScreen theme="light" onStart={onStart} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "打开示例文档" }));
+      expect(screen.getByText("产品定位")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "用中文思路，写出自然英文" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "LinguaType 是一款面向中文母语者的英文写作辅助工具。你可以先用中英混合写下想法，再在原文位置附近获得自然英文改写、修改解释和表达沉淀，让每一次写作都变成可积累的英文表达训练。",
+        ),
+      ).toBeInTheDocument();
 
-    expect(onStart).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "打开示例文档" }));
+
+      expect(screen.getByRole("main", { name: "LinguaType 欢迎页" })).toHaveAttribute(
+        "data-welcome-state",
+        "leaving",
+      );
+      expect(screen.getByRole("button", { name: "正在打开..." })).toBeDisabled();
+      expect(onStart).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(onStart).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
