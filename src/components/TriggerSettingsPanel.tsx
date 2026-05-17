@@ -136,26 +136,6 @@ export function TriggerSettingsPanel({ settings, onChange }: TriggerSettingsPane
             关闭大面板自动弹出
           </SoftCheckbox>
         </div>
-
-        <SoftSelect label="写作习惯反馈" htmlFor="writing-habits-feedback">
-          <DesignSelect
-            id="writing-habits-feedback"
-            aria-label="写作习惯反馈"
-            value={settings.writingHabitsFeedback}
-            onChange={(event) =>
-              update(
-                {
-                  writingHabitsFeedback: event.target.value as TriggerSettings["writingHabitsFeedback"],
-                },
-                "写作习惯反馈",
-              )
-            }
-            wrapperClassName="w-full"
-          >
-            <option value="badge">徽标</option>
-            <option value="manual_only">仅手动查看</option>
-          </DesignSelect>
-        </SoftSelect>
       </div>
 
       {message ? (

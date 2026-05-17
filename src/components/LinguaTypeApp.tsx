@@ -3530,7 +3530,7 @@ function TriggerSettingsWorkspacePage({
     <section className="text-[var(--lt-text)]">
       <div>
         <h1 className="font-serif text-[38px] font-normal leading-tight">触发设置</h1>
-        <p className="mt-2 text-base leading-7 text-[var(--lt-muted)]">控制快捷键、低打扰反馈和弹层行为。</p>
+        <p className="mt-2 text-base leading-7 text-[var(--lt-muted)]">控制快捷键、段落检查时机和弹层行为。</p>
       </div>
       <div className="mt-7 border-t border-[var(--lt-border)] pt-6">
         <TriggerSettingsPanel settings={triggerSettings} onChange={onTriggerSettingsChange} />

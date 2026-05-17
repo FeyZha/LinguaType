@@ -46,4 +46,15 @@ describe("TriggerSettingsPanel", () => {
       documentMapAutoCheck: "remind_only",
     });
   });
+
+  it("does not expose writing habits feedback controls", () => {
+    const onChange = vi.fn();
+
+    render(<TriggerSettingsPanel settings={defaultTriggerSettings()} onChange={onChange} />);
+
+    expect(screen.queryByText("写作习惯反馈")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "写作习惯反馈" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "徽标" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "仅手动查看" })).not.toBeInTheDocument();
+  });
 });

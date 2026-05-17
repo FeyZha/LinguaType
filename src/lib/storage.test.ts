@@ -274,8 +274,6 @@ describe("v0.2.2  storage", () => {
       sentenceEnhancementShortcut: "ctrl_enter",
       paragraphHealthTrigger: "after_every_apply",
       documentMapAutoCheck: "auto_idle",
-      writingHabitsFeedback: "badge",
-      statusFeedbackStyle: "popover_footer",
       popoverBehavior: {
         autoCloseAfterApply: true,
         escapeCloses: true,
@@ -288,6 +286,8 @@ describe("v0.2.2  storage", () => {
     const storage = createMemoryStorage({
       [TRIGGER_SETTINGS_STORAGE_KEY]: JSON.stringify({
         sentenceEnhancementShortcut: "disable_shortcut",
+        writingHabitsFeedback: "manual_only",
+        statusFeedbackStyle: "toast",
         popoverBehavior: { escapeCloses: false },
       }),
     });
@@ -296,6 +296,8 @@ describe("v0.2.2  storage", () => {
     expect(loaded.sentenceEnhancementShortcut).toBe("button_only");
     expect(loaded.documentMapAutoCheck).toBe("auto_idle");
     expect("inlineExpressionMenuTrigger" in loaded).toBe(false);
+    expect("writingHabitsFeedback" in loaded).toBe(false);
+    expect("statusFeedbackStyle" in loaded).toBe(false);
     expect(loaded.popoverBehavior).toEqual({
       autoCloseAfterApply: true,
       escapeCloses: true,
@@ -308,7 +310,10 @@ describe("v0.2.2  storage", () => {
     });
     expect(saved.paragraphHealthTrigger).toBe("after_paragraph_complete");
     expect(saved.documentMapAutoCheck).toBe("auto_idle");
-    expect(JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}").paragraphHealthTrigger).toBe("after_paragraph_complete");
+    const storedSettings = JSON.parse(storage.getItem(TRIGGER_SETTINGS_STORAGE_KEY) ?? "{}");
+    expect(storedSettings.paragraphHealthTrigger).toBe("after_paragraph_complete");
+    expect("writingHabitsFeedback" in storedSettings).toBe(false);
+    expect("statusFeedbackStyle" in storedSettings).toBe(false);
   });
 
   it("normalizes document map auto check modes", () => {

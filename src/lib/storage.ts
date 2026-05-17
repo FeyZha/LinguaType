@@ -128,8 +128,6 @@ export type TriggerSettings = {
   sentenceEnhancementShortcut: "ctrl_enter" | "button_only";
   paragraphHealthTrigger: "after_every_apply" | "after_paragraph_complete";
   documentMapAutoCheck: "off" | "remind_only" | "auto_idle" | "manual_first";
-  writingHabitsFeedback: "badge" | "manual_only";
-  statusFeedbackStyle: "popover_footer" | "inline" | "toast";
   popoverBehavior: {
     autoCloseAfterApply: boolean;
     escapeCloses: boolean;
@@ -178,8 +176,6 @@ export function defaultTriggerSettings(): TriggerSettings {
     sentenceEnhancementShortcut: "ctrl_enter",
     paragraphHealthTrigger: "after_every_apply",
     documentMapAutoCheck: "auto_idle",
-    writingHabitsFeedback: "badge",
-    statusFeedbackStyle: "popover_footer",
     popoverBehavior: {
       autoCloseAfterApply: true,
       escapeCloses: true,
@@ -770,12 +766,6 @@ function normalizeTriggerSettings(value?: Record<string, unknown>): TriggerSetti
     documentMapAutoCheck: isDocumentMapAutoCheckMode(value?.documentMapAutoCheck)
       ? value.documentMapAutoCheck
       : defaults.documentMapAutoCheck,
-    writingHabitsFeedback: isWritingHabitsFeedback(value?.writingHabitsFeedback)
-      ? value.writingHabitsFeedback
-      : defaults.writingHabitsFeedback,
-    statusFeedbackStyle: isStatusFeedbackStyle(value?.statusFeedbackStyle)
-      ? value.statusFeedbackStyle
-      : defaults.statusFeedbackStyle,
     popoverBehavior: {
       autoCloseAfterApply: typeof popoverBehavior.autoCloseAfterApply === "boolean"
         ? popoverBehavior.autoCloseAfterApply
@@ -1270,14 +1260,6 @@ function normalizeParagraphHealthTrigger(
     return "after_every_apply";
   }
   return isParagraphHealthTrigger(value) ? value : fallback;
-}
-
-function isWritingHabitsFeedback(value: unknown): value is TriggerSettings["writingHabitsFeedback"] {
-  return value === "badge" || value === "manual_only";
-}
-
-function isStatusFeedbackStyle(value: unknown): value is TriggerSettings["statusFeedbackStyle"] {
-  return value === "popover_footer" || value === "inline" || value === "toast";
 }
 
 function mapLegacyCorrectionType(value: unknown): CorrectionEventType {
