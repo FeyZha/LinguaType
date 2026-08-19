@@ -1,0 +1,67 @@
+{
+  "manifestVersion": 1,
+  "evalSetId": "expression-scaffold.dev.v1",
+  "status": "frozen",
+  "frozenAt": "2026-08-19",
+  "caseSetVersion": "v0.3",
+  "caseIds": [
+    "LT-ESC-001",
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-005",
+    "LT-ESC-006",
+    "LT-ESC-007",
+    "LT-ESC-008",
+    "LT-ESC-009",
+    "LT-ESC-010",
+    "LT-ESC-012",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-015",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018",
+    "LT-ESC-019",
+    "LT-ESC-020",
+    "LT-ESC-021"
+  ],
+  "counts": {
+    "cases": 20,
+    "chineseSegments": 25,
+    "caseTypes": {
+      "routine": 8,
+      "context_dependent": 3,
+      "mixed_complex": 4,
+      "boundary": 5
+    }
+  },
+  "sourceBoundary": {
+    "realFragmentReconstructedContext": 1,
+    "aiDraftStaticReviewed": 19,
+    "realUserDataset": false
+  },
+  "canonicalFiles": [
+    {
+      "path": "cases.md",
+      "sha256": "530938fe0ce5685e2264a15b523956dac1c1334362a1a39a300a66f978424f6a"
+    },
+    {
+      "path": "case-schema.md",
+      "sha256": "555c6126c4e562ca45ffab1e8fdc3348c893343322eef5f5a776a839afeebf42"
+    },
+    {
+      "path": "model-output.md",
+      "sha256": "2f9721216eb0a780b5c10ba5a87b18a75186bc33bda2d835cbff5cd095b76b74"
+    },
+    {
+      "path": "rubric.md",
+      "sha256": "4d9c4107a3aa3f40bb2620667a119946efac0f1556f6d66636406ff279f53fb4"
+    },
+    {
+      "path": "scoring.md",
+      "sha256": "91b2457c05ae773a6320a646c3924c59212475cbe13446289993e4e35d30c254"
+    }
+  ],
+  "mutationPolicy": "Any change to a canonical file requires a new evalSetId and a new freeze manifest. Existing runs must continue to reference this frozen version."
+}

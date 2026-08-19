@@ -1,0 +1,2 @@
+# Frozen evaluation assets use LF so SHA-256 verification is stable on every OS.
+evals/expression-scaffold/** text eol=lf

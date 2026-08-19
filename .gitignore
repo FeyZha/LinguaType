@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.vs/
+out/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+.env*
+
+# Local project-agent and personal knowledge connection files
+.agents/
+.codex/agent-instance.json
+.knowledge-link.json
+PROJECT-KNOWLEDGE.md

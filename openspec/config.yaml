@@ -1,0 +1,57 @@
+project:
+  name: LinguaType
+  language: zh-CN
+  stage: product-discovery-and-offline-evaluation
+  description: >
+    LinguaType 聚焦中文母语学习者在雅思写作中的跨语言表达卡点：
+    用户知道中文意思，但无法在当前英文句子中自然表达。
+
+product:
+  source_of_truth:
+    - AGENTS.md
+    - docs/PRODUCT-REASONING.md
+  current_anchor: >
+    以雅思题目和全文为上下文，为任意一个中英混合句提供逐句、
+    单结果、非代写式的英文表达支架。
+  current_question: >
+    表达支架能否帮助用户跨过当前卡点，同时保留用户的写作主导权？
+  single_flow:
+    - 用户用中文占位并继续写作
+    - 用户选择一个含中文的目标句
+    - 模型读取题目、全文和目标句
+    - 每个中文片段返回一个英文表达
+    - 用户自行完成句子
+  non_goals:
+    - 完整句生成或整句改写
+    - 自动插入、替换或应用
+    - 多候选表达选择
+    - 全文批改、评分、续写或观点生成
+    - 通用翻译或聊天机器人
+    - 表达复盘、RAG 或学习闭环
+
+evidence:
+  eval_set: expression-scaffold.dev.v1
+  cases: 20
+  chinese_segments: 25
+  real_fragment_reconstructed_context: 1
+  ai_draft_static_reviewed: 19
+  baseline_status: not_run
+  real_user_test_status: not_run
+
+conventions:
+  documentation_language: zh-CN
+  change_management:
+    - 非平凡 product、evaluation、architecture、API、storage 或 interaction 变更必须先创建 OpenSpec change
+    - change artifacts 放在 openspec/changes/<change-name>/
+    - proposal、design 和 tasks 清晰后再实现
+    - 完成并验证后再 archive
+  verification:
+    - 优先运行与风险匹配的最小验证
+    - 评测变更先运行冻结校验和 validate-only
+    - 不主动安装依赖或启动长期服务
+
+openspec:
+  changes_dir: openspec/changes
+  specs_dir: openspec/specs
+  archive_dir: openspec/changes/archive
+  spec_language: zh-CN
