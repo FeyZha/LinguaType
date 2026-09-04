@@ -1,17 +1,27 @@
-# LinguaType internal prototype
+# LinguaType 高保真原型
 
 当前原型接通一条链路：从原创练习题或自定义题目创建作文 → 题目与完整作文输入 → 本地识别含中文句子 → 用户逐句选择“处理本句” → 每句各自单次生成 → 直接表达或本地渐进揭示 → 下载本篇内部测试记录。
 
-## OpenDesign 前端入口
+## 当前状态
 
-本分支用于前端重设计，后端仍固定为 `POST /api/scaffold` 的 v1 契约。
+OpenDesign 前端调整已经完成，并于 2026-09-04 合入当前项目；`app/` 是现行高保真源码。`FRONTEND-BRIEF.md` 保留为设计过程与边界的历史交接材料，不再代表待执行任务。后端仍固定为 `POST /api/scaffold` 的 v1 契约。
 
-- 先阅读 `FRONTEND-BRIEF.md`，它定义页面、状态和不能改变的产品边界。
+## 本地审查
+
+```text
+npm ci
+npm run dev
+```
+
+打开 `http://localhost:3000/`。页面可直接审查；真实模型调用仍需按 `.env.example` 从仓库外提供环境变量。
+
+## 契约与 Mock
+
 - 接口唯一口径是 `contracts/scaffold-api.v1.openapi.json`；共享前端类型在 `app/scaffold-api-contract.ts`。
 - 运行 `npm run contract:check` 可确认 TypeScript 与 OpenAPI 公共契约没有偏离冻结标签。
 - 运行 `npm run mock:api` 可在 `http://127.0.0.1:4010` 启动无模型费用的契约 mock；前端开发环境应把 `/api/scaffold` 代理到该地址。
 - 无模型凭证时，在另一个终端把环境变量 `SCAFFOLD_API_PROXY` 设为 `http://127.0.0.1:4010` 后运行 `npm run dev`，即可让前端同源请求走契约 mock。
-- 前端开发不修改 `app/api/scaffold/route.ts`、`app/scaffold-api-contract.ts` 或 `contracts/`。如接口确实需要变化，先停止前端开发并单独确认新版本。
+- 后续前端调整不修改 `app/api/scaffold/route.ts`、`app/scaffold-api-contract.ts` 或 `contracts/`。如接口确实需要变化，先单独确认新版本。
 
 ## 环境
 

@@ -1,10 +1,12 @@
 # LinguaType OpenDesign 前端设计开发交接说明
 
+> 状态：已完成并归档。OpenDesign 最终前端已于 2026-09-04 合入 `app/`；本文保留当时的设计任务、冻结边界和验收依据，不再作为当前待执行清单。
+
 | 交接字段 | 当前值 |
 | --- | --- |
-| 状态 | 可执行交接 · 2026-08-30 |
-| 工作树 | `D:/My_events/LinguaType-opendesign-frontend` |
-| 分支 | `codex/opendesign-frontend` |
+| 状态 | 已完成并合入 · 2026-09-04 |
+| 当前源码 | `prototype/app/` |
+| 历史快照 | `frontend-opendesign-final` 标签 |
 | 起点 | `88c56cf823e66d3e6acf0fea58609295f82d841d` |
 | 冻结接口 | `POST /api/scaffold` · `scaffold-api-v1.0.0` · `1.0.0` |
 

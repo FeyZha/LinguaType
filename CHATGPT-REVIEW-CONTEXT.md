@@ -33,6 +33,12 @@ LinguaType 面向中文母语的雅思写作者：当用户知道中文意思、
 - 本地状态：同一设备保存多篇作文、支架、揭示状态与反馈；不含账号与云同步。
 - 当前 GitHub 分支与已发布的 `v0.3.1` 旧应用相互独立；旧版不是当前需求或功能的继承来源。
 
+## 当前阶段
+
+- 产品所有者已完成 1 次真实写作自测，外部用户邀请暂缓。
+- 原型已从单篇测试工具推进为本设备多篇作文工作区，并加入原创题库与自定义题目入口；这些能力没有改变表达支架的单一 AI 主链路。
+- OpenDesign 高保真前端已于 2026-09-04 合入 `prototype/`。当前审查重点是找出发布阻塞问题和文档、实现偏差，而不是继续扩展功能范围。
+
 ## 已有证据
 
 - 冻结评测集共 20 个 case、25 个顶层中文片段。
@@ -57,7 +63,7 @@ LinguaType 面向中文母语的雅思写作者：当用户知道中文意思、
 2. `AGENTS.md`：当前不可突破的产品边界和证据口径。
 3. `docs/PRODUCT-REASONING.md`：需求如何收敛为当前产品锚点。
 4. `docs/MVP-IMPLEMENTATION-CHAIN.md`：产品链路、状态与失败边界。
-5. `prototype/FRONTEND-BRIEF.md`：高保真交互目标。
+5. `prototype/FRONTEND-BRIEF.md`：已完成的高保真设计任务与冻结边界。
 6. `prototype/README.md` 与 `prototype/app/`：当前实现。
 7. `evals/expression-scaffold/README.md`：全部评测版本、实验和运行结果入口。
 8. `evals/expression-scaffold/eval-sets/`、`prompts/`、`runs/`：核验具体证据。
