@@ -1,0 +1,26 @@
+{
+  "manifestVersion": 1,
+  "repairType": "missing_judge_items_minimal_plain_json_once",
+  "baselineRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured",
+  "judgeModel": "LongCat-2.0",
+  "expectedCalls": 5,
+  "attempted": 5,
+  "succeeded": 3,
+  "failed": 2,
+  "sourceHashes": {
+    "judgeInput": "289bd2a2fbcaa012ada996cba0e6de5b38534180d59eb9629614afce4988dffa",
+    "partialScores": "f25a3553b9d263d9668cdd6714d0adf77ec241211475473cf2fe5464b68eb1c9",
+    "judgePrompt": "d04eca99daa765978b5d3d62a5f18a7001afdb17dd550be7c665b6d50e867ca7",
+    "runner": "749cd7cd8eb4a43f22e0c09485ff3303eea8190e02fe47593b7ff7312dd6523b"
+  },
+  "finalScoredItemPhases": 33,
+  "expectedItemPhases": 35,
+  "status": "completed_with_errors",
+  "finalArtifacts": {
+    "repairOutputs": "judge-repair-outputs.jsonl",
+    "repairScores": "judge-repair-scores.jsonl",
+    "scores": "judge-scores-complete.jsonl",
+    "summary": "judge-summary-complete.json",
+    "humanReview": "human-review-v2-complete.md"
+  }
+}

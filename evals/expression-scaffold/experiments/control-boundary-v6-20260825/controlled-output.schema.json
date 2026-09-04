@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "expression-scaffold-controlled-generation.v6-experiment",
+  "title": "LinguaType controlled model payload v6 experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["directExpressions", "scaffoldSets"],
+  "properties": {
+    "directExpressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["itemId", "recommendedExpression"],
+        "properties": {
+          "itemId": { "type": "string", "pattern": "^i[1-9][0-9]*$" },
+          "recommendedExpression": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "scaffoldSets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["itemId", "scaffolds"],
+        "properties": {
+          "itemId": { "type": "string", "pattern": "^i[1-9][0-9]*$" },
+          "scaffolds": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["scaffoldId", "focusZh", "recommendedExpression"],
+              "properties": {
+                "scaffoldId": { "type": "string", "pattern": "^s[1-4]$" },
+                "focusZh": { "type": "string", "minLength": 1 },
+                "recommendedExpression": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "calibrationId": "baseline-v2-20260824-human-calibration",
+  "baselineRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured",
+  "status": "completed_for_all_codex_non_pass_items",
+  "reviewedItems": 7,
+  "agreements": 6,
+  "overrides": 1,
+  "override": {
+    "case_id": "LT-ESC-005",
+    "codex_result": "bad_case",
+    "human_result": "pass",
+    "classification": "evaluation_rule_mismatch_not_model_failure"
+  },
+  "finalItemPhaseResults": {
+    "pass": 29,
+    "needs_improvement": 5,
+    "bad_case": 1
+  },
+  "finalCaseResultsByWorstItem": {
+    "pass": 15,
+    "needs_improvement": 4,
+    "bad_case": 1
+  },
+  "confirmedModelIssues": {
+    "unnatural_or_imprecise_english": [
+      "LT-ESC-001/initial/1",
+      "LT-ESC-021/initial/1",
+      "LT-ESC-018/selected_focus/1"
+    ],
+    "focus_granularity_too_large": [
+      "LT-ESC-014/initial/2",
+      "LT-ESC-016/initial/2"
+    ],
+    "core_semantic_relation_error": [
+      "LT-ESC-016/selected_focus/2"
+    ]
+  },
+  "evaluationRuleChangesForNextEvalSet": [
+    "A long expression may request smaller focus units instead of receiving a full English translation immediately.",
+    "A focus unit must be traceable to the original meaning but need not be an exact contiguous substring.",
+    "A semantic focus unit must not add content, change stance, or silently combine unrelated meanings."
+  ],
+  "remainingEvaluationDesignIssues": {
+    "selectedFocusProbeNotReachableFromActualInitial": 3,
+    "cases": [
+      "LT-ESC-014/2",
+      "LT-ESC-015/1",
+      "LT-ESC-016/2"
+    ]
+  },
+  "evidenceBoundary": "Human calibration covers the seven Codex non-pass items only; real user effectiveness remains untested."
+}

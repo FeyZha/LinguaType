@@ -1,0 +1,87 @@
+{
+  "experimentVersion": 1,
+  "experimentId": "context-ablation-v4-20260825",
+  "status": "defined",
+  "purpose": "Explore offline output differences associated with reducing essay context beyond the selected target sentence.",
+  "decisionAuthority": "hypothesis_generation_only",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "rubricVersion": "expression-scaffold-rubric.v4",
+  "promptVersion": "expression-scaffold-baseline-v4-one-call-progressive-reveal",
+  "outputSchemaId": "expression-scaffold-output.v4",
+  "independentVariable": "full_essay_context_scope",
+  "transformVersion": "essay-context-scope.v1",
+  "sourcePins": {
+    "promptSha256": "bd59924c585ff40ecd1930c366ef1b2f7c1dbeafc373da65bb5a558fa4a482d2",
+    "outputSchemaSha256": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544",
+    "v4FreezeManifestSha256": "d78b901065ac01ab76e0bb7db0a9ff3efe54a121798020398d20daf18dd281e3",
+    "v4RunnerSha256": "6a04af06f08539d7e8bf7188a9ac2dd3f9ba5aebe4fcf0bce2b4cb792fed20db"
+  },
+  "baselineReference": {
+    "runId": "baseline-v4-20260824-longcat-2.0-one-call-progressive-reveal",
+    "runManifestSha256": "580dc98417f23f51a7277d8d1c91fc37f0f41a1c617cd667b235de813af84389",
+    "modelOutputsSha256": "34e243da305e7d392c6fe7bbf8e27ffd5b0ceafdceffe050ebb9328e75c968f9",
+    "initialUserViewsSha256": "41cb55d872c6f00af15f175ade8abf52e9f7a7e80e47949576eef0e05eb31426"
+  },
+  "constants": [
+    "task_prompt",
+    "target_sentence",
+    "system_prompt",
+    "user_message_template",
+    "output_schema",
+    "model_name",
+    "model_parameters",
+    "case_set",
+    "rubric"
+  ],
+  "conditions": [
+    {
+      "id": "A",
+      "name": "full-essay",
+      "fullEssayPolicy": "canonical_full_essay",
+      "runId": "baseline-v4-20260824-longcat-2.0-one-call-progressive-reveal",
+      "historicalReference": true
+    },
+    {
+      "id": "B",
+      "name": "local-window",
+      "fullEssayPolicy": "previous_target_next",
+      "historicalReference": false
+    },
+    {
+      "id": "C",
+      "name": "target-only",
+      "fullEssayPolicy": "target_sentence_only",
+      "historicalReference": false
+    }
+  ],
+  "comparisons": [
+    {
+      "conditions": ["A", "B"],
+      "question": "Does essay context before the immediately previous sentence add observable offline value?"
+    },
+    {
+      "conditions": ["B", "C"],
+      "question": "Do the immediately neighboring sentences add observable offline value?"
+    },
+    {
+      "conditions": ["A", "C"],
+      "question": "Does any essay context beyond the target sentence add observable offline value?"
+    }
+  ],
+  "nextRetestRoutingRule": {
+    "candidateTargetOnly": "No observed new hard failure, no observed new score of 1 in any v4 dimension, no observed case-verdict decline, and every decisive difference is user-calibrated; nominate C for contemporaneous retest only.",
+    "candidateLocalWindow": "C shows an observed user-calibrated degradation while B does not; nominate B for contemporaneous retest only.",
+    "evidenceToKeepFullEssayForNow": "B shows an observed user-calibrated semantic hard failure; keep A as the working input until a contemporaneous retest.",
+    "inconclusive": "Observed differences are mixed across dimensions, order-unstable, or materially disputed by reviewers."
+  },
+  "limitations": [
+    "Condition A is historical rather than contemporaneous and interleaved.",
+    "All 20 frozen target sentences are the penultimate sentence of their essay.",
+    "Only one Chinese fragment originated from a real user difficulty, and its context was reconstructed.",
+    "A single run per condition cannot establish deterministic causality.",
+    "B and C are separate sequential runs rather than an interleaved run block.",
+    "The historical A run did not record an endpoint hash, so backend identity cannot be fully verified across A/B/C.",
+    "This experiment does not test whether task_prompt or target_sentence is necessary.",
+    "This exploratory run can nominate a candidate for contemporaneous retesting but cannot directly remove a product field."
+  ]
+}

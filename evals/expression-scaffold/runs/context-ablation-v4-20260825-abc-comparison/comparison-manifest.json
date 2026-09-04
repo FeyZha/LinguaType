@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 1,
+  "experimentId": "context-ablation-v4-20260825",
+  "status": "product_variant_selected_quality_calibration_pending",
+  "blindSeed": 20260825,
+  "candidateCount": 60,
+  "artifacts": {
+    "automaticSummary": "automatic-summary.json",
+    "blindReviewInputs": "blind-review-inputs.jsonl",
+    "blindMap": "blind-map.jsonl",
+    "reviewFull": "codex-review-full.jsonl",
+    "reviewSemantic": "codex-review-semantic.jsonl",
+    "reviewCalibration": "codex-review-calibration.jsonl",
+    "reviewAdjudication": "codex-review-adjudication.jsonl",
+    "reviewFinal": "codex-review-final.jsonl",
+    "reviewFinalSummary": "codex-review-final-summary.json",
+    "humanCalibration": "human-calibration.md"
+  },
+  "sourceRuns": {
+    "A": "baseline-v4-20260824-longcat-2.0-one-call-progressive-reveal",
+    "B": "ablation-v4-20260825-b-local-window",
+    "C": "ablation-v4-20260825-c-target-only"
+  },
+  "productDecision": {
+    "selectedCondition": "A",
+    "selectedInput": "task prompt, canonical full essay, and target sentence",
+    "retestBC": false,
+    "decisionDate": "2026-08-25",
+    "evidenceBoundary": "Product selection only; the seven non-pass A cases remain pending human quality calibration before real-user testing."
+  }
+}

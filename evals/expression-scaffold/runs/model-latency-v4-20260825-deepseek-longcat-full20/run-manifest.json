@@ -1,0 +1,111 @@
+{
+  "manifestVersion": 1,
+  "runId": "model-latency-v4-20260825-deepseek-longcat-full20",
+  "runType": "offline_v4_interleaved_model_latency_screen",
+  "status": "completed",
+  "startedAt": "2026-08-24T20:13:54.482385Z",
+  "completedAt": "2026-08-24T20:23:20.979278Z",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "promptVersion": "expression-scaffold-baseline-v4-one-call-progressive-reveal",
+  "outputSchemaId": "expression-scaffold-output.v4",
+  "caseIds": [
+    "LT-ESC-001",
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-005",
+    "LT-ESC-006",
+    "LT-ESC-007",
+    "LT-ESC-008",
+    "LT-ESC-009",
+    "LT-ESC-010",
+    "LT-ESC-021",
+    "LT-ESC-012",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-015",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018",
+    "LT-ESC-019",
+    "LT-ESC-020"
+  ],
+  "repetitions": 1,
+  "concurrency": 1,
+  "profiles": [
+    {
+      "label": "longcat",
+      "provider": "openai_compatible",
+      "model": "LongCat-2.0",
+      "thinkingType": null,
+      "temperature": 0.0,
+      "maxTokens": 4096,
+      "timeoutSeconds": 120.0,
+      "endpointSha256": "ba846f44e1f948952bfb94bdc4e52b1e22e689a6449a1f3a171e00068f2dd294"
+    },
+    {
+      "label": "deepseek",
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash",
+      "thinkingType": "disabled",
+      "temperature": 0.0,
+      "maxTokens": 4096,
+      "timeoutSeconds": 120.0,
+      "endpointSha256": "812b1f7c4a8b1af438d207c4d010794296f83296c29dcd10b8b6dd22f64c79db"
+    }
+  ],
+  "artifacts": {
+    "records": "records.jsonl",
+    "summary": "summary.json"
+  },
+  "sourceHashes": {
+    "v4FreezeManifest": "d78b901065ac01ab76e0bb7db0a9ff3efe54a121798020398d20daf18dd281e3",
+    "prompt": "bd59924c585ff40ecd1930c366ef1b2f7c1dbeafc373da65bb5a558fa4a482d2",
+    "outputSchema": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544",
+    "runner": "ebe8e2b1843ea21f47a9493caca47414474b4b3bfdd1b393d9204cfa99192bfc"
+  },
+  "summary": {
+    "profiles": {
+      "longcat": {
+        "model": "LongCat-2.0",
+        "thinkingType": null,
+        "calls": 20,
+        "succeeded": 20,
+        "failed": 0,
+        "successRate": 1.0,
+        "latencyMs": {
+          "mean": 25963.0,
+          "p50": 18975,
+          "p90": 57399,
+          "min": 3821,
+          "max": 69502
+        },
+        "averageTokenUsage": {
+          "input_tokens": 1059.0,
+          "output_tokens": 1096.5,
+          "total_tokens": 2155.6
+        }
+      },
+      "deepseek": {
+        "model": "deepseek-v4-flash",
+        "thinkingType": "disabled",
+        "calls": 20,
+        "succeeded": 17,
+        "failed": 3,
+        "successRate": 0.85,
+        "latencyMs": {
+          "mean": 1267.1,
+          "p50": 1112,
+          "p90": 1930,
+          "min": 645,
+          "max": 2373
+        },
+        "averageTokenUsage": {
+          "input_tokens": 1151.8,
+          "output_tokens": 149.2,
+          "total_tokens": 1301.0
+        }
+      }
+    }
+  }
+}

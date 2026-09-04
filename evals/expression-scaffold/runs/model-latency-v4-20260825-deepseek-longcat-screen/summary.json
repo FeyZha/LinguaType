@@ -1,0 +1,44 @@
+{
+  "profiles": {
+    "longcat": {
+      "model": "LongCat-2.0",
+      "thinkingType": null,
+      "calls": 18,
+      "succeeded": 18,
+      "failed": 0,
+      "successRate": 1.0,
+      "latencyMs": {
+        "mean": 23974.4,
+        "p50": 22141,
+        "p90": 33214,
+        "min": 11420,
+        "max": 33770
+      },
+      "averageTokenUsage": {
+        "input_tokens": 1056.2,
+        "output_tokens": 1041.4,
+        "total_tokens": 2097.6
+      }
+    },
+    "deepseek": {
+      "model": "deepseek-v4-flash",
+      "thinkingType": "disabled",
+      "calls": 18,
+      "succeeded": 18,
+      "failed": 0,
+      "successRate": 1.0,
+      "latencyMs": {
+        "mean": 1079.8,
+        "p50": 963,
+        "p90": 1632,
+        "min": 675,
+        "max": 1728
+      },
+      "averageTokenUsage": {
+        "input_tokens": 1148.7,
+        "output_tokens": 126.3,
+        "total_tokens": 1275.0
+      }
+    }
+  }
+}

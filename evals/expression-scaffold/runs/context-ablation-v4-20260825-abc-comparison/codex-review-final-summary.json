@@ -1,0 +1,117 @@
+{
+  "status": "codex_pre_review_complete_user_calibration_pending",
+  "candidateCount": 60,
+  "adjudicatedCount": 17,
+  "variantVerdictCounts": {
+    "A": {
+      "pass": 13,
+      "needs_improvement": 4,
+      "bad_case": 3,
+      "not_scored_input_issue": 0
+    },
+    "B": {
+      "pass": 14,
+      "needs_improvement": 2,
+      "bad_case": 4,
+      "not_scored_input_issue": 0
+    },
+    "C": {
+      "pass": 8,
+      "needs_improvement": 3,
+      "bad_case": 9,
+      "not_scored_input_issue": 0
+    }
+  },
+  "pairedCaseVerdictComparison": {
+    "A-B": {
+      "leftBetter": [
+        "LT-ESC-004",
+        "LT-ESC-016"
+      ],
+      "rightBetter": [
+        "LT-ESC-015",
+        "LT-ESC-017",
+        "LT-ESC-018"
+      ],
+      "tie": [
+        "LT-ESC-001",
+        "LT-ESC-002",
+        "LT-ESC-003",
+        "LT-ESC-005",
+        "LT-ESC-006",
+        "LT-ESC-007",
+        "LT-ESC-008",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012",
+        "LT-ESC-013",
+        "LT-ESC-014",
+        "LT-ESC-019",
+        "LT-ESC-020"
+      ],
+      "notComparable": []
+    },
+    "B-C": {
+      "leftBetter": [
+        "LT-ESC-002",
+        "LT-ESC-006",
+        "LT-ESC-013",
+        "LT-ESC-015",
+        "LT-ESC-017",
+        "LT-ESC-018"
+      ],
+      "rightBetter": [],
+      "tie": [
+        "LT-ESC-001",
+        "LT-ESC-003",
+        "LT-ESC-004",
+        "LT-ESC-005",
+        "LT-ESC-007",
+        "LT-ESC-008",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012",
+        "LT-ESC-014",
+        "LT-ESC-016",
+        "LT-ESC-019",
+        "LT-ESC-020"
+      ],
+      "notComparable": []
+    },
+    "A-C": {
+      "leftBetter": [
+        "LT-ESC-002",
+        "LT-ESC-004",
+        "LT-ESC-006",
+        "LT-ESC-013",
+        "LT-ESC-015",
+        "LT-ESC-016"
+      ],
+      "rightBetter": [],
+      "tie": [
+        "LT-ESC-001",
+        "LT-ESC-003",
+        "LT-ESC-005",
+        "LT-ESC-007",
+        "LT-ESC-008",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012",
+        "LT-ESC-014",
+        "LT-ESC-017",
+        "LT-ESC-018",
+        "LT-ESC-019",
+        "LT-ESC-020"
+      ],
+      "notComparable": []
+    }
+  },
+  "evidenceBoundary": [
+    "This is isolated Codex pre-review, not final human calibration.",
+    "A is historical and B/C were sequential rather than interleaved.",
+    "Verdict comparisons are ordinal case outcomes, not improvement percentages."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "calibrationId": "deepseek-v6-control-targeted9-20260825-human-calibration",
+  "status": "completed_from_user_conversation_review",
+  "reviewedCases": 9,
+  "finalHumanResults": {
+    "pass": 7,
+    "needs_improvement": 2,
+    "bad_case": 0
+  },
+  "confirmedIssues": {
+    "standalone_modal_scaffold": ["LT-ESC-016"],
+    "standalone_connector_scaffold": ["LT-ESC-017"]
+  },
+  "productRuleCandidate": "A connector, modal, degree marker, structural particle, or other function-like fragment must not be an independent scaffold. It must be absorbed into the nearest content-bearing scaffold.",
+  "evidenceBoundary": "The user described the remaining two issues in conversation and stated that the other v6 comparison results were broadly acceptable. This applies only to the nine targeted offline cases and does not prove real-user effectiveness."
+}

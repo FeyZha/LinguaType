@@ -6,6 +6,9 @@ dist/
 coverage/
 *.log
 *.tsbuildinfo
+.venv/
+__pycache__/
+*.py[cod]
 .env*
 
 # Local project-agent and personal knowledge connection files
@@ -13,3 +16,11 @@ coverage/
 .codex/agent-instance.json
 .knowledge-link.json
 PROJECT-KNOWLEDGE.md
+
+# Curated GitHub review branch
+.codex/
+artifacts/
+worktrees/
+prototype/public/design-references/
+prototype/linguatype-writing-workbench.html
+!prototype/.env.example

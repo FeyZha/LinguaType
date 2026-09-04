@@ -1,0 +1,46 @@
+{
+  "status": "needs_adjudication",
+  "candidateCount": 60,
+  "unanimousCount": 43,
+  "disagreementCount": 17,
+  "disagreementCandidateIds": [
+    "review-010-1",
+    "review-010-2",
+    "review-010-3",
+    "review-013-1",
+    "review-013-2",
+    "review-015-2",
+    "review-015-3",
+    "review-016-1",
+    "review-016-3",
+    "review-017-1",
+    "review-017-2",
+    "review-017-3",
+    "review-018-1",
+    "review-018-3",
+    "review-019-3",
+    "review-020-1",
+    "review-020-3"
+  ],
+  "reviewerVerdictCounts": {
+    "full": {
+      "pass": 31,
+      "needs_improvement": 14,
+      "bad_case": 15,
+      "not_scored_input_issue": 0
+    },
+    "semantic": {
+      "pass": 25,
+      "needs_improvement": 15,
+      "bad_case": 20,
+      "not_scored_input_issue": 0
+    },
+    "calibration": {
+      "pass": 35,
+      "needs_improvement": 12,
+      "bad_case": 13,
+      "not_scored_input_issue": 0
+    }
+  },
+  "note": "Variant identities remain hidden in the adjudication artifact."
+}

@@ -1,0 +1,64 @@
+{
+  "manifestVersion": 1,
+  "runId": "baseline-v3-20260824-longcat-2.0-actual-path-structured",
+  "runType": "offline_actual_path_baseline",
+  "status": "completed_with_errors",
+  "startedAt": "2026-08-24T11:42:12.235918Z",
+  "completedAt": "2026-08-24T11:49:33.572058Z",
+  "evalSetId": "expression-scaffold.dev.v3",
+  "evalSetStatus": "frozen",
+  "rubricVersion": "expression-scaffold-rubric.v3",
+  "promptVersion": "expression-scaffold-baseline-v3",
+  "outputSchemaId": "expression-scaffold-output.v3",
+  "provider": "openai_compatible",
+  "model": {
+    "name": "LongCat-2.0",
+    "temperature": 0,
+    "maxTokens": 4096,
+    "maxRetries": 0,
+    "timeoutSeconds": 120,
+    "structuredOutputMethod": "function_calling"
+  },
+  "trajectory": {
+    "selectionSource": "actual_initial_output",
+    "selectionPolicy": "first_focus_option",
+    "representsUserPreference": false,
+    "fixedNodeProbesIncluded": false
+  },
+  "execution": {
+    "expectedInitialCalls": 20,
+    "expectedSelectedFocusCallsUnderGold": 11,
+    "actual": {
+      "initial": {
+        "attempted": 20,
+        "succeeded": 18,
+        "failed": 2
+      },
+      "selected_focus": {
+        "generatedFromInitial": 9,
+        "attempted": 9,
+        "succeeded": 9,
+        "failed": 0
+      }
+    }
+  },
+  "artifacts": {
+    "initialOutputs": "initial-outputs.jsonl",
+    "actualSelections": "actual-focus-selections.jsonl",
+    "selectedFocusOutputs": "selected-focus-outputs.jsonl"
+  },
+  "sourceHashes": {
+    "v1FreezeManifest": "04d71a5ca1ea27abef2c65b0bd316a46de234a870e2953cbb478c3cb51205d00",
+    "v3FreezeManifest": "82bf6997f607d612ca001d8fbdffe51190ebcc9adc242693f3e7b8b354d83e0d",
+    "v3Cases": "93f54b9dcbf078d0f887401ec25f07b24f343972d64999fe5ffec3b055701d6f",
+    "prompt": "f135a86473b1e730d1b7ad7807137d5731fc36f648fc7f359635f955d66ffc0a",
+    "outputSchema": "bd1fa23d53f446d929242d692abb8a5603532cd026cd529d3157c80e15b6dc67",
+    "runner": "64de013e53a5fd38213a5798b1d1bbedf40d52c8cd5bff2a9c767b06d571ab55"
+  },
+  "runtime": {
+    "python": "3.11.9",
+    "langgraph": "1.2.10",
+    "langchainOpenAI": "1.5.2",
+    "pydantic": "2.13.4"
+  }
+}

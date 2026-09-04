@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 1,
+  "retryType": "failed_judge_calls_plain_json_once",
+  "baselineRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured",
+  "judgeModel": "LongCat-2.0",
+  "preservesOriginalFailures": true,
+  "expectedRetryCalls": 9,
+  "attempted": 9,
+  "succeeded": 4,
+  "failed": 5,
+  "sourceHashes": {
+    "judgeInput": "289bd2a2fbcaa012ada996cba0e6de5b38534180d59eb9629614afce4988dffa",
+    "originalJudgeOutputs": "7a0025a298f7593a0a26a441541a163470b95ad91e302e7dddaa6a3e8e3cb326",
+    "originalJudgeScores": "4a2d6cecf559c3727c5e1073f1ba0a1ff4a7cd064e2f5fd300a6c1e8c3961bac",
+    "judgePrompt": "d04eca99daa765978b5d3d62a5f18a7001afdb17dd550be7c665b6d50e867ca7",
+    "runner": "1a9b02cec92f5c68cc317032b30a814310588d3b2886897316e8beea05c854ad"
+  },
+  "finalArtifacts": {
+    "retryOutputs": "judge-retry-outputs.jsonl",
+    "retryScores": "judge-retry-scores.jsonl",
+    "scores": "judge-scores-final.jsonl",
+    "summary": "judge-summary-final.json",
+    "humanReview": "human-review-v2-final.md"
+  },
+  "finalScoredItemPhases": 29,
+  "status": "completed_with_errors"
+}

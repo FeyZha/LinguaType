@@ -1,0 +1,45 @@
+{
+  "manifestVersion": 1,
+  "runId": "baseline-v3-20260824-longcat-2.0-actual-path-structured",
+  "reviewStatus": "pending_human_calibration",
+  "reviewedAt": "2026-08-24",
+  "reviewMethod": "three_isolated_codex_subagents_with_single_item_adjudication",
+  "generationModelExcludedFromReview": true,
+  "reviewers": [
+    "codex_full_judge",
+    "codex_protocol_audit",
+    "codex_language_audit"
+  ],
+  "scope": {
+    "expectedInitialItems": 25,
+    "actualSelectedFocusItems": 9,
+    "totalItemPhases": 34,
+    "caseCount": 20
+  },
+  "itemPhaseVerdicts": {
+    "pass": 29,
+    "needs_improvement": 3,
+    "bad_case": 2
+  },
+  "caseWorstVerdicts": {
+    "pass": 15,
+    "needs_improvement": 3,
+    "bad_case": 2
+  },
+  "dimensionDistributions": {
+    "semantic_fidelity": {"1": 1, "2": 0, "3": 33},
+    "scaffold_quality": {"1": 1, "2": 4, "3": 29},
+    "assistance_calibration": {"1": 2, "2": 0, "3": 32},
+    "user_continuability": {"1": 1, "2": 2, "3": 31}
+  },
+  "artifacts": {
+    "scores": "codex-subagent-scores.jsonl",
+    "review": "codex-subagent-review.md"
+  },
+  "humanOverrideArtifact": null,
+  "notes": [
+    "LT-ESC-017 selected-focus was adjudicated from pass to needs_improvement.",
+    "LT-ESC-016 items 2 and 3 passed initial-content review but their selected paths were blocked by the invalid initial response.",
+    "The frozen v3 cases.md retains a stale draft status label; canonical files were not rewritten."
+  ]
+}

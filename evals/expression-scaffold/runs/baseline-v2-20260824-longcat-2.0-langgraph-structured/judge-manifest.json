@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 1,
+  "judgeRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured-judge-v2",
+  "baselineRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured",
+  "runType": "offline_llm_judge_prescreen",
+  "status": "completed_with_errors",
+  "startedAt": "2026-08-24T06:20:20.205682Z",
+  "completedAt": "2026-08-24T06:30:49.558127Z",
+  "evalSetId": "expression-scaffold.dev.v2",
+  "rubricVersion": "expression-scaffold-rubric.v2",
+  "judgePromptVersion": "expression-scaffold-judge-v2",
+  "judgeModel": {
+    "name": "LongCat-2.0",
+    "temperature": 0,
+    "maxTokens": 4096,
+    "maxRetries": 0,
+    "timeoutSeconds": 120,
+    "structuredOutputMethod": "function_calling"
+  },
+  "independence": {
+    "inputIsolation": true,
+    "differentModelFromBaseline": false,
+    "limitation": "Only LongCat-2.0 was available; this is same-model self-evaluation and requires human calibration.",
+    "blindFieldsExcluded": [
+      "case_type",
+      "slot_function",
+      "source_type",
+      "span_scope"
+    ]
+  },
+  "execution": {
+    "expectedCalls": 30,
+    "attempted": 30,
+    "succeeded": 21,
+    "failed": 9
+  },
+  "artifacts": {
+    "judgeInput": "judge-input.jsonl",
+    "judgeRawOutputs": "judge-outputs.jsonl",
+    "judgeScores": "judge-scores.jsonl",
+    "judgeSummary": "judge-summary.json",
+    "humanReview": "human-review-v2.md"
+  },
+  "sourceHashes": {
+    "initialOutputs": "6f51fc6e0ee03d14c06c2784e2fa11388805a8658d3d0c0ff75e07b61c2a737a",
+    "selectedFocusOutputs": "0c552e8693aa72900d1d1829093d570fbde5e91549000a2f2af4c55b280ed0b8",
+    "judgePrompt": "d04eca99daa765978b5d3d62a5f18a7001afdb17dd550be7c665b6d50e867ca7",
+    "rubric": "bc0a47283d466369cfa635d5df719e02b35000135171a5e244d0d061b8dbd163",
+    "scoring": "6a640cf3a0634bff179145d3e84b43eb7b4519537b0d42e6a49b82d1f7c3e9f8",
+    "runner": "4448aeb33b4e3c48f0d2911a23b071e51cb29f35f846bbbd90af88ed9cd6fc83",
+    "judgeInput": "289bd2a2fbcaa012ada996cba0e6de5b38534180d59eb9629614afce4988dffa"
+  },
+  "summary": {
+    "caseResults": {
+      "pass": 16,
+      "bad_case": 2
+    },
+    "humanReviewItems": 2,
+    "protocolFailureItems": 2
+  }
+}

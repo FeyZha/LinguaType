@@ -1,0 +1,70 @@
+{
+  "calibrationId": "model-latency-v4-20260825-deepseek-human-calibration",
+  "baselineRunId": "model-latency-v4-20260825-deepseek-longcat-full20",
+  "modelProfile": "deepseek",
+  "status": "completed_for_all_20_cases",
+  "reviewedCases": 20,
+  "finalHumanResults": {
+    "pass": 13,
+    "needs_improvement": 6,
+    "bad_case": 1
+  },
+  "protocolQualityMatrix": {
+    "protocol_pass_human_pass": 11,
+    "protocol_pass_human_needs_improvement": 6,
+    "protocol_pass_human_bad_case": 0,
+    "protocol_fail_human_pass": 2,
+    "protocol_fail_human_needs_improvement": 0,
+    "protocol_fail_human_bad_case": 1
+  },
+  "humanNonPassCases": {
+    "needs_improvement": [
+      "LT-ESC-002",
+      "LT-ESC-004",
+      "LT-ESC-006",
+      "LT-ESC-013",
+      "LT-ESC-014",
+      "LT-ESC-017"
+    ],
+    "bad_case": [
+      "LT-ESC-003"
+    ]
+  },
+  "analystIssueClustersFromHumanNotes": {
+    "over_split_or_redundant_scaffolds": [
+      "LT-ESC-002",
+      "LT-ESC-003",
+      "LT-ESC-006",
+      "LT-ESC-017"
+    ],
+    "incomplete_or_over_specific_expression_frame": [
+      "LT-ESC-004",
+      "LT-ESC-013"
+    ],
+    "scaffold_grouping_not_aligned_with_meaning_units": [
+      "LT-ESC-014"
+    ],
+    "top_level_source_contract_violation": [
+      "LT-ESC-003",
+      "LT-ESC-016",
+      "LT-ESC-018"
+    ]
+  },
+  "protocolOnlyDivergenceCases": [
+    "LT-ESC-016",
+    "LT-ESC-018"
+  ],
+  "modelReplacementDecision": "not_ready_under_current_prompt_and_protocol_contract",
+  "recommendedTargetedRetestCases": [
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-006",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018"
+  ],
+  "evidenceBoundary": "The user manually reviewed all 20 DeepSeek responses. Results apply only to this frozen offline set and do not prove real-user effectiveness or support a direct model replacement under the current prompt and protocol contract."
+}

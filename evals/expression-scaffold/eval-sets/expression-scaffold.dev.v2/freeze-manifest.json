@@ -1,0 +1,77 @@
+{
+  "manifestVersion": 2,
+  "evalSetId": "expression-scaffold.dev.v2",
+  "parentEvalSetId": "expression-scaffold.dev.v1",
+  "parentManifestPath": "../../freeze-manifest.json",
+  "parentManifestSha256": "04d71a5ca1ea27abef2c65b0bd316a46de234a870e2953cbb478c3cb51205d00",
+  "status": "frozen",
+  "frozenAt": "2026-08-24",
+  "caseSetVersion": "v0.4",
+  "outputSchemaVersion": "expression-scaffold-output.v2",
+  "rubricVersion": "expression-scaffold-rubric.v2",
+  "caseIds": [
+    "LT-ESC-001",
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-005",
+    "LT-ESC-006",
+    "LT-ESC-007",
+    "LT-ESC-008",
+    "LT-ESC-009",
+    "LT-ESC-010",
+    "LT-ESC-021",
+    "LT-ESC-012",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-015",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018",
+    "LT-ESC-019",
+    "LT-ESC-020"
+  ],
+  "counts": {
+    "cases": 20,
+    "chineseSegments": 25,
+    "initialCalls": 20,
+    "selectedFocusCalls": 10,
+    "actions": {
+      "provide_expression": 15,
+      "request_focus": 10
+    }
+  },
+  "sourceBoundary": {
+    "realFragmentReconstructedContext": 1,
+    "aiDraftStaticReviewed": 19,
+    "realUserDataset": false,
+    "selectedFocusIsOfflineProbe": true
+  },
+  "canonicalFiles": [
+    {
+      "path": "cases.md",
+      "sha256": "ba00b863f964e4a75eaf8f8cd75018752f409b720bd13b35e703ea08e932fa1e"
+    },
+    {
+      "path": "case-schema.md",
+      "sha256": "79b2167386484f3111ce853bb3470e8ec2308bdf8b93cad520de1ad9a9f17279"
+    },
+    {
+      "path": "model-output.md",
+      "sha256": "7aa1b84bad5608122e2164b34fbcecd6bbf17f1574ec3edee9ee9f9932839cca"
+    },
+    {
+      "path": "model-output.schema.json",
+      "sha256": "27861dacd317a0a3f5d944ae6011c4884416593f63c2b088f122e37d9287c951"
+    },
+    {
+      "path": "rubric.md",
+      "sha256": "bc0a47283d466369cfa635d5df719e02b35000135171a5e244d0d061b8dbd163"
+    },
+    {
+      "path": "scoring.md",
+      "sha256": "6a640cf3a0634bff179145d3e84b43eb7b4519537b0d42e6a49b82d1f7c3e9f8"
+    }
+  ],
+  "mutationPolicy": "Any change to a canonical file requires a new evalSetId and a new freeze manifest. Existing runs must continue to reference this frozen version."
+}

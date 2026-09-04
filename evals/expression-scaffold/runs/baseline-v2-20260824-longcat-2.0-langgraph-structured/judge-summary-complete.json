@@ -1,0 +1,87 @@
+{
+  "status": "deprecated_same_model_judge_not_used_for_quality_review",
+  "sameModelJudge": true,
+  "judgeFailedCalls": 2,
+  "scoredItemPhases": 33,
+  "phaseResults": {
+    "initial": {
+      "pass": 24,
+      "bad_case": 1
+    },
+    "selected_focus": {
+      "pass": 7,
+      "bad_case": 1
+    }
+  },
+  "caseResults": {
+    "pass": 16,
+    "bad_case": 2,
+    "judge_incomplete": 2
+  },
+  "caseResultById": {
+    "LT-ESC-001": "pass",
+    "LT-ESC-002": "pass",
+    "LT-ESC-003": "pass",
+    "LT-ESC-004": "pass",
+    "LT-ESC-005": "bad_case",
+    "LT-ESC-006": "pass",
+    "LT-ESC-007": "pass",
+    "LT-ESC-008": "pass",
+    "LT-ESC-009": "pass",
+    "LT-ESC-010": "pass",
+    "LT-ESC-012": "pass",
+    "LT-ESC-013": "judge_incomplete",
+    "LT-ESC-014": "pass",
+    "LT-ESC-015": "pass",
+    "LT-ESC-016": "pass",
+    "LT-ESC-017": "pass",
+    "LT-ESC-018": "bad_case",
+    "LT-ESC-019": "pass",
+    "LT-ESC-020": "judge_incomplete",
+    "LT-ESC-021": "pass"
+  },
+  "dimensionDistributions": {
+    "assistance_calibration": {
+      "1": 2,
+      "3": 31
+    },
+    "scaffold_quality": {
+      "1": 1,
+      "2": 1,
+      "3": 31
+    },
+    "semantic_fidelity": {
+      "1": 1,
+      "2": 1,
+      "3": 31
+    },
+    "user_continuability": {
+      "1": 1,
+      "2": 1,
+      "3": 31
+    }
+  },
+  "protocolFailureItems": 2,
+  "humanReviewItems": 2,
+  "judgeRecovery": {
+    "functionCallingFailedCalls": 9,
+    "plainJsonRecoveredCalls": 4,
+    "minimalJsonExpectedCalls": 5,
+    "minimalJsonRecoveredCalls": 3,
+    "minimalJsonFailedCalls": 2
+  },
+  "judgeIncompleteCalls": [
+    {
+      "case_id": "LT-ESC-013",
+      "item_index": 1,
+      "interaction_phase": "selected_focus",
+      "selected_focus_zh": "是否仍有必要"
+    },
+    {
+      "case_id": "LT-ESC-020",
+      "item_index": 1,
+      "interaction_phase": "selected_focus",
+      "selected_focus_zh": "不会自动转化为"
+    }
+  ]
+}

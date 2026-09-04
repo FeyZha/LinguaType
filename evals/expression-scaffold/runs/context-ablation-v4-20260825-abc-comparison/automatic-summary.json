@@ -1,0 +1,499 @@
+{
+  "experimentId": "context-ablation-v4-20260825",
+  "comparisonType": "exploratory_historical_A_vs_new_B_C",
+  "evidenceBoundary": [
+    "A is historical rather than contemporaneous and interleaved.",
+    "Automatic equality and route checks do not judge semantic quality.",
+    "Quality conclusions require blinded independent review and user calibration."
+  ],
+  "runs": {
+    "A": {
+      "runId": "baseline-v4-20260824-longcat-2.0-one-call-progressive-reveal",
+      "runManifestSha256": "580dc98417f23f51a7277d8d1c91fc37f0f41a1c617cd667b235de813af84389",
+      "wallDurationSeconds": 532.011,
+      "callMetrics": null
+    },
+    "B": {
+      "runId": "ablation-v4-20260825-b-local-window",
+      "runManifestSha256": "c37fd7bfb5f32af4cac2a9bcb40147246c2722b21abc9a69dc6a1241f343ea0c",
+      "wallDurationSeconds": 352.358,
+      "callMetrics": {
+        "modelCallLatencyMsTotal": 352319,
+        "modelCallLatencyMsMean": 17615.95,
+        "recordsWithTokenUsage": 20,
+        "tokenUsageTotals": {
+          "input_tokens": 20740,
+          "output_tokens": 14410,
+          "total_tokens": 35150
+        }
+      }
+    },
+    "C": {
+      "runId": "ablation-v4-20260825-c-target-only",
+      "runManifestSha256": "bf460d974080927cc62b8b768992a6b6c9993c29e6c373458edc8fc97d6f8938",
+      "wallDurationSeconds": 281.808,
+      "callMetrics": {
+        "modelCallLatencyMsTotal": 281769,
+        "modelCallLatencyMsMean": 14088.45,
+        "recordsWithTokenUsage": 20,
+        "tokenUsageTotals": {
+          "input_tokens": 20132,
+          "output_tokens": 11854,
+          "total_tokens": 31986
+        }
+      }
+    }
+  },
+  "inputStats": {
+    "A": {
+      "taskPromptChars": 2333,
+      "canonicalFullEssayChars": 7635,
+      "sentFullEssayChars": 7635,
+      "targetSentenceChars": 1420,
+      "renderedUserMessageChars": 12308,
+      "fullEssayCharsRemoved": 0,
+      "fullEssayReductionRatio": 0
+    },
+    "B": {
+      "taskPromptChars": 2333,
+      "canonicalFullEssayChars": 7635,
+      "sentFullEssayChars": 5097,
+      "targetSentenceChars": 1420,
+      "renderedUserMessageChars": 9770,
+      "fullEssayCharsRemoved": 2538,
+      "fullEssayReductionRatio": 0.332417
+    },
+    "C": {
+      "taskPromptChars": 2333,
+      "canonicalFullEssayChars": 7635,
+      "sentFullEssayChars": 1420,
+      "targetSentenceChars": 1420,
+      "renderedUserMessageChars": 6093,
+      "fullEssayCharsRemoved": 6215,
+      "fullEssayReductionRatio": 0.814014
+    }
+  },
+  "outputStats": {
+    "A": {
+      "cases": 20,
+      "contractValidCases": 20,
+      "runErrors": [],
+      "schemaFailures": [],
+      "contractFailures": [],
+      "items": 25,
+      "directItems": 14,
+      "scaffoldSets": 11,
+      "scaffolds": 27,
+      "expectedActionMismatches": [],
+      "routeSignatures": {
+        "LT-ESC-001": [
+          "provide_expression"
+        ],
+        "LT-ESC-002": [
+          "provide_expression"
+        ],
+        "LT-ESC-003": [
+          "provide_expression"
+        ],
+        "LT-ESC-004": [
+          "provide_expression"
+        ],
+        "LT-ESC-005": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-006": [
+          "provide_expression"
+        ],
+        "LT-ESC-007": [
+          "provide_expression"
+        ],
+        "LT-ESC-008": [
+          "provide_expression"
+        ],
+        "LT-ESC-009": [
+          "provide_expression"
+        ],
+        "LT-ESC-010": [
+          "provide_expression"
+        ],
+        "LT-ESC-021": [
+          "provide_expression"
+        ],
+        "LT-ESC-012": [
+          "provide_expression"
+        ],
+        "LT-ESC-013": [
+          "offer_scaffolds",
+          "provide_expression"
+        ],
+        "LT-ESC-014": [
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-015": [
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-016": [
+          "provide_expression",
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-017": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-018": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-019": [
+          "provide_expression"
+        ],
+        "LT-ESC-020": [
+          "offer_scaffolds"
+        ]
+      }
+    },
+    "B": {
+      "cases": 20,
+      "contractValidCases": 19,
+      "runErrors": [
+        {
+          "case_id": "LT-ESC-020",
+          "stage": "contract_validation",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        }
+      ],
+      "schemaFailures": [],
+      "contractFailures": [
+        {
+          "case_id": "LT-ESC-020",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        }
+      ],
+      "items": 27,
+      "directItems": 16,
+      "scaffoldSets": 11,
+      "scaffolds": 29,
+      "expectedActionMismatches": [
+        {
+          "case_id": "LT-ESC-004",
+          "itemIndex": 1,
+          "expected": "provide_expression",
+          "actual": "offer_scaffolds"
+        }
+      ],
+      "routeSignatures": {
+        "LT-ESC-001": [
+          "provide_expression"
+        ],
+        "LT-ESC-002": [
+          "provide_expression"
+        ],
+        "LT-ESC-003": [
+          "provide_expression"
+        ],
+        "LT-ESC-004": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-005": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-006": [
+          "provide_expression"
+        ],
+        "LT-ESC-007": [
+          "provide_expression"
+        ],
+        "LT-ESC-008": [
+          "provide_expression"
+        ],
+        "LT-ESC-009": [
+          "provide_expression"
+        ],
+        "LT-ESC-010": [
+          "provide_expression"
+        ],
+        "LT-ESC-021": [
+          "provide_expression"
+        ],
+        "LT-ESC-012": [
+          "provide_expression"
+        ],
+        "LT-ESC-013": [
+          "offer_scaffolds",
+          "provide_expression"
+        ],
+        "LT-ESC-014": [
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-015": [
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-016": [
+          "provide_expression",
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-017": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-018": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-019": [
+          "provide_expression"
+        ],
+        "LT-ESC-020": [
+          "provide_expression",
+          "provide_expression",
+          "provide_expression"
+        ]
+      }
+    },
+    "C": {
+      "cases": 20,
+      "contractValidCases": 18,
+      "runErrors": [
+        {
+          "case_id": "LT-ESC-015",
+          "stage": "contract_validation",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        },
+        {
+          "case_id": "LT-ESC-016",
+          "stage": "contract_validation",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        }
+      ],
+      "schemaFailures": [],
+      "contractFailures": [
+        {
+          "case_id": "LT-ESC-015",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        },
+        {
+          "case_id": "LT-ESC-016",
+          "type": "OutputContractError",
+          "message": "output must return every top-level sourceZh once and in order"
+        }
+      ],
+      "items": 27,
+      "directItems": 14,
+      "scaffoldSets": 13,
+      "scaffolds": 40,
+      "expectedActionMismatches": [
+        {
+          "case_id": "LT-ESC-002",
+          "itemIndex": 1,
+          "expected": "provide_expression",
+          "actual": "offer_scaffolds"
+        },
+        {
+          "case_id": "LT-ESC-004",
+          "itemIndex": 1,
+          "expected": "provide_expression",
+          "actual": "offer_scaffolds"
+        },
+        {
+          "case_id": "LT-ESC-006",
+          "itemIndex": 1,
+          "expected": "provide_expression",
+          "actual": "offer_scaffolds"
+        },
+        {
+          "case_id": "LT-ESC-013",
+          "itemIndex": 1,
+          "expected": "offer_scaffolds",
+          "actual": "provide_expression"
+        }
+      ],
+      "routeSignatures": {
+        "LT-ESC-001": [
+          "provide_expression"
+        ],
+        "LT-ESC-002": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-003": [
+          "provide_expression"
+        ],
+        "LT-ESC-004": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-005": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-006": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-007": [
+          "provide_expression"
+        ],
+        "LT-ESC-008": [
+          "provide_expression"
+        ],
+        "LT-ESC-009": [
+          "provide_expression"
+        ],
+        "LT-ESC-010": [
+          "provide_expression"
+        ],
+        "LT-ESC-021": [
+          "provide_expression"
+        ],
+        "LT-ESC-012": [
+          "provide_expression"
+        ],
+        "LT-ESC-013": [
+          "provide_expression",
+          "provide_expression"
+        ],
+        "LT-ESC-014": [
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-015": [
+          "provide_expression",
+          "provide_expression",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-016": [
+          "provide_expression",
+          "offer_scaffolds",
+          "offer_scaffolds",
+          "offer_scaffolds"
+        ],
+        "LT-ESC-017": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-018": [
+          "offer_scaffolds"
+        ],
+        "LT-ESC-019": [
+          "provide_expression"
+        ],
+        "LT-ESC-020": [
+          "offer_scaffolds"
+        ]
+      }
+    }
+  },
+  "routeDifferenceCaseIds": {
+    "A-B": [
+      "LT-ESC-004",
+      "LT-ESC-020"
+    ],
+    "B-C": [
+      "LT-ESC-002",
+      "LT-ESC-006",
+      "LT-ESC-013",
+      "LT-ESC-015",
+      "LT-ESC-016",
+      "LT-ESC-020"
+    ],
+    "A-C": [
+      "LT-ESC-002",
+      "LT-ESC-004",
+      "LT-ESC-006",
+      "LT-ESC-013",
+      "LT-ESC-015",
+      "LT-ESC-016"
+    ]
+  },
+  "exactOutputComparisons": {
+    "A-B": {
+      "exactlyEqualCount": 12,
+      "differentCount": 8,
+      "exactlyEqualCaseIds": [
+        "LT-ESC-001",
+        "LT-ESC-002",
+        "LT-ESC-005",
+        "LT-ESC-006",
+        "LT-ESC-007",
+        "LT-ESC-008",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012",
+        "LT-ESC-013",
+        "LT-ESC-019"
+      ],
+      "differentCaseIds": [
+        "LT-ESC-003",
+        "LT-ESC-004",
+        "LT-ESC-014",
+        "LT-ESC-015",
+        "LT-ESC-016",
+        "LT-ESC-017",
+        "LT-ESC-018",
+        "LT-ESC-020"
+      ],
+      "note": "String/structure equality is descriptive only and is not a quality judgment."
+    },
+    "B-C": {
+      "exactlyEqualCount": 7,
+      "differentCount": 13,
+      "exactlyEqualCaseIds": [
+        "LT-ESC-001",
+        "LT-ESC-003",
+        "LT-ESC-007",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012"
+      ],
+      "differentCaseIds": [
+        "LT-ESC-002",
+        "LT-ESC-004",
+        "LT-ESC-005",
+        "LT-ESC-006",
+        "LT-ESC-008",
+        "LT-ESC-013",
+        "LT-ESC-014",
+        "LT-ESC-015",
+        "LT-ESC-016",
+        "LT-ESC-017",
+        "LT-ESC-018",
+        "LT-ESC-019",
+        "LT-ESC-020"
+      ],
+      "note": "String/structure equality is descriptive only and is not a quality judgment."
+    },
+    "A-C": {
+      "exactlyEqualCount": 6,
+      "differentCount": 14,
+      "exactlyEqualCaseIds": [
+        "LT-ESC-001",
+        "LT-ESC-007",
+        "LT-ESC-009",
+        "LT-ESC-010",
+        "LT-ESC-021",
+        "LT-ESC-012"
+      ],
+      "differentCaseIds": [
+        "LT-ESC-002",
+        "LT-ESC-003",
+        "LT-ESC-004",
+        "LT-ESC-005",
+        "LT-ESC-006",
+        "LT-ESC-008",
+        "LT-ESC-013",
+        "LT-ESC-014",
+        "LT-ESC-015",
+        "LT-ESC-016",
+        "LT-ESC-017",
+        "LT-ESC-018",
+        "LT-ESC-019",
+        "LT-ESC-020"
+      ],
+      "note": "String/structure equality is descriptive only and is not a quality judgment."
+    }
+  }
+}

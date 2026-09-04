@@ -1,0 +1,94 @@
+{
+  "manifestVersion": 1,
+  "runId": "deepseek-v6-control-targeted9-20260825",
+  "runType": "offline_deepseek_v6_control_boundary_experiment",
+  "status": "completed",
+  "startedAt": "2026-08-25T10:23:17.303420Z",
+  "completedAt": "2026-08-25T10:23:29.603072Z",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "evalSetStatus": "frozen",
+  "promptVersion": "expression-scaffold-v6-controlled-source-and-route",
+  "controlledOutputSchemaId": "expression-scaffold-controlled-generation.v6-experiment",
+  "finalOutputSchemaId": "expression-scaffold-output.v4",
+  "caseIds": [
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-006",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018"
+  ],
+  "repetitions": 1,
+  "routePolicy": {
+    "type": "deterministic_chinese_character_threshold",
+    "provideExpressionMaximum": 10,
+    "offerScaffoldsMinimum": 11,
+    "fullFrozenAudit": {
+      "segments": 25,
+      "matches": 25,
+      "mismatches": []
+    },
+    "generalization": "unproven_outside_current_frozen_set"
+  },
+  "controlBoundary": {
+    "applicationOwned": [
+      "itemId",
+      "sourceZh",
+      "requiredAction",
+      "final merge"
+    ],
+    "modelOwned": [
+      "recommendedExpression",
+      "scaffolds"
+    ],
+    "automaticRetry": false
+  },
+  "model": {
+    "provider": "deepseek",
+    "name": "deepseek-v4-flash",
+    "thinkingType": "disabled",
+    "temperature": 0.0,
+    "maxTokens": 4096,
+    "maxRetries": 0,
+    "timeoutSeconds": 120.0,
+    "endpointSha256": "812b1f7c4a8b1af438d207c4d010794296f83296c29dcd10b8b6dd22f64c79db"
+  },
+  "artifacts": {
+    "records": "records.jsonl",
+    "summary": "summary.json"
+  },
+  "sourceHashes": {
+    "v4FreezeManifest": "d78b901065ac01ab76e0bb7db0a9ff3efe54a121798020398d20daf18dd281e3",
+    "v4Cases": "f02f97f5188a6d08dc43fe13c19887d9580af7430bb6deb38dd6c85c79b6db8e",
+    "prompt": "1e5f4cd1c7f8acf862a07f04ee030acba36df6b4ddec8240ace027cf28cf9394",
+    "controlledOutputSchema": "790be0f6b096126742496d5d0636171cca63b98ea4ca2892202fe45aee91b2fa",
+    "finalOutputSchema": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544",
+    "runner": "75a65a30e0ca7db39dab52afe91858e824ea6b753c3199af326e8615c04ac9de"
+  },
+  "summary": {
+    "profile": "deepseek",
+    "model": "deepseek-v4-flash",
+    "thinkingType": "disabled",
+    "calls": 9,
+    "succeeded": 9,
+    "failed": 0,
+    "successRate": 1.0,
+    "routePolicyMatchesFrozenCases": 9,
+    "routePolicyMatchRate": 1.0,
+    "latencyMs": {
+      "mean": 1365.6,
+      "p50": 1295,
+      "p90": 2084,
+      "min": 913,
+      "max": 2084
+    },
+    "averageTokenUsage": {
+      "input_tokens": 1142.0,
+      "output_tokens": 158.8,
+      "total_tokens": 1300.8
+    }
+  }
+}

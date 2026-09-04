@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "runId": "deepseek-v5-v6-latency-phases-20260825",
+  "runType": "offline_v5_v6_streaming_latency_phase_diagnostic",
+  "status": "failed",
+  "startedAt": "2026-08-25T11:40:50.934244Z",
+  "completedAt": "2026-08-25T11:40:59.435278Z",
+  "caseIds": [
+    "LT-ESC-002",
+    "LT-ESC-013",
+    "LT-ESC-016"
+  ],
+  "repetitions": 3,
+  "variants": [
+    "expression-scaffold-baseline-v5-explicit-source-minimum-usable-unit",
+    "expression-scaffold-v6-controlled-source-and-route"
+  ],
+  "deliveryMode": "streaming_diagnostic_not_product_benchmark",
+  "automaticRetry": false,
+  "artifacts": {
+    "records": "records.jsonl",
+    "summary": "summary.json"
+  },
+  "runError": "6 validation errors for ControlledOutput\nscaffoldSets.0.scaffolds.0.recommendedExpression\n  Field required [type=missing, input_value={'scaffoldId': 's1', 'foc..... are still necessary'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nscaffoldSets.0.scaffolds.0.expression\n  Extra inputs are not permitted [type=extra_forbidden, input_value='whether ... are still necessary', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\nscaffoldSets.0.scaffolds.1.recommendedExpression\n  Field required [type=missing, input_value={'scaffoldId': 's2', 'foc...on': 'public libraries'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nscaffoldSets.0.scaffolds.1.expression\n  Extra inputs are not permitted [type=extra_forbidden, input_value='public libraries', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden\nscaffoldSets.0.scaffolds.2.recommendedExpression\n  Field required [type=missing, input_value={'scaffoldId': 's3', 'foc...'depends partly on ...'}, input_type=dict]\n    For further information visit https://er"
+}

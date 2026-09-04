@@ -1,0 +1,9 @@
+{"case_id":"LT-ESC-002","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-003","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-004","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-006","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-013","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-014","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-016","human_result":"needs_improvement","human_note_zh":"“重新分配道路空间可能会在短期内造成不便”被拆出“可能 → may ...”；情态词不能独立成为表达支架，应与核心谓语合并。","failure_type":"standalone_modal_scaffold","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-017","human_result":"needs_improvement","human_note_zh":"“由政府承担主要责任，同时让个人发挥辅助作用”已在第二个支架中用 while 表达关系，又单独返回“同时 → at the same time”；连接词支架重复且不符合产品定位。","failure_type":"standalone_connector_scaffold","source":"user_conversation_calibration"}
+{"case_id":"LT-ESC-018","human_result":"pass","human_note_zh":"用户表示除明确列出的复杂支架过细问题外，大体没有问题。","source":"user_conversation_calibration"}

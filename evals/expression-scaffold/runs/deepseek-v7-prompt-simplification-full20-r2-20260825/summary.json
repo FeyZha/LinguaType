@@ -1,0 +1,67 @@
+{
+  "model": "deepseek-v4-flash",
+  "calls": 80,
+  "repetitions": 2,
+  "variants": {
+    "full": {
+      "calls": 40,
+      "succeeded": 40,
+      "failed": 0,
+      "successRate": 1.0,
+      "latencyMs": {
+        "mean": 1363.6,
+        "p50": 1320,
+        "p90": 1662,
+        "min": 1017,
+        "max": 1966
+      },
+      "averageTokenUsage": {
+        "input_tokens": 1175.0,
+        "output_tokens": 116.2,
+        "total_tokens": 1291.3
+      },
+      "scaffoldSets": 22,
+      "scaffoldCountDistribution": {
+        "2": 20,
+        "3": 2
+      },
+      "standaloneFunctionFocusViolations": 0,
+      "violationDetails": []
+    },
+    "compact": {
+      "calls": 40,
+      "succeeded": 39,
+      "failed": 1,
+      "successRate": 0.975,
+      "latencyMs": {
+        "mean": 1262.5,
+        "p50": 1194,
+        "p90": 1645,
+        "min": 730,
+        "max": 1924
+      },
+      "averageTokenUsage": {
+        "input_tokens": 951.0,
+        "output_tokens": 114.4,
+        "total_tokens": 1065.5
+      },
+      "scaffoldSets": 21,
+      "scaffoldCountDistribution": {
+        "2": 21
+      },
+      "standaloneFunctionFocusViolations": 0,
+      "violationDetails": []
+    }
+  },
+  "compactMinusFull": {
+    "systemCharacters": -455,
+    "meanLatencyMs": -101.1,
+    "p50LatencyMs": -126,
+    "p90LatencyMs": -17,
+    "averageInputTokens": -224.0,
+    "averageOutputTokens": -1.8,
+    "protocolFailures": 1,
+    "standaloneFunctionFocusViolations": 0
+  },
+  "automaticQualityBoundary": "structural_and_explicit_granularity_rules_only; semantic quality requires human review"
+}

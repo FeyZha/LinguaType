@@ -1,0 +1,20 @@
+{
+  "runType": "local_prototype_v7_full20_api_regression",
+  "startedAndCompletedAt": "2026-08-25T13:16:37.257186Z",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "promptVersion": "expression-scaffold-v7-full-controlled-rules",
+  "streaming": false,
+  "automaticRetry": false,
+  "calls": 20,
+  "succeeded": 20,
+  "failed": 0,
+  "latencyMs": {
+    "mean": 1221.5,
+    "p50": 1083,
+    "p90": 1693,
+    "min": 661,
+    "max": 2314
+  },
+  "failureDetails": [],
+  "qualityBoundary": "protocol and initial projection only; semantic quality not judged"
+}

@@ -1,0 +1,81 @@
+{
+  "manifestVersion": 3,
+  "evalSetId": "expression-scaffold.dev.v3",
+  "parentEvalSetId": "expression-scaffold.dev.v1",
+  "parentManifestPath": "../../freeze-manifest.json",
+  "parentManifestSha256": "04d71a5ca1ea27abef2c65b0bd316a46de234a870e2953cbb478c3cb51205d00",
+  "status": "frozen",
+  "frozenAt": "2026-08-24",
+  "caseSetVersion": "v0.5",
+  "outputSchemaVersion": "expression-scaffold-output.v3",
+  "rubricVersion": "expression-scaffold-rubric.v3",
+  "caseIds": [
+    "LT-ESC-001",
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-005",
+    "LT-ESC-006",
+    "LT-ESC-007",
+    "LT-ESC-008",
+    "LT-ESC-009",
+    "LT-ESC-010",
+    "LT-ESC-021",
+    "LT-ESC-012",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-015",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018",
+    "LT-ESC-019",
+    "LT-ESC-020"
+  ],
+  "counts": {
+    "cases": 20,
+    "chineseSegments": 25,
+    "initialCalls": 20,
+    "selectedFocusCallsUnderGold": 11,
+    "provideExpression": 14,
+    "requestFocus": 11
+  },
+  "trajectoryPolicy": {
+    "selectionSource": "actual_initial_output",
+    "selectionPolicy": "first_focus_option",
+    "fixedTextProbeInMainPath": false,
+    "representsUserPreference": false
+  },
+  "sourceBoundary": {
+    "realFragmentReconstructedContext": 1,
+    "aiDraftStaticReviewed": 19,
+    "realUserDataset": false,
+    "selectedFocusFollowsActualInitial": true
+  },
+  "canonicalFiles": [
+    {
+      "path": "cases.md",
+      "sha256": "93f54b9dcbf078d0f887401ec25f07b24f343972d64999fe5ffec3b055701d6f"
+    },
+    {
+      "path": "case-schema.md",
+      "sha256": "dda42d7019d1dc58bb6495e64d8e42d3d6f7b9a2e24e9ff3ff17177b8b8878ad"
+    },
+    {
+      "path": "model-output.md",
+      "sha256": "481708d30f19b17a3cba2a4e2772700fb1e8f7f04d4e57c554e3349c0ae6b8d9"
+    },
+    {
+      "path": "model-output.schema.json",
+      "sha256": "bd1fa23d53f446d929242d692abb8a5603532cd026cd529d3157c80e15b6dc67"
+    },
+    {
+      "path": "rubric.md",
+      "sha256": "6d753e5ce86ff140cf9dd879cb01ef2e5528f915c6efe61e3fa35e01257c89c4"
+    },
+    {
+      "path": "scoring.md",
+      "sha256": "89a6561814a1fca1096e3ad0c59f8b4c135b42f076c699e0470dd35cae338f70"
+    }
+  ],
+  "mutationPolicy": "Any canonical change requires a new evalSetId. v2 and v3 scores are not directly comparable because route gold and trajectory semantics changed."
+}

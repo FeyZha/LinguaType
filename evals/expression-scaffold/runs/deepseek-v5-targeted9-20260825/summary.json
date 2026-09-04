@@ -1,0 +1,23 @@
+{
+  "profile": "deepseek",
+  "model": "deepseek-v4-flash",
+  "thinkingType": "disabled",
+  "calls": 9,
+  "succeeded": 9,
+  "failed": 0,
+  "successRate": 1.0,
+  "routeMatchesGold": 6,
+  "routeMatchRate": 0.6667,
+  "latencyMs": {
+    "mean": 1024.2,
+    "p50": 954,
+    "p90": 1748,
+    "min": 555,
+    "max": 1748
+  },
+  "averageTokenUsage": {
+    "input_tokens": 1362.7,
+    "output_tokens": 123.8,
+    "total_tokens": 1486.4
+  }
+}

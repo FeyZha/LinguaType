@@ -1,0 +1,88 @@
+{
+  "manifestVersion": 4,
+  "evalSetId": "expression-scaffold.dev.v4",
+  "parentEvalSetId": "expression-scaffold.dev.v3",
+  "parentManifestPath": "../expression-scaffold.dev.v3/freeze-manifest.json",
+  "parentManifestSha256": "82bf6997f607d612ca001d8fbdffe51190ebcc9adc242693f3e7b8b354d83e0d",
+  "status": "frozen",
+  "frozenAt": "2026-08-24",
+  "caseSetVersion": "v0.6",
+  "outputSchemaVersion": "expression-scaffold-output.v4",
+  "rubricVersion": "expression-scaffold-rubric.v4",
+  "caseIds": [
+    "LT-ESC-001",
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-005",
+    "LT-ESC-006",
+    "LT-ESC-007",
+    "LT-ESC-008",
+    "LT-ESC-009",
+    "LT-ESC-010",
+    "LT-ESC-021",
+    "LT-ESC-012",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-015",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018",
+    "LT-ESC-019",
+    "LT-ESC-020"
+  ],
+  "counts": {
+    "cases": 20,
+    "chineseSegments": 25,
+    "modelCalls": 20,
+    "provideExpression": 14,
+    "offerScaffolds": 11,
+    "modelCallsOnReveal": 0
+  },
+  "interactionPolicy": {
+    "generation": "one_call_internal_scaffold_bundle",
+    "initialVisibility": "chinese_focus_only_for_scaffold_sets",
+    "reveal": "deterministic_local_state",
+    "multipleRevealsAllowed": true,
+    "revealedItemsRemainVisible": true,
+    "automaticAssembly": false
+  },
+  "sourceBoundary": {
+    "realFragmentReconstructedContext": 1,
+    "aiDraftStaticReviewed": 19,
+    "realUserDataset": false,
+    "revealsRepresentUserBehavior": false
+  },
+  "canonicalFiles": [
+    {
+      "path": "README.md",
+      "sha256": "6f1d5d499a49564cb428f6ea13bf3e312693352e0e80bb07ae929bd09905bd09"
+    },
+    {
+      "path": "cases.md",
+      "sha256": "f02f97f5188a6d08dc43fe13c19887d9580af7430bb6deb38dd6c85c79b6db8e"
+    },
+    {
+      "path": "case-schema.md",
+      "sha256": "86a46baf91a5879c0506a06e3c29c6708de89f0161994c7def406214c6e9ca92"
+    },
+    {
+      "path": "model-output.md",
+      "sha256": "63f34db32079c786eda0c9f31a43954e4c191bd697023b8041626b5d898f2816"
+    },
+    {
+      "path": "model-output.schema.json",
+      "sha256": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544"
+    },
+    {
+      "path": "rubric.md",
+      "sha256": "d68a7719bcd16211ea0d86b4046a3a6fd34f3cc41d6f60f9476159e484a47ab5"
+    },
+    {
+      "path": "scoring.md",
+      "sha256": "a29cdb51e717336f63f6092cd11438f55c53159612738a739ae8d155e13380c1"
+    }
+  ],
+  "mutationPolicy": "Any canonical change requires a new evalSetId. v3 and v4 scores are not directly comparable because interaction and output semantics changed."
+}
+

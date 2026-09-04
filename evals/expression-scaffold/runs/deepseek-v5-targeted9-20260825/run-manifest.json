@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "runId": "deepseek-v5-targeted9-20260825",
+  "runType": "offline_deepseek_v5_targeted_prompt_regression",
+  "status": "completed",
+  "startedAt": "2026-08-25T09:53:13.584623Z",
+  "completedAt": "2026-08-25T09:53:22.808156Z",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "evalSetStatus": "frozen",
+  "promptVersion": "expression-scaffold-baseline-v5-explicit-source-minimum-usable-unit",
+  "outputSchemaId": "expression-scaffold-output.v4",
+  "caseIds": [
+    "LT-ESC-002",
+    "LT-ESC-003",
+    "LT-ESC-004",
+    "LT-ESC-006",
+    "LT-ESC-013",
+    "LT-ESC-014",
+    "LT-ESC-016",
+    "LT-ESC-017",
+    "LT-ESC-018"
+  ],
+  "repetitions": 1,
+  "model": {
+    "provider": "deepseek",
+    "name": "deepseek-v4-flash",
+    "thinkingType": "disabled",
+    "temperature": 0.0,
+    "maxTokens": 4096,
+    "maxRetries": 0,
+    "timeoutSeconds": 120.0,
+    "endpointSha256": "a34e2a4708ed1c61008a151688838dcf1c44d4e7f08054633e72ba7c0b16cfc1"
+  },
+  "experimentalChange": {
+    "prompt": "v5 minimum usable expression and scaffold granularity rules",
+    "input": "explicit locally derived top-level Chinese source list",
+    "automaticRetry": false
+  },
+  "artifacts": {
+    "records": "records.jsonl",
+    "summary": "summary.json"
+  },
+  "sourceHashes": {
+    "v4FreezeManifest": "d78b901065ac01ab76e0bb7db0a9ff3efe54a121798020398d20daf18dd281e3",
+    "v4Cases": "f02f97f5188a6d08dc43fe13c19887d9580af7430bb6deb38dd6c85c79b6db8e",
+    "prompt": "401843f7cc99ebd6ce28fcd08316026fc8903ee1c7a8a0b1e5bb657205699dd8",
+    "outputSchema": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544",
+    "runner": "80ba06c52176ec164dd8da942aead619cef23f2161294f182f20f80c5ae9742f"
+  },
+  "summary": {
+    "profile": "deepseek",
+    "model": "deepseek-v4-flash",
+    "thinkingType": "disabled",
+    "calls": 9,
+    "succeeded": 9,
+    "failed": 0,
+    "successRate": 1.0,
+    "routeMatchesGold": 6,
+    "routeMatchRate": 0.6667,
+    "latencyMs": {
+      "mean": 1024.2,
+      "p50": 954,
+      "p90": 1748,
+      "min": 555,
+      "max": 1748
+    },
+    "averageTokenUsage": {
+      "input_tokens": 1362.7,
+      "output_tokens": 123.8,
+      "total_tokens": 1486.4
+    }
+  }
+}

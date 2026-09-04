@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "expression-scaffold-output.v4",
+  "title": "LinguaType one-call progressive-reveal output v4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceZh", "action", "recommendedExpression", "scaffolds"],
+            "properties": {
+              "sourceZh": {"type": "string", "minLength": 1},
+              "action": {"const": "provide_expression"},
+              "recommendedExpression": {"type": "string", "minLength": 1},
+              "scaffolds": {"type": "array", "maxItems": 0}
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceZh", "action", "recommendedExpression", "scaffolds"],
+            "properties": {
+              "sourceZh": {"type": "string", "minLength": 1},
+              "action": {"const": "offer_scaffolds"},
+              "recommendedExpression": {"type": "null"},
+              "scaffolds": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["scaffoldId", "focusZh", "recommendedExpression"],
+                  "properties": {
+                    "scaffoldId": {"type": "string", "pattern": "^s[1-4]$"},
+                    "focusZh": {"type": "string", "minLength": 1},
+                    "recommendedExpression": {"type": "string", "minLength": 1}
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+

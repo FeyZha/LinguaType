@@ -1,0 +1,65 @@
+{
+  "manifestVersion": 1,
+  "reviewId": "baseline-v2-20260824-codex-subagent-review",
+  "baselineRunId": "baseline-v2-20260824-longcat-2.0-langgraph-structured",
+  "status": "completed_and_human_calibrated",
+  "reviewMethod": "three_blind_codex_subagents_with_adjudication",
+  "reviewerRoles": [
+    "full_four_dimension_review",
+    "protocol_and_assistance_calibration_audit",
+    "semantic_and_language_quality_audit"
+  ],
+  "blindInputsExcluded": [
+    "LongCat judge outputs",
+    "LongCat judge summaries",
+    "previous human review conclusions"
+  ],
+  "rubricVersion": "expression-scaffold-rubric.v2",
+  "coverage": {
+    "expectedItemPhases": 35,
+    "reviewedItemPhases": 35,
+    "initialItems": 25,
+    "selectedFocusItems": 10
+  },
+  "itemPhaseResults": {
+    "pass": 28,
+    "needs_improvement": 5,
+    "bad_case": 2
+  },
+  "caseResultsByWorstItem": {
+    "pass": 14,
+    "needs_improvement": 4,
+    "bad_case": 2
+  },
+  "crossStageProbeReachability": {
+    "reachable": 7,
+    "notReachableFromActualInitial": 3
+  },
+  "artifacts": {
+    "scores": "codex-subagent-scores.jsonl",
+    "review": "codex-subagent-review.md",
+    "humanCalibration": "human-calibration-v2.jsonl",
+    "humanCalibrationSummary": "human-calibration-summary.json",
+    "humanCalibratedReview": "human-calibrated-review.md"
+  },
+  "humanCalibratedResults": {
+    "itemPhases": {
+      "pass": 29,
+      "needs_improvement": 5,
+      "bad_case": 1
+    },
+    "casesByWorstItem": {
+      "pass": 15,
+      "needs_improvement": 4,
+      "bad_case": 1
+    },
+    "agreements": 6,
+    "overrides": 1
+  },
+  "supersedesForCurrentQualityReview": [
+    "judge-scores-complete.jsonl",
+    "judge-summary-complete.json",
+    "human-review-v2-complete.md"
+  ],
+  "evidenceBoundary": "All seven Codex non-pass items were human-calibrated; real writing effectiveness is still untested."
+}

@@ -1,0 +1,111 @@
+{
+  "manifestVersion": 1,
+  "runId": "ablation-v4-20260825-b-local-window",
+  "runType": "offline_v4_context_ablation",
+  "status": "completed_with_errors",
+  "startedAt": "2026-08-24T16:52:12.974331Z",
+  "completedAt": "2026-08-24T16:58:05.332714Z",
+  "evalSetId": "expression-scaffold.dev.v4",
+  "evalSetStatus": "frozen",
+  "rubricVersion": "expression-scaffold-rubric.v4",
+  "promptVersion": "expression-scaffold-baseline-v4-one-call-progressive-reveal",
+  "outputSchemaId": "expression-scaffold-output.v4",
+  "provider": "openai_compatible",
+  "model": {
+    "name": "LongCat-2.0",
+    "temperature": 0,
+    "maxTokens": 4096,
+    "maxRetries": 0,
+    "timeoutSeconds": 120,
+    "structuredOutputMethod": "function_calling"
+  },
+  "interaction": {
+    "modelCallsPerCase": 1,
+    "modelCallsOnReveal": 0,
+    "multipleRevealsAllowed": true,
+    "unrevealedEnglishInitiallyHidden": true
+  },
+  "execution": {
+    "expectedCalls": 20,
+    "actual": {
+      "attempted": 20,
+      "succeeded": 19,
+      "failed": 1
+    }
+  },
+  "artifacts": {
+    "inputSnapshots": "input-snapshots.jsonl",
+    "modelOutputs": "model-outputs.jsonl",
+    "initialUserViews": "initial-user-views.jsonl",
+    "callMetrics": "call-metrics.jsonl"
+  },
+  "sourceHashes": {
+    "v1FreezeManifest": "04d71a5ca1ea27abef2c65b0bd316a46de234a870e2953cbb478c3cb51205d00",
+    "v3FreezeManifest": "82bf6997f607d612ca001d8fbdffe51190ebcc9adc242693f3e7b8b354d83e0d",
+    "v4FreezeManifest": "d78b901065ac01ab76e0bb7db0a9ff3efe54a121798020398d20daf18dd281e3",
+    "v4Cases": "f02f97f5188a6d08dc43fe13c19887d9580af7430bb6deb38dd6c85c79b6db8e",
+    "prompt": "bd59924c585ff40ecd1930c366ef1b2f7c1dbeafc373da65bb5a558fa4a482d2",
+    "outputSchema": "85abf9923ae0dadcbde284b5d2e45726ecb6107f4845942ad9d9d1f360c0a544",
+    "v4Runner": "6a04af06f08539d7e8bf7188a9ac2dd3f9ba5aebe4fcf0bce2b4cb792fed20db",
+    "runner": "21b07e42533e5ecda1bd39c625ec8387c132425d59f511e32321275229f9a8d7",
+    "experimentDefinition": "3de09e1eb2aa2445cb7d321a880ed9402dd15d3fbb88a3f1dfbf667176911434"
+  },
+  "runtime": {
+    "python": "3.11.9",
+    "langgraph": "1.2.10",
+    "langchainOpenAI": "1.5.2",
+    "pydantic": "2.13.4"
+  },
+  "experimentId": "context-ablation-v4-20260825",
+  "independentVariable": "full_essay_context_scope",
+  "inputVariant": {
+    "id": "B",
+    "policy": "previous_target_next",
+    "description": "Previous sentence, target sentence, and next sentence.",
+    "name": "local-window",
+    "transformVersion": "essay-context-scope.v1",
+    "templateAndFieldNamesUnchanged": true,
+    "targetAppearsInBothEssayAndTargetFields": true
+  },
+  "baselineReference": {
+    "conditionId": "A",
+    "runId": "baseline-v4-20260824-longcat-2.0-one-call-progressive-reveal",
+    "runManifestSha256": "580dc98417f23f51a7277d8d1c91fc37f0f41a1c617cd667b235de813af84389",
+    "modelOutputsSha256": "34e243da305e7d392c6fe7bbf8e27ffd5b0ceafdceffe050ebb9328e75c968f9",
+    "initialUserViewsSha256": "41cb55d872c6f00af15f175ade8abf52e9f7a7e80e47949576eef0e05eb31426",
+    "historicalComparison": true
+  },
+  "comparisonLimitations": [
+    "Condition A is a historical run, not a contemporaneous interleaved control.",
+    "Conditions B and C are separate sequential runs, not an interleaved run block.",
+    "Condition A did not record an endpoint hash, so backend identity cannot be fully verified across A/B/C.",
+    "A single temperature-zero run does not establish deterministic causality.",
+    "The frozen set contains one reconstructed real fragment and nineteen AI-drafted cases."
+  ],
+  "inputStats": {
+    "taskPromptChars": 2333,
+    "canonicalFullEssayChars": 7635,
+    "sentFullEssayChars": 5097,
+    "targetSentenceChars": 1420,
+    "renderedUserMessageChars": 9770,
+    "fullEssayCharsRemoved": 2538,
+    "fullEssayReductionRatio": 0.332417
+  },
+  "metrics": {
+    "modelCallLatencyMsTotal": 352319,
+    "modelCallLatencyMsMean": 17615.95,
+    "recordsWithTokenUsage": 20,
+    "tokenUsageTotals": {
+      "input_tokens": 20740,
+      "output_tokens": 14410,
+      "total_tokens": 35150
+    }
+  },
+  "providerEndpointSha256": "ba846f44e1f948952bfb94bdc4e52b1e22e689a6449a1f3a171e00068f2dd294",
+  "artifactHashes": {
+    "inputSnapshots": "0743b30f5c474ff4349fedf355c70cbc8eda515c9b120361960d83a90da2fad8",
+    "modelOutputs": "4a7a92b3f2ef4f3dd6570d7d3f578c9a7ef79a4cea456de96871fcb1a3d4dcdd",
+    "initialUserViews": "71e2986d9846d3d1a22796909f7db49e7ebe9a8ff8c7decb20563397752d98c0",
+    "callMetrics": "a23c63b6e6d5f51c118ad1121a94f0d5595e3f9780523e1c9f6680f25337dfba"
+  }
+}

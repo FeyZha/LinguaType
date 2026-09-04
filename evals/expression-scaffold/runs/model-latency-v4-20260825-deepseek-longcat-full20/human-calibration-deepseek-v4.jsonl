@@ -1,0 +1,20 @@
+{"case_id":"LT-ESC-001","human_result":"pass","raw_conclusion_zh":"pass","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-002","human_result":"needs_improvement","raw_conclusion_zh":"需要提升","machine_protocol":"pass","human_issue_zh":"支架拆分","human_note_zh":"单独把更多拆出来没有必要，需要直接给‘’‘承担...责任’‘’或者直接把sourcezh全部提供"}
+{"case_id":"LT-ESC-003","human_result":"bad_case","raw_conclusion_zh":"bad case","machine_protocol":"fail","human_issue_zh":null,"human_note_zh":"模型把英文列为sourcezh。对于一个简单的表达，拆成了复杂的支架，两个表达拆的没有意义"}
+{"case_id":"LT-ESC-004","human_result":"needs_improvement","raw_conclusion_zh":"需要提升","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":"对于一个类似“培养习惯”的短语，需要让它返回“培养...的习惯”的表达，少一个介词就可能会多一个卡点"}
+{"case_id":"LT-ESC-005","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-006","human_result":"needs_improvement","raw_conclusion_zh":"需要改进","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":"拆的太细碎了，可以直接给较为完整的英文表达，因为从这个颗粒度再往下拆旧只剩单词了"}
+{"case_id":"LT-ESC-007","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-008","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-009","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-010","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-021","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-012","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-013","human_result":"needs_improvement","raw_conclusion_zh":"需要提升","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":"是否仍有必要 → `whether libraries are still necessary`这个表达中不该出现libraries，应该表达成“whether ... is still necessary”"}
+{"case_id":"LT-ESC-014","human_result":"needs_improvement","raw_conclusion_zh":"需要提升","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":"可以拆成仅增加街面可见警力和处理犯罪背后的社会原因"}
+{"case_id":"LT-ESC-015","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-016","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"fail","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-017","human_result":"needs_improvement","raw_conclusion_zh":"需要改进","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":"‘同时’单独作为一个支架有点累赘"}
+{"case_id":"LT-ESC-018","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"fail","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-019","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}
+{"case_id":"LT-ESC-020","human_result":"pass","raw_conclusion_zh":"通过","machine_protocol":"pass","human_issue_zh":null,"human_note_zh":null}

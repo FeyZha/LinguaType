@@ -1,0 +1,118 @@
+{
+  "manifestVersion": 1,
+  "runId": "deepseek-v5-v6-latency-phases-20260825-rerun",
+  "runType": "offline_v5_v6_streaming_latency_phase_diagnostic",
+  "status": "completed",
+  "startedAt": "2026-08-25T11:41:32.261547Z",
+  "completedAt": "2026-08-25T11:42:02.406324Z",
+  "caseIds": [
+    "LT-ESC-002",
+    "LT-ESC-013",
+    "LT-ESC-016"
+  ],
+  "repetitions": 3,
+  "variants": [
+    "expression-scaffold-baseline-v5-explicit-source-minimum-usable-unit",
+    "expression-scaffold-v6-controlled-source-and-route"
+  ],
+  "deliveryMode": "streaming_diagnostic_not_product_benchmark",
+  "automaticRetry": false,
+  "artifacts": {
+    "records": "records.jsonl",
+    "summary": "summary.json"
+  },
+  "summary": {
+    "v5": {
+      "calls": 9,
+      "validationSucceeded": 9,
+      "timingMs": {
+        "requestPrepareMs": {
+          "mean": 1.502,
+          "p50": 1.459,
+          "p90": 2.264
+        },
+        "responseHeadersMs": {
+          "mean": 91.842,
+          "p50": 91.746,
+          "p90": 104.44
+        },
+        "firstEventMs": {
+          "mean": 98.037,
+          "p50": 94.939,
+          "p90": 129.348
+        },
+        "firstContentMs": {
+          "mean": 882.757,
+          "p50": 749.176,
+          "p90": 1686.177
+        },
+        "streamGenerationMs": {
+          "mean": 543.115,
+          "p50": 448.601,
+          "p90": 1088.342
+        },
+        "providerStreamTotalMs": {
+          "mean": 1425.872,
+          "p50": 1344.155,
+          "p90": 2213.307
+        },
+        "localFinalizeMs": {
+          "mean": 0.099,
+          "p50": 0.074,
+          "p90": 0.156
+        },
+        "endToEndMs": {
+          "mean": 1427.473,
+          "p50": 1345.686,
+          "p90": 2214.938
+        }
+      }
+    },
+    "v6": {
+      "calls": 9,
+      "validationSucceeded": 6,
+      "timingMs": {
+        "requestPrepareMs": {
+          "mean": 1.9,
+          "p50": 1.754,
+          "p90": 2.665
+        },
+        "responseHeadersMs": {
+          "mean": 94.841,
+          "p50": 91.437,
+          "p90": 132.862
+        },
+        "firstEventMs": {
+          "mean": 97.293,
+          "p50": 94.1,
+          "p90": 133.115
+        },
+        "firstContentMs": {
+          "mean": 736.661,
+          "p50": 840.879,
+          "p90": 942.99
+        },
+        "streamGenerationMs": {
+          "mean": 789.015,
+          "p50": 789.911,
+          "p90": 1312.193
+        },
+        "providerStreamTotalMs": {
+          "mean": 1525.675,
+          "p50": 1415.653,
+          "p90": 2186.333
+        },
+        "localFinalizeMs": {
+          "mean": 0.145,
+          "p50": 0.113,
+          "p90": 0.252
+        },
+        "endToEndMs": {
+          "mean": 1527.719,
+          "p50": 1417.852,
+          "p90": 2188.219
+        }
+      }
+    }
+  }
+}
